@@ -55,7 +55,7 @@ class PaperTrader:
     def _execute_directional(
         self, signal: Signal, current_prices: dict[str, float]
     ) -> PaperTrade | None:
-        """Execute a directional buy (YES or NO)."""
+        """Execute a directional buy (YES or NO) with Kelly-inspired sizing."""
         if not signal.token_id:
             return None
 
@@ -63,32 +63,37 @@ class PaperTrader:
         if price <= 0:
             return None
 
-        # Calculate size
-        # Kelly-inspired sizing: size = (edge / odds) * bankroll, capped
-        if signal.expected_edge > 0 and signal.confidence > 0:
-            odds = (1.0 / max(signal.confidence, 0.1)) - 1.0  # implied odds
-            edge = signal.expected_edge / 100  # convert cents to dollars
-            kelly_raw = (signal.confidence * odds - (1 - signal.confidence)) / max(odds, 0.01)
-            kelly_fraction = max(0, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, cap 20%
-            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
-        else:
-            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)  # minimum sizing
-        if size_usd <= 0:
-            return None
-
         # Apply slippage (0.5%)
         fill_price = price * 1.005
+        if fill_price >= 0.99:
+            return None
+
+        # Kelly-inspired sizing for directional bets
+        if signal.expected_edge > 0 and signal.confidence > 0:
+            odds = (1.0 / max(signal.confidence, 0.1)) - 1.0
+            kelly_raw = (signal.confidence * odds - (1 - signal.confidence)) / max(odds, 0.01)
+            kelly_fraction = max(0.01, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, floor 1%, cap 20%
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
+        else:
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)
+
+        if size_usd < 1.0:  # minimum $1 trade
+            logger.info(f"[PAPER] Directional size too small: ${size_usd:.2f}")
+            return None
+
         shares = size_usd / fill_price
         fee = BASE_FEE_RATE * min(fill_price, 1 - fill_price) * shares
 
-        # Simulate fill
-        price = fill_price
+        # Check total cost doesn't exceed cash
         total_cost = size_usd + fee
         if total_cost > self.portfolio.cash:
-            size_usd = (self.portfolio.cash - fee) * 0.95
-            shares = size_usd / price
-            fee = BASE_FEE_RATE * min(price, 1 - price) * shares
+            size_usd = (self.portfolio.cash - fee) * 0.90
+            shares = size_usd / fill_price
+            fee = BASE_FEE_RATE * min(fill_price, 1 - fill_price) * shares
             total_cost = size_usd + fee
+
+        if total_cost > self.portfolio.cash or size_usd < 1.0:
+            return None
 
         self.portfolio.cash -= total_cost
         self.portfolio.total_fees_paid += fee
@@ -101,8 +106,8 @@ class PaperTrader:
             market_slug=signal.market_slug,
             side="YES" if signal.action == SignalAction.BUY_YES else "NO",
             shares=shares,
-            avg_entry_price=price,
-            current_price=price,
+            avg_entry_price=fill_price,
+            current_price=fill_price,
             source=signal.source,
         )
         self.portfolio.positions.append(position)
@@ -114,7 +119,7 @@ class PaperTrader:
             condition_id=signal.condition_id,
             token_id=signal.token_id,
             side=Side.BUY,
-            price=price,
+            price=fill_price,
             size_shares=shares,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
@@ -124,7 +129,7 @@ class PaperTrader:
 
         logger.info(
             f"[PAPER] Executed: {signal.action.value} on {signal.market_slug} | "
-            f"{shares:.1f} shares @ ${price:.3f} = ${size_usd:.2f} (fee: ${fee:.3f})"
+            f"{shares:.1f} shares @ ${fill_price:.3f} = ${size_usd:.2f} (fee: ${fee:.3f})"
         )
         return trade
 
@@ -132,56 +137,89 @@ class PaperTrader:
         self, signal: Signal, current_prices: dict[str, float]
     ) -> PaperTrade | None:
         """Execute a hedged liquidity provision order (both sides)."""
-        # Simplified: track as a single hedge position
+        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.25)
+        if size_usd < 1.0:
+            return None
+
+        self.portfolio.cash -= size_usd
+        self.portfolio.total_trades += 1
+
+        position = Position(
+            token_id=signal.token_id or "HEDGE",
+            condition_id=signal.condition_id,
+            market_slug=signal.market_slug,
+            side="HEDGE",
+            shares=size_usd,
+            avg_entry_price=1.0,
+            current_price=1.0,
+            source=signal.source,
+        )
+        self.portfolio.positions.append(position)
+
         trade = PaperTrade(
             signal_id=signal.id,
             source=signal.source,
             market_slug=signal.market_slug,
             condition_id=signal.condition_id,
-            token_id=signal.token_id or "",
+            token_id=signal.token_id or "HEDGE",
             side=Side.BUY,
             price=0.0,
             size_shares=0,
-            size_usd=signal.suggested_size_usd,
+            size_usd=size_usd,
             status=TradeStatus.FILLED,
         )
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
-        logger.info(f"[PAPER] Hedge position on {signal.market_slug}: ${signal.suggested_size_usd:.2f}")
+        logger.info(f"[PAPER] Hedge position on {signal.market_slug}: ${size_usd:.2f}")
         return trade
 
     def _execute_arb(
         self, signal: Signal, current_prices: dict[str, float]
     ) -> PaperTrade | None:
-        """Execute a multi-outcome arb (buy all outcomes)."""
+        """
+        Execute a multi-outcome arb (buy all outcomes).
+        Arb sizing is deterministic (not Kelly) — arb is guaranteed profit, not a bet.
+        """
         if signal.arb_total_cost <= 0:
+            logger.warning(f"[PAPER] Arb rejected: zero cost on {signal.market_slug}")
             return None
 
-        # Kelly-inspired sizing: size = (edge / odds) * bankroll, capped
-        if signal.expected_edge > 0 and signal.confidence > 0:
-            odds = (1.0 / max(signal.confidence, 0.1)) - 1.0  # implied odds
-            edge = signal.expected_edge / 100  # convert cents to dollars
-            kelly_raw = (signal.confidence * odds - (1 - signal.confidence)) / max(odds, 0.01)
-            kelly_fraction = max(0, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, cap 20%
-            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
+        # Arb sizing: edge-scaled with hard cap at 25% of cash
+        edge_pct = signal.expected_edge / 100.0 if signal.expected_edge > 0 else 0
+        max_size = self.portfolio.cash * 0.25
+        edge_scaled = max_size * min(edge_pct / 0.10, 1.0)  # full allocation at 10%+ edge
+
+        if signal.suggested_size_usd > 0:
+            size_usd = min(signal.suggested_size_usd, edge_scaled)
         else:
-            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)  # minimum sizing
-        if size_usd <= 0:
+            size_usd = edge_scaled
+
+        size_usd = max(size_usd, 0)
+        if size_usd < 1.0:
+            logger.info(
+                f"[PAPER] Arb size too small: ${size_usd:.2f} | "
+                f"edge={edge_pct:.3f} | cash=${self.portfolio.cash:.2f}"
+            )
             return None
 
-        # The arb locks in guaranteed profit
+        # Calculate guaranteed profit
         units = size_usd / signal.arb_total_cost
         guaranteed_profit = units * (signal.arb_guaranteed_payout - signal.arb_total_cost)
-        fee_estimate = size_usd * BASE_FEE_RATE * 0.5  # rough fee estimate
+        fee_estimate = size_usd * BASE_FEE_RATE * 0.5
 
         net_profit = guaranteed_profit - fee_estimate
         if net_profit <= 0:
+            logger.info(
+                f"[PAPER] Arb unprofitable after fees: gross=${guaranteed_profit:.3f} "
+                f"fee=${fee_estimate:.3f} net=${net_profit:.3f}"
+            )
             return None
 
+        # Execute — track as open position (profit at resolution, not instant)
         self.portfolio.cash -= size_usd
         self.portfolio.total_fees_paid += fee_estimate
         self.portfolio.total_trades += 1
-        # Track as open position — profit only realized at resolution
+
         position = Position(
             token_id="ARB_ALL",
             condition_id=signal.condition_id,
@@ -206,20 +244,25 @@ class PaperTrader:
             size_shares=units,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
-            realized_pnl=net_profit,
+            realized_pnl=0.0,  # credited at resolution, not now
         )
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
 
         logger.info(
             f"[PAPER] Arb executed: {signal.market_slug} | "
-            f"Cost: ${size_usd:.2f} | Net profit: ${net_profit:.3f}"
+            f"Cost: ${size_usd:.2f} | Units: {units:.1f} | "
+            f"Expected profit: ${net_profit:.3f} (at resolution)"
         )
         return trade
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
         for pos in self.portfolio.positions:
+            if pos.token_id == "ARB_ALL":
+                continue  # arb profit is fixed, no mark-to-market
+            if pos.side == "HEDGE":
+                continue  # hedge P&L comes from reward accrual
             new_price = current_prices.get(pos.token_id, pos.current_price)
             pos.current_price = new_price
             pos.unrealized_pnl = (new_price - pos.avg_entry_price) * pos.shares
@@ -233,18 +276,7 @@ class PaperTrader:
             self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
 
     def _update_drawdown(self):
-        """Recalculate drawdown properly."""
-        current = self.portfolio.cash + sum(
-            p.shares * p.current_price for p in self.portfolio.positions
-        )
-        if current >= self.portfolio.starting_capital:
-            self.portfolio.max_drawdown = 0.0
-        elif self.portfolio.starting_capital > 0:
-            dd = (self.portfolio.starting_capital - current) / self.portfolio.starting_capital
-            self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
-
-    def _update_drawdown(self):
-        """Recalculate drawdown properly."""
+        """Recalculate drawdown from actual portfolio value."""
         current = self.portfolio.cash + sum(
             p.shares * p.current_price for p in self.portfolio.positions
         )
@@ -257,29 +289,37 @@ class PaperTrader:
     def _passes_risk_checks(self, signal: Signal) -> bool:
         """Check if a signal passes risk management rules."""
         self._update_drawdown()
-        self._update_drawdown()
+
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:
             logger.info("[RISK] Max exposure reached")
             return False
-        # Check max drawdown
+
+        # Check max drawdown (30% threshold)
         if self.portfolio.max_drawdown > 0.30:
             logger.warning("[RISK] Max drawdown exceeded — pausing trading")
             return False
+
         # Check cash available
         if self.portfolio.cash < signal.suggested_size_usd * 0.5:
+            logger.info(
+                f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < "
+                f"${signal.suggested_size_usd * 0.5:.2f} needed"
+            )
             return False
+
         # No duplicate positions on same market
         existing = [p for p in self.portfolio.positions if p.condition_id == signal.condition_id]
         if existing:
             logger.info(f"[RISK] Already have position on {signal.market_slug}")
             return False
-        # Max 3 positions per resolution week
-        if signal.market_slug:
-            same_source = [p for p in self.portfolio.positions if p.source == signal.source]
-            if len(same_source) >= 5:
-                logger.info(f"[RISK] Too many positions from {signal.source.value}")
-                return False
+
+        # Max 5 positions per strategy
+        same_source = [p for p in self.portfolio.positions if p.source == signal.source]
+        if len(same_source) >= 5:
+            logger.info(f"[RISK] Too many positions from {signal.source.value}")
+            return False
+
         # Max 30% of capital in any single strategy
         strategy_exposure = sum(
             p.shares * p.current_price for p in self.portfolio.positions
@@ -288,6 +328,7 @@ class PaperTrader:
         if strategy_exposure > self.portfolio.starting_capital * 0.30:
             logger.info(f"[RISK] Strategy {signal.source.value} at 30% cap")
             return False
+
         return True
 
     # ------------------------------------------------------------------
@@ -344,7 +385,7 @@ class PaperTrader:
         for src, stats in by_strategy.items():
             if stats["trades"] > 0:
                 stats["avg_pnl"] = stats["total_pnl"] / stats["trades"]
-                stats["win_rate"] = stats["wins"] / stats["trades"] if stats["trades"] > 0 else 0
+                stats["win_rate"] = stats["wins"] / stats["trades"]
 
         return {
             "total_value": self.portfolio.total_value,

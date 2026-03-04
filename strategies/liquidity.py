@@ -88,7 +88,7 @@ class HedgedLiquidityStrategy(BaseStrategy):
 
         # Prefer markets near 50/50 (symmetric pricing reduces hedge skew)
         if self.cfg.prefer_price_near_50:
-            if yes_price < 0.25 or yes_price > 0.75:
+            if yes_price < 0.05 or yes_price > 0.95:
                 return False
 
         # Max spread check

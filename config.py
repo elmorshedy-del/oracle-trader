@@ -61,9 +61,9 @@ class WhaleTrackingConfig:
     """Whale wallet tracking (Layer 3 — the advisor)."""
     enabled: bool = True
     # Min historical PnL to qualify as a "whale"
-    min_pnl_usd: float = 10000.0
+    min_pnl_usd: float = 1000.0
     # Min win rate (0.0 - 1.0)
-    min_win_rate: float = 0.55
+    min_win_rate: float = 0.40
     # How many top wallets to track
     top_n_wallets: int = 50
     # Refresh wallet rankings every N hours

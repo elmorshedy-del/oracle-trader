@@ -50,7 +50,7 @@ class NewsLatencyStrategy(BaseStrategy):
             return []
 
         # Pre-filter: only send to LLM if headline contains market-related keywords
-        relevant_headlines = self._keyword_prefilter(new_headlines)
+        relevant_headlines = new_headlines[:10]  # send top 10 headlines directly to Claude
 
         signals = []
         for headline in relevant_headlines:

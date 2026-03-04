@@ -59,6 +59,16 @@ class Pipeline:
 
         # A/B tester
         self.ab_tester = ABTester(log_dir="logs")
+        self.ab_tester.create_test(
+            "mean_reversion",
+            "conservative", {"drop_threshold": 0.15, "exit_reversion": 0.50, "min_days_left": 30},
+            "aggressive", {"drop_threshold": 0.10, "exit_reversion": 0.70, "min_days_left": 14},
+        )
+        self.ab_tester.create_test(
+            "liquidity_sizing",
+            "kelly_25pct", {"kelly_cap": 0.25, "competitor_estimate": 10},
+            "kelly_10pct", {"kelly_cap": 0.10, "competitor_estimate": 20},
+        )
 
         # Health monitor
         self.health = HealthMonitor(log_dir="logs")

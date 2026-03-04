@@ -243,8 +243,20 @@ class PaperTrader:
             dd = (self.portfolio.starting_capital - current) / self.portfolio.starting_capital
             self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
 
+    def _update_drawdown(self):
+        """Recalculate drawdown properly."""
+        current = self.portfolio.cash + sum(
+            p.shares * p.current_price for p in self.portfolio.positions
+        )
+        if current >= self.portfolio.starting_capital:
+            self.portfolio.max_drawdown = 0.0
+        elif self.portfolio.starting_capital > 0:
+            dd = (self.portfolio.starting_capital - current) / self.portfolio.starting_capital
+            self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
+
     def _passes_risk_checks(self, signal: Signal) -> bool:
         """Check if a signal passes risk management rules."""
+        self._update_drawdown()
         self._update_drawdown()
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:

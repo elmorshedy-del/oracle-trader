@@ -31,13 +31,9 @@ class MeanReversionStrategy(BaseStrategy):
         self._stats["scans_completed"] += 1
         signals = []
 
-        for market in markets:
-            if market.closed or not market.active:
-                continue
-            if market.liquidity < self.config.risk.min_liquidity_usd:
-                continue
-            if not market.outcomes:
-                continue
+        # Limit to top 20 markets by volume to avoid flooding API
+        sorted_markets = sorted([m for m in markets if m.active and not m.closed and m.outcomes and m.liquidity >= self.config.risk.min_liquidity_usd], key=lambda x: x.volume_24h, reverse=True)[:20]
+        for market in sorted_markets:
 
             token_id = market.outcomes[0].token_id
             current_price = market.outcomes[0].price

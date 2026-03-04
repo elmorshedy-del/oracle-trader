@@ -140,9 +140,16 @@ class NewsLatencyStrategy(BaseStrategy):
     def _keyword_prefilter(self, headlines: list[NewsHeadline]) -> list[NewsHeadline]:
         """Only keep headlines that match keywords from active markets."""
         relevant = []
+        market_keywords = set(self._market_index.keys())
         for h in headlines:
-            h_words = set(h.title.lower().split())
-            if h_words & set(self._market_index.keys()):
+            title_lower = h.title.lower()
+            matched = False
+            for kw in market_keywords:
+                # Substring match: "iran" matches keyword "iranian" and vice versa
+                if kw in title_lower or any(w in kw for w in title_lower.split() if len(w) > 3):
+                    matched = True
+                    break
+            if matched:
                 relevant.append(h)
         logger.info(f"[NEWS] Pre-filter: {len(relevant)}/{len(headlines)} headlines relevant")
         return relevant

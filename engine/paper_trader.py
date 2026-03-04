@@ -44,7 +44,7 @@ class PaperTrader:
         # Route to appropriate execution method
         if signal.action == SignalAction.HEDGE_BOTH:
             return self._execute_hedge(signal, current_prices)
-        elif signal.action == SignalAction.ARB_ALL_OUTCOMES:
+        elif signal.action == SignalAction.ARB_ALL:
             return self._execute_arb(signal, current_prices)
         elif signal.action in (SignalAction.BUY_YES, SignalAction.BUY_NO):
             return self._execute_directional(signal, current_prices)

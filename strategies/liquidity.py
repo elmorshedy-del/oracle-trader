@@ -112,7 +112,7 @@ class HedgedLiquidityStrategy(BaseStrategy):
             return 0.0
 
         s = self.cfg.target_distance_cents / 100  # our target distance from mid
-        b = market.reward_pool  # using pool as proxy for multiplier
+        b = min(max(market.reward_pool / 500, 1.0), 3.0)  # normalize to 1-3 range as multiplier
 
         if s >= v:
             return 0.0
@@ -133,17 +133,16 @@ class HedgedLiquidityStrategy(BaseStrategy):
         if len(market.outcomes) < 2:
             return float('inf')
 
-        p_yes = market.outcomes[0].price
-        p_no = market.outcomes[1].price
+        # Always use ask prices (what we actually pay)
+        ask_yes = market.outcomes[0].book_ask or market.outcomes[0].price
+        ask_no = market.outcomes[1].book_ask or market.outcomes[1].price
 
-        total = p_yes + p_no
-        # Cost per hedge cycle: how much above $1.00 we pay
+        # Add slippage buffer (0.5% per leg)
+        ask_yes *= 1.005
+        ask_no *= 1.005
+
+        total = ask_yes + ask_no
         hedge_cost = max(0, total - 1.0)
-
-        # Factor in spread — we'll likely buy at ask prices
-        if market.outcomes[0].book_ask and market.outcomes[1].book_ask:
-            actual_cost = market.outcomes[0].book_ask + market.outcomes[1].book_ask
-            hedge_cost = max(0, actual_cost - 1.0)
 
         return hedge_cost
 
@@ -180,12 +179,16 @@ class HedgedLiquidityStrategy(BaseStrategy):
         if hedge_cost <= 0:
             hedge_cost = 0.001  # avoid division by zero
 
-        # Estimate probability of successful hedge based on spread & volatility
-        p = 0.7  # base assumption: 70% of hedges complete
-        if market.spread < 0.01:
-            p = 0.85  # tight spread = easier to hedge
-        elif market.spread > 0.03:
-            p = 0.5  # wide spread = harder
+        # Estimate fill probability from spread and liquidity
+        spread_ratio = market.spread / max(market.midpoint, 0.01)
+        if spread_ratio < 0.02:
+            p = 0.85
+        elif spread_ratio < 0.05:
+            p = 0.65
+        elif spread_ratio < 0.10:
+            p = 0.45
+        else:
+            p = 0.25
 
         b = expected_reward / hedge_cost if hedge_cost > 0 else 0
         q = 1 - p

@@ -64,14 +64,17 @@ class PaperTrader:
             return None
 
         # Calculate size
-        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.95)
+        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.20)  # max 20% of cash per trade
         if size_usd <= 0:
             return None
 
-        shares = size_usd / price
-        fee = BASE_FEE_RATE * min(price, 1 - price) * shares
+        # Apply slippage (0.5%)
+        fill_price = price * 1.005
+        shares = size_usd / fill_price
+        fee = BASE_FEE_RATE * min(fill_price, 1 - fill_price) * shares
 
         # Simulate fill
+        price = fill_price
         total_cost = size_usd + fee
         if total_cost > self.portfolio.cash:
             size_usd = (self.portfolio.cash - fee) * 0.95
@@ -146,7 +149,7 @@ class PaperTrader:
         if signal.arb_total_cost <= 0:
             return None
 
-        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.95)
+        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.20)  # max 20% of cash per trade
         if size_usd <= 0:
             return None
 
@@ -160,12 +163,21 @@ class PaperTrader:
             return None
 
         self.portfolio.cash -= size_usd
-        # Immediately credit the guaranteed profit (arb resolves at market close)
-        self.portfolio.cash += size_usd + net_profit
-        self.portfolio.total_realized_pnl += net_profit
         self.portfolio.total_fees_paid += fee_estimate
         self.portfolio.total_trades += 1
-        self.portfolio.winning_trades += 1
+        # Track as open position — profit only realized at resolution
+        position = Position(
+            token_id="ARB_ALL",
+            condition_id=signal.condition_id,
+            market_slug=signal.market_slug,
+            side="ARB",
+            shares=units,
+            avg_entry_price=signal.arb_total_cost,
+            current_price=signal.arb_guaranteed_payout,
+            unrealized_pnl=net_profit,
+            source=signal.source,
+        )
+        self.portfolio.positions.append(position)
 
         trade = PaperTrade(
             signal_id=signal.id,

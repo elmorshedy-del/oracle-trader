@@ -41,6 +41,17 @@ class MeanReversionStrategy(BaseStrategy):
             if current_price <= 0.05 or current_price >= 0.95:
                 continue  # skip extreme prices
 
+            # Resolution-aware: skip markets within 30 days of close
+            if market.end_date:
+                try:
+                    from datetime import datetime
+                    end = datetime.fromisoformat(market.end_date.replace("Z", "+00:00"))
+                    days_left = (end - datetime.now(timezone.utc)).days
+                    if days_left < 30:
+                        continue
+                except Exception:
+                    pass
+
             # Update baseline
             baseline = await self._get_baseline(token_id, current_price)
             if baseline is None:
@@ -70,7 +81,7 @@ class MeanReversionStrategy(BaseStrategy):
                         f"from baseline {baseline:.3f} → {current_price:.3f} | "
                         f"Target: {current_price + edge:.3f} ({self.cfg.exit_reversion_pct:.0%} reversion)"
                     ),
-                    suggested_size_usd=self.config.risk.max_position_usd * min(drop_pct * 2, 1.0),
+                    suggested_size_usd=self.config.risk.max_position_usd * 0.3,
                 )
 
             elif spike_pct >= self.cfg.drop_threshold_pct:
@@ -90,7 +101,7 @@ class MeanReversionStrategy(BaseStrategy):
                         f"from baseline {baseline:.3f} → {current_price:.3f} | "
                         f"Target: {current_price - edge:.3f} ({self.cfg.exit_reversion_pct:.0%} reversion)"
                     ),
-                    suggested_size_usd=self.config.risk.max_position_usd * min(spike_pct * 2, 1.0),
+                    suggested_size_usd=self.config.risk.max_position_usd * 0.3,
                 )
 
             if signal:

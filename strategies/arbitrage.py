@@ -56,26 +56,29 @@ class ArbitrageStrategy(BaseStrategy):
         if market.liquidity < self.config.risk.min_liquidity_usd:
             return None
 
-        yes_price = market.outcomes[0].price
-        no_price = market.outcomes[1].price
+        # Use ask prices (what we actually pay to cross the spread)
+        yes_ask = market.outcomes[0].book_ask or market.outcomes[0].price
+        no_ask = market.outcomes[1].book_ask or market.outcomes[1].price
 
-        if yes_price <= 0 or no_price <= 0:
+        if yes_ask <= 0 or no_ask <= 0:
             return None
 
-        total = yes_price + no_price
-        deviation = abs(total - 1.0)
+        # Add slippage buffer (0.5% per leg)
+        yes_ask *= 1.005
+        no_ask *= 1.005
 
-        # Estimate fees for buying both sides
-        fee_yes = BASE_FEE_RATE * min(yes_price, 1 - yes_price)
-        fee_no = BASE_FEE_RATE * min(no_price, 1 - no_price)
+        total = yes_ask + no_ask
+
+        # Estimate fees on ask prices
+        fee_yes = BASE_FEE_RATE * min(yes_ask, 1 - yes_ask)
+        fee_no = BASE_FEE_RATE * min(no_ask, 1 - no_ask)
         total_fees = fee_yes + fee_no
 
-        # Net profit after fees
+        # Net profit after fees and slippage
         if total < 1.0:
             gross_profit = 1.0 - total
             net_profit = gross_profit - total_fees
         else:
-            # Overpriced — no direct arb unless we can short
             return None
 
         if net_profit < self.cfg.min_profit_cents / 100:
@@ -88,7 +91,7 @@ class ArbitrageStrategy(BaseStrategy):
             action=SignalAction.ARB_ALL_OUTCOMES,
             market_slug=market.slug,
             condition_id=market.condition_id,
-            confidence=min(net_profit * 20, 1.0),  # higher profit = higher confidence
+            confidence=min(net_profit * 15, 0.95),  # conservative: ask-based pricing
             expected_edge=net_profit * 100,  # in cents
             reasoning=(
                 f"Binary mispricing: YES={yes_price:.3f} + NO={no_price:.3f} = "
@@ -127,8 +130,8 @@ class ArbitrageStrategy(BaseStrategy):
                 all_valid = False
                 break
 
-            # Use ask price if available (more realistic execution)
-            exec_price = market.outcomes[0].book_ask or yes_price
+            # Use ask price + slippage (realistic execution)
+            exec_price = (market.outcomes[0].book_ask or yes_price) * 1.005
             fee = BASE_FEE_RATE * min(exec_price, 1 - exec_price)
 
             total_cost += exec_price

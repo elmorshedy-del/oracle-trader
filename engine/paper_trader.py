@@ -64,7 +64,15 @@ class PaperTrader:
             return None
 
         # Calculate size
-        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.20)  # max 20% of cash per trade
+        # Kelly-inspired sizing: size = (edge / odds) * bankroll, capped
+        if signal.expected_edge > 0 and signal.confidence > 0:
+            odds = (1.0 / max(signal.confidence, 0.1)) - 1.0  # implied odds
+            edge = signal.expected_edge / 100  # convert cents to dollars
+            kelly_raw = (signal.confidence * odds - (1 - signal.confidence)) / max(odds, 0.01)
+            kelly_fraction = max(0, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, cap 20%
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
+        else:
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)  # minimum sizing
         if size_usd <= 0:
             return None
 
@@ -149,7 +157,15 @@ class PaperTrader:
         if signal.arb_total_cost <= 0:
             return None
 
-        size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.20)  # max 20% of cash per trade
+        # Kelly-inspired sizing: size = (edge / odds) * bankroll, capped
+        if signal.expected_edge > 0 and signal.confidence > 0:
+            odds = (1.0 / max(signal.confidence, 0.1)) - 1.0  # implied odds
+            edge = signal.expected_edge / 100  # convert cents to dollars
+            kelly_raw = (signal.confidence * odds - (1 - signal.confidence)) / max(odds, 0.01)
+            kelly_fraction = max(0, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, cap 20%
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
+        else:
+            size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)  # minimum sizing
         if size_usd <= 0:
             return None
 

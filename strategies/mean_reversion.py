@@ -64,29 +64,11 @@ class MeanReversionStrategy(BaseStrategy):
             signal = None
 
             if drop_pct >= self.cfg.drop_threshold_pct:
-                # Price dropped significantly — buy YES (expect reversion up)
-                expected_reversion = baseline * self.cfg.exit_reversion_pct
-                edge = (baseline - current_price) * self.cfg.exit_reversion_pct
-
-                signal = Signal(
-                    source=SignalSource.MEAN_REVERSION,
-                    action=SignalAction.BUY_YES,
-                    market_slug=market.slug,
-                    condition_id=market.condition_id,
-                    token_id=token_id,
-                    confidence=min(drop_pct * 3, 0.9),  # bigger drop = more confident
-                    expected_edge=edge * 100,
-                    reasoning=(
-                        f"MEAN REVERSION (dip): Price dropped {drop_pct:.1%} "
-                        f"from baseline {baseline:.3f} → {current_price:.3f} | "
-                        f"Target: {current_price + edge:.3f} ({self.cfg.exit_reversion_pct:.0%} reversion)"
-                    ),
-                    suggested_size_usd=self.config.risk.max_position_usd * 0.3,
-                )
-
-            elif spike_pct >= self.cfg.drop_threshold_pct:
-                # Price spiked significantly — buy NO (expect reversion down)
-                edge = (current_price - baseline) * self.cfg.exit_reversion_pct
+                # Price dropping — momentum says ride it down (buy NO)
+                # Closer to resolution = stronger signal
+                days_multiplier = min(30 / max(days_left, 1), 3.0) if days_left else 1.0
+                confidence = min(drop_pct * 2 * days_multiplier, 0.9)
+                edge = drop_pct * 0.5  # expect trend to continue ~50% further
 
                 signal = Signal(
                     source=SignalSource.MEAN_REVERSION,
@@ -94,14 +76,36 @@ class MeanReversionStrategy(BaseStrategy):
                     market_slug=market.slug,
                     condition_id=market.condition_id,
                     token_id=market.outcomes[1].token_id if len(market.outcomes) > 1 else None,
-                    confidence=min(spike_pct * 3, 0.9),
+                    confidence=confidence,
                     expected_edge=edge * 100,
                     reasoning=(
-                        f"MEAN REVERSION (spike): Price spiked {spike_pct:.1%} "
+                        f"MOMENTUM (drop): Price fell {drop_pct:.1%} "
                         f"from baseline {baseline:.3f} → {current_price:.3f} | "
-                        f"Target: {current_price - edge:.3f} ({self.cfg.exit_reversion_pct:.0%} reversion)"
+                        f"Riding trend down | Days left: {days_left or '?'}"
                     ),
-                    suggested_size_usd=self.config.risk.max_position_usd * 0.3,
+                    suggested_size_usd=self.config.risk.max_position_usd * 0.2 * confidence,
+                )
+
+            elif spike_pct >= self.cfg.drop_threshold_pct:
+                # Price spiking — momentum says ride it up (buy YES)
+                days_multiplier = min(30 / max(days_left, 1), 3.0) if days_left else 1.0
+                confidence = min(spike_pct * 2 * days_multiplier, 0.9)
+                edge = spike_pct * 0.5
+
+                signal = Signal(
+                    source=SignalSource.MEAN_REVERSION,
+                    action=SignalAction.BUY_YES,
+                    market_slug=market.slug,
+                    condition_id=market.condition_id,
+                    token_id=token_id,
+                    confidence=confidence,
+                    expected_edge=edge * 100,
+                    reasoning=(
+                        f"MOMENTUM (spike): Price rose {spike_pct:.1%} "
+                        f"from baseline {baseline:.3f} → {current_price:.3f} | "
+                        f"Riding trend up | Days left: {days_left or '?'}"
+                    ),
+                    suggested_size_usd=self.config.risk.max_position_usd * 0.2 * confidence,
                 )
 
             if signal:

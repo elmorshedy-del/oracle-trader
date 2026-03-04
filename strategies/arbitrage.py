@@ -88,7 +88,7 @@ class ArbitrageStrategy(BaseStrategy):
 
         return Signal(
             source=SignalSource.ARBITRAGE,
-            action=SignalAction.ARB_ALL_OUTCOMES,
+            action=SignalAction.ARB_ALL,
             market_slug=market.slug,
             condition_id=market.condition_id,
             confidence=min(net_profit * 15, 0.95),  # conservative: ask-based pricing
@@ -155,7 +155,7 @@ class ArbitrageStrategy(BaseStrategy):
 
         return Signal(
             source=SignalSource.ARBITRAGE,
-            action=SignalAction.ARB_ALL_OUTCOMES,
+            action=SignalAction.ARB_ALL,
             market_slug=event.slug,
             condition_id=event.markets[0].condition_id if event.markets else "",
             confidence=min(net_profit * 10, 1.0),

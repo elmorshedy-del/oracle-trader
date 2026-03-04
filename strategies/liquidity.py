@@ -112,7 +112,7 @@ class HedgedLiquidityStrategy(BaseStrategy):
             return 0.0
 
         s = self.cfg.target_distance_cents / 100  # our target distance from mid
-        b = min(max(market.reward_pool / 500, 1.0), 3.0)  # normalize to 1-3 range as multiplier
+        b = min(max(market.reward_pool / 200, 1.0), 5.0)  # wider range
 
         if s >= v:
             return 0.0
@@ -157,7 +157,7 @@ class HedgedLiquidityStrategy(BaseStrategy):
             return 0.0
 
         # Rough estimate: assume we're 1 of ~5-20 providers
-        estimated_competitors = 10
+        estimated_competitors = 5
         estimated_total_score = score * estimated_competitors
         our_share = score / estimated_total_score
         daily_reward = our_share * market.reward_pool

@@ -47,7 +47,7 @@ class MeanReversionStrategy(BaseStrategy):
                     from datetime import datetime
                     end = datetime.fromisoformat(market.end_date.replace("Z", "+00:00"))
                     days_left = (end - datetime.now(timezone.utc)).days
-                    if days_left < 30:
+                    if days_left < 7:
                         continue
                 except Exception:
                     pass

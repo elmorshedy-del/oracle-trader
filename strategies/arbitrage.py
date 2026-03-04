@@ -94,7 +94,7 @@ class ArbitrageStrategy(BaseStrategy):
             confidence=min(net_profit * 15, 0.95),  # conservative: ask-based pricing
             expected_edge=net_profit * 100,  # in cents
             reasoning=(
-                f"Binary mispricing: YES={yes_price:.3f} + NO={no_price:.3f} = "
+                f"Binary mispricing: YES={yes_ask:.3f} + NO={no_ask:.3f} = "
                 f"{total:.3f} | Gross: {gross_profit:.3f} | Fees: {total_fees:.3f} | "
                 f"Net: {net_profit:.3f}"
             ),
@@ -125,13 +125,13 @@ class ArbitrageStrategy(BaseStrategy):
                 all_valid = False
                 break
 
-            yes_price = market.outcomes[0].price
+            yes_ask = market.outcomes[0].price
             if market.liquidity < self.cfg.min_liquidity_usd:
                 all_valid = False
                 break
 
             # Use ask price + slippage (realistic execution)
-            exec_price = (market.outcomes[0].book_ask or yes_price) * 1.005
+            exec_price = (market.outcomes[0].book_ask or yes_ask) * 1.005
             fee = BASE_FEE_RATE * min(exec_price, 1 - exec_price)
 
             total_cost += exec_price

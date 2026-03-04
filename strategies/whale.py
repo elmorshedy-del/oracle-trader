@@ -48,12 +48,28 @@ class WhaleTrackingStrategy(BaseStrategy):
             self.whale_wallets = []
 
             for entry in leaderboard:
+                address = (
+                    entry.get("proxyWallet") or
+                    entry.get("address") or
+                    entry.get("wallet") or
+                    entry.get("user") or ""
+                )
+                name = entry.get("name") or entry.get("pseudonym") or entry.get("username") or "anon"
+                total_pnl = float(
+                    entry.get("cashPnl") or entry.get("pnl") or
+                    entry.get("totalPnl") or entry.get("profit") or 0
+                )
+                win_rate = float(entry.get("winRate") or entry.get("win_rate") or 0)
+                total_trades = int(
+                    entry.get("numTrades") or entry.get("totalTrades") or
+                    entry.get("trades") or entry.get("numTraded") or 0
+                )
                 wallet = WhaleWallet(
-                    address=entry.get("proxyWallet", entry.get("address", "")),
-                    name=entry.get("name") or entry.get("pseudonym"),
-                    total_pnl=float(entry.get("cashPnl", 0) or 0),
-                    win_rate=float(entry.get("winRate", 0) or 0),
-                    total_trades=int(entry.get("numTrades", 0) or 0),
+                    address=address,
+                    name=name,
+                    total_pnl=total_pnl,
+                    win_rate=win_rate,
+                    total_trades=total_trades,
                 )
 
                 if (wallet.total_pnl >= self.cfg.min_pnl_usd and
@@ -61,6 +77,10 @@ class WhaleTrackingStrategy(BaseStrategy):
                     self.whale_wallets.append(wallet)
 
             self._last_refresh = datetime.now(timezone.utc)
+            logger.info(
+                f"[WHALE] Refreshed: {len(self.whale_wallets)} whales loaded from "
+                f"{len(leaderboard)} entries"
+            )
             self._stats["whale_count"] = len(self.whale_wallets)
             logger.info(f"[WHALE] Refreshed: tracking {len(self.whale_wallets)} whales")
 

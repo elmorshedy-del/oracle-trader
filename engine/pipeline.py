@@ -109,6 +109,7 @@ class Pipeline:
     async def stop(self):
         """Stop the pipeline gracefully."""
         self._running = False
+        self.trader.save_state()
         await self.collector.close()
         logger.info("Pipeline stopped")
 
@@ -183,6 +184,9 @@ class Pipeline:
         self.dashboard_state.portfolio = self.trader.portfolio
 
         cycle_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+        # Persist state every scan
+        self.trader.save_state()
+
         self.health.record_scan(cycle_time, len(self._markets), len(all_signals), executed)
         logger.info(
             f"Scan #{self._scan_count}: {len(self._markets)} markets | "
@@ -231,7 +235,7 @@ class Pipeline:
                 "total_pnl_pct": round(self.trader.portfolio.total_pnl_pct, 2),
                 "total_trades": self.trader.portfolio.total_trades,
                 "win_rate": round(self.trader.portfolio.win_rate * 100, 1),
-                "max_drawdown": round(self.trader.portfolio.max_drawdown * 100, 2),
+                "max_drawdown": round(getattr(self.trader.portfolio, "current_drawdown", self.trader.portfolio.max_drawdown) * 100, 2),
                 "total_fees": round(self.trader.portfolio.total_fees_paid, 2),
                 "positions": [
                     {

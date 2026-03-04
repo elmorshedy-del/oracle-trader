@@ -157,6 +157,7 @@ class Portfolio(BaseModel):
     total_fees_paid: float = 0.0
     peak_value: float = 1000.0
     max_drawdown: float = 0.0
+    current_drawdown: float = 0.0
 
     @property
     def positions_value(self) -> float:

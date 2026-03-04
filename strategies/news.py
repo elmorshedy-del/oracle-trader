@@ -206,6 +206,15 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             data = resp.json()
             text = data["content"][0]["text"].strip()
 
+            # Strip markdown code blocks if Claude wrapped the JSON
+            if text.startswith("```"):
+                lines = text.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text = "\n".join(lines).strip()
+
             import json
             classification = json.loads(text)
             headline.classification = classification

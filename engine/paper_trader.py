@@ -21,12 +21,49 @@ BASE_FEE_RATE = 0.02
 class PaperTrader:
     """Simulates trade execution in paper mode."""
 
-    def __init__(self, starting_capital: float = 1000.0, log_dir: str = "logs"):
-        self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital)
-        self.trade_log: list[PaperTrade] = []
-        self.signal_log: list[Signal] = []
+    def __init__(self, starting_capital: float = 1000.0, log_dir: str = "logs", state_path: str = "/data/state.json"):
+        self.state_path = Path(state_path)
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)
+
+        # Try to restore state from disk, fall back to fresh start
+        if not self._load_state():
+            self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital)
+            self.trade_log: list[PaperTrade] = []
+            self.signal_log: list[Signal] = []
+            logger.info(f"[PAPER] Fresh start with ${starting_capital}")
+        else:
+            logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
+
+    def _load_state(self) -> bool:
+        """Load state from disk if available."""
+        try:
+            if self.state_path.exists():
+                data = json.loads(self.state_path.read_text())
+                self.portfolio = Portfolio(**data["portfolio"])
+                # Reconstruct positions (they're nested in portfolio)
+                self.trade_log = [PaperTrade(**t) for t in data.get("trade_log", [])]
+                self.signal_log = []  # don't restore signals, they're transient
+                return True
+        except Exception as e:
+            logger.warning(f"[PAPER] Failed to load state: {e}")
+        return False
+
+    def save_state(self):
+        """Persist current state to disk."""
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "portfolio": self.portfolio.model_dump(),
+                "trade_log": [t.model_dump() for t in self.trade_log[-200:]],  # keep last 200
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+            }
+            # Write to temp file first, then rename (atomic)
+            tmp = self.state_path.with_suffix('.tmp')
+            tmp.write_text(json.dumps(data, default=str))
+            tmp.rename(self.state_path)
+        except Exception as e:
+            logger.error(f"[PAPER] Failed to save state: {e}")
 
     def execute_signal(self, signal: Signal, current_prices: dict[str, float]) -> PaperTrade | None:
         """
@@ -163,8 +200,8 @@ class PaperTrader:
             condition_id=signal.condition_id,
             token_id=signal.token_id or "HEDGE",
             side=Side.BUY,
-            price=0.0,
-            size_shares=0,
+            price=1.0,
+            size_shares=size_usd,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
         )
@@ -273,7 +310,9 @@ class PaperTrader:
             self.portfolio.peak_value = total_val
         if self.portfolio.peak_value > 0:
             dd = (self.portfolio.peak_value - total_val) / self.portfolio.peak_value
-            self.portfolio.max_drawdown = dd  # current drawdown, not all-time max
+            self.portfolio.current_drawdown = dd
+            if dd > self.portfolio.max_drawdown:
+                self.portfolio.max_drawdown = dd
 
     def _update_drawdown(self):
         """Recalculate drawdown from actual portfolio value."""
@@ -281,10 +320,12 @@ class PaperTrader:
             p.shares * p.current_price for p in self.portfolio.positions
         )
         if current >= self.portfolio.starting_capital:
-            self.portfolio.max_drawdown = 0.0
+            self.portfolio.current_drawdown = 0.0
         elif self.portfolio.starting_capital > 0:
             dd = (self.portfolio.starting_capital - current) / self.portfolio.starting_capital
-            self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
+            self.portfolio.current_drawdown = dd
+            if dd > self.portfolio.max_drawdown:
+                self.portfolio.max_drawdown = dd
 
     def _passes_risk_checks(self, signal: Signal) -> bool:
         """Check if a signal passes risk management rules."""
@@ -295,8 +336,8 @@ class PaperTrader:
             logger.info("[RISK] Max exposure reached")
             return False
 
-        # Check max drawdown (30% threshold)
-        if self.portfolio.max_drawdown > 0.30:
+        # Check current drawdown (30% threshold)
+        if self.portfolio.current_drawdown > 0.30:
             logger.warning("[RISK] Max drawdown exceeded — pausing trading")
             return False
 

@@ -110,15 +110,17 @@ class WhaleTrackingStrategy(BaseStrategy):
         if buys + sells == 0:
             direction = "neutral"
             multiplier = 1.0
-        elif buys > sells * 1.5:
-            direction = "bullish"
-            multiplier = self.cfg.confirmation_boost
-        elif sells > buys * 1.5:
-            direction = "bearish"
-            multiplier = self.cfg.confirmation_boost
         else:
-            direction = "neutral"
-            multiplier = 1.0
+            buy_ratio = buys / (buys + sells)
+            if buy_ratio > 0.65:
+                direction = "bullish"
+                multiplier = 1.0 + min((buy_ratio - 0.5) * 0.75, 0.3)
+            elif buy_ratio < 0.35:
+                direction = "bearish"
+                multiplier = 1.0 + min((0.5 - buy_ratio) * 0.75, 0.3)
+            else:
+                direction = "neutral"
+                multiplier = 1.0
 
         return {
             "whale_count": whale_count,
@@ -149,11 +151,11 @@ class WhaleTrackingStrategy(BaseStrategy):
                 f"{whale_data['net_direction']} (vol: ${whale_data['total_volume']:.0f})"
             )
         else:
-            # Whales disagree — reduce confidence
-            signal.confidence *= 0.5
+            penalty = 1.0 / max(whale_data["confidence_multiplier"], 1.01)
+            signal.confidence *= max(penalty, 0.4)
             signal.reasoning += (
-                f" | Whale WARNING: {whale_data['whale_count']} whales "
-                f"{whale_data['net_direction']} — OPPOSING signal"
+                f" | Whale caution: {whale_data['whale_count']} whales "
+                f"{whale_data['net_direction']} — opposing (penalty: {penalty:.2f}x)"
             )
 
         return signal

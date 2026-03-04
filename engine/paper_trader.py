@@ -236,6 +236,7 @@ class PaperTrader:
         """Check if a signal passes risk management rules."""
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:
+            logger.info("[RISK] Max exposure reached")
             return False
         # Check max drawdown
         if self.portfolio.max_drawdown > 0.15:
@@ -243,6 +244,25 @@ class PaperTrader:
             return False
         # Check cash available
         if self.portfolio.cash < signal.suggested_size_usd * 0.5:
+            return False
+        # No duplicate positions on same market
+        existing = [p for p in self.portfolio.positions if p.condition_id == signal.condition_id]
+        if existing:
+            logger.info(f"[RISK] Already have position on {signal.market_slug}")
+            return False
+        # Max 3 positions per resolution week
+        if signal.market_slug:
+            same_source = [p for p in self.portfolio.positions if p.source == signal.source]
+            if len(same_source) >= 5:
+                logger.info(f"[RISK] Too many positions from {signal.source.value}")
+                return False
+        # Max 30% of capital in any single strategy
+        strategy_exposure = sum(
+            p.shares * p.current_price for p in self.portfolio.positions
+            if p.source == signal.source
+        )
+        if strategy_exposure > self.portfolio.starting_capital * 0.30:
+            logger.info(f"[RISK] Strategy {signal.source.value} at 30% cap")
             return False
         return True
 

@@ -77,7 +77,7 @@ class NewsConfig:
     """News-to-price latency engine (optional — requires LLM API key)."""
     enabled: bool = bool(os.getenv("ANTHROPIC_API_KEY", ""))
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    model: str = "claude-haiku-4-5-20251001"  # cheap first pass
+    model: str = "claude-sonnet-4-5-20250929"  # cheap first pass
     escalation_model: str = "claude-sonnet-4-5-20250929"  # for high-confidence
     # RSS / news sources
     rss_feeds: list = field(default_factory=lambda: [

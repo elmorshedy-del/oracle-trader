@@ -291,7 +291,7 @@ class PolymarketCollector:
             if clob_rewards and len(clob_rewards) > 0:
                 r = clob_rewards[0] if isinstance(clob_rewards[0], dict) else {}
                 reward_pool = float(r.get("rewardsDailyRate", 0) or 0)
-                max_spread = float(r.get("maxSpread", 0) or 0)
+                max_spread = float(r.get("maxSpread", 0) or 0) or 0.05
                 min_shares = int(r.get("minSize", 0) or 0)
 
             return Market(

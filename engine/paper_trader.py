@@ -273,7 +273,7 @@ class PaperTrader:
             self.portfolio.peak_value = total_val
         if self.portfolio.peak_value > 0:
             dd = (self.portfolio.peak_value - total_val) / self.portfolio.peak_value
-            self.portfolio.max_drawdown = max(self.portfolio.max_drawdown, dd)
+            self.portfolio.max_drawdown = dd  # current drawdown, not all-time max
 
     def _update_drawdown(self):
         """Recalculate drawdown from actual portfolio value."""

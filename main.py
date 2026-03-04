@@ -13,7 +13,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+import io
 from fastapi.staticfiles import StaticFiles
 
 from config import PipelineConfig
@@ -131,6 +132,72 @@ async def get_whales():
         return JSONResponse({"error": "Pipeline not initialized"}, status_code=503)
     state = pipeline.get_state()
     return state.get("whale_wallets", [])
+
+
+@app.get("/api/logs/download")
+async def download_logs():
+    """Download all logs as a JSON bundle."""
+    import json as _json
+    from pathlib import Path as _Path
+    log_dir = _Path("logs")
+    bundle = {}
+    for log_file in log_dir.glob("*.jsonl"):
+        lines = []
+        try:
+            for line in log_file.read_text().strip().split("\n"):
+                if line:
+                    try:
+                        lines.append(_json.loads(line))
+                    except _json.JSONDecodeError:
+                        lines.append({"raw": line})
+        except Exception:
+            pass
+        bundle[log_file.stem] = lines
+    # Add current state
+    if pipeline:
+        try:
+            bundle["current_state"] = pipeline.get_state()
+        except Exception:
+            pass
+    content = _json.dumps(bundle, indent=2, default=str)
+    return StreamingResponse(
+        io.BytesIO(content.encode()),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=oracle-trader-logs.json"}
+    )
+
+
+@app.get("/api/health/detail")
+async def health_detail():
+    """Get detailed health report."""
+    if pipeline is None:
+        return {"overall_status": "unknown", "apis": {}, "strategies": {}}
+    try:
+        return pipeline.health.get_health_report()
+    except Exception as e:
+        return {"overall_status": "error", "error": str(e)}
+
+
+@app.get("/api/ab-report")
+async def ab_report():
+    """Get A/B testing report."""
+    if pipeline is None:
+        return {}
+    try:
+        return pipeline.ab_tester.get_report()
+    except Exception:
+        return {}
+
+
+@app.get("/api/slippage")
+async def slippage_stats():
+    """Get slippage model calibration stats."""
+    if pipeline is None:
+        return {}
+    try:
+        return pipeline.slippage.get_stats()
+    except Exception:
+        return {}
 
 
 @app.get("/api/health")

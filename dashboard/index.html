@@ -285,6 +285,7 @@
     <span>|</span>
     <span id="scan-count">Scans: 0</span>
     <span>|</span>
+    <a href="/api/logs/download" style="color:var(--blue);text-decoration:none;border:1px solid var(--blue);padding:2px 8px;border-radius:3px;font-size:11px">⬇ LOGS</a>
     <span id="last-update" class="dot-pulse">Connecting...</span>
   </div>
 </div>
@@ -453,6 +454,37 @@
     </div>
     <div class="scrollable" id="error-log" style="font-family: var(--mono); font-size: 11px; color: var(--text-dim);">
       <div>Initializing pipeline...</div>
+    </div>
+  </div>
+
+  <!-- System Health -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">System Health</span>
+      <span class="card-badge" id="health-badge">—</span>
+    </div>
+    <div class="scrollable" id="health-panel" style="font-family: var(--mono); font-size: 11px;">
+      <div style="color:var(--text-dim)">Loading health data...</div>
+    </div>
+  </div>
+
+  <!-- Slippage Calibration -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Slippage Model</span>
+    </div>
+    <div id="slippage-panel" style="font-family: var(--mono); font-size: 12px;">
+      <div style="color:var(--text-dim)">Calibrating...</div>
+    </div>
+  </div>
+
+  <!-- A/B Tests -->
+  <div class="card card-wide">
+    <div class="card-header">
+      <span class="card-title">A/B Tests</span>
+    </div>
+    <div class="scrollable" id="ab-panel">
+      <div style="color:var(--text-dim);padding:20px;text-align:center;font-family:var(--mono);font-size:12px">No A/B tests configured yet</div>
     </div>
   </div>
 
@@ -639,6 +671,11 @@ function render(d) {
     }).join('');
   }
 
+  // Health, Slippage, A/B
+  renderHealth(d);
+  renderSlippage(d);
+  renderAB(d);
+
   // Errors
   const errors = d.errors || [];
   if (errors.length > 0) {
@@ -646,6 +683,82 @@ function render(d) {
       `<div style="padding:3px 0;border-bottom:1px solid var(--border);color:var(--red)">${e}</div>`
     ).join('');
   }
+}
+
+function renderHealth(d) {
+  const h = d.health;
+  if (!h) return;
+
+  // Badge
+  const badge = document.getElementById('health-badge');
+  const statusColors = {healthy:'var(--green)',degraded:'var(--yellow)',unhealthy:'var(--red)',unknown:'var(--text-dim)'};
+  badge.textContent = (h.overall_status || 'unknown').toUpperCase();
+  badge.style.background = (statusColors[h.overall_status] || 'var(--text-dim)') + '22';
+  badge.style.color = statusColors[h.overall_status] || 'var(--text-dim)';
+
+  // API status
+  const apis = h.apis || {};
+  let html = '<div style="margin-bottom:8px;font-weight:600;color:var(--text)">APIs</div>';
+  for (const [name, info] of Object.entries(apis)) {
+    const color = statusColors[info.status] || 'var(--text-dim)';
+    const dot = '<span style="color:' + color + '">●</span>';
+    html += '<div style="padding:2px 0">' + dot + ' ' + name.toUpperCase() +
+      ' <span style="color:var(--text-dim)">ok:' + (info.success_count||0) + ' err:' + (info.error_count||0) + '</span>';
+    if (info.last_error) html += '<div style="color:var(--red);font-size:10px;margin-left:14px">' + info.last_error.slice(0,60) + '</div>';
+    html += '</div>';
+  }
+
+  // Strategy status
+  const strats = h.strategies || {};
+  if (Object.keys(strats).length > 0) {
+    html += '<div style="margin:8px 0 4px;font-weight:600;color:var(--text)">Strategies</div>';
+    for (const [name, info] of Object.entries(strats)) {
+      const color = statusColors[info.status] || 'var(--text-dim)';
+      const dot = '<span style="color:' + color + '">●</span>';
+      html += '<div style="padding:2px 0">' + dot + ' ' + name +
+        ' <span style="color:var(--text-dim)">runs:' + (info.runs||0) + ' err:' + (info.errors||0) + ' sig:' + (info.total_signals||0) + '</span></div>';
+    }
+  }
+
+  // System
+  const sys = h.system || {};
+  if (sys.memory_mb) {
+    html += '<div style="margin:8px 0 4px;font-weight:600;color:var(--text)">System</div>';
+    html += '<div style="padding:2px 0;color:var(--text-dim)">Memory: ' + sys.memory_mb + 'MB | CPU: ' + sys.cpu_percent + '% | Threads: ' + sys.threads + '</div>';
+  }
+
+  document.getElementById('health-panel').innerHTML = html;
+}
+
+function renderSlippage(d) {
+  const s = d.slippage;
+  if (!s) return;
+  document.getElementById('slippage-panel').innerHTML =
+    '<div style="font-family:var(--mono)">'+
+    '<div style="font-size:20px;font-weight:700;color:var(--blue)">k = ' + (s.k || 0.1).toFixed(5) + '</div>' +
+    '<div style="color:var(--text-dim);margin-top:4px">EMA Error: ' + (s.ema_error || 0).toFixed(5) + '</div>' +
+    '<div style="color:var(--text-dim)">Observations: ' + (s.calibration_count || 0) + '</div>' +
+    '</div>';
+}
+
+function renderAB(d) {
+  const tests = d.ab_tests;
+  if (!tests || Object.keys(tests).length === 0) return;
+
+  let html = '<table><thead><tr><th>Test</th><th>Variant A</th><th>Variant B</th><th>Leader</th></tr></thead><tbody>';
+  for (const [name, test] of Object.entries(tests)) {
+    const a = test.variant_a || {};
+    const b = test.variant_b || {};
+    const leaderColor = test.leader === a.name ? 'var(--green)' : test.leader === b.name ? 'var(--green)' : 'var(--text-dim)';
+    html += '<tr>' +
+      '<td>' + name + '</td>' +
+      '<td>' + (a.name||'A') + ': ' + (a.total_trades||0) + ' trades, $' + (a.total_pnl||0).toFixed(2) + ' (' + (a.win_rate||0) + '%)</td>' +
+      '<td>' + (b.name||'B') + ': ' + (b.total_trades||0) + ' trades, $' + (b.total_pnl||0).toFixed(2) + ' (' + (b.win_rate||0) + '%)</td>' +
+      '<td style="color:' + leaderColor + '">' + (test.leader||'—') + '</td>' +
+      '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('ab-panel').innerHTML = html;
 }
 
 // Poll every 5 seconds

@@ -17,6 +17,9 @@ from strategies.whale import WhaleTrackingStrategy
 from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from engine.paper_trader import PaperTrader
+from engine.slippage import SlippageModel
+from engine.ab_tester import ABTester
+from engine.health_monitor import HealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +53,15 @@ class Pipeline:
             starting_capital=self.config.risk.max_total_exposure_usd,
             log_dir="logs",
         )
+
+        # Slippage model (self-calibrating)
+        self.slippage = SlippageModel(initial_k=0.1, log_dir="logs")
+
+        # A/B tester
+        self.ab_tester = ABTester(log_dir="logs")
+
+        # Health monitor
+        self.health = HealthMonitor(log_dir="logs")
 
         # State
         self.dashboard_state = DashboardState(mode=self.config.mode)
@@ -103,15 +115,20 @@ class Pipeline:
         # Run all enabled strategies
         all_signals: list[Signal] = []
 
+        import time as _time
         for name, strategy in self.strategies.items():
             if not strategy.enabled:
                 continue
             try:
+                _strat_start = _time.time()
                 signals = await strategy.scan(self._markets, self._events)
+                _strat_dur = (_time.time() - _strat_start) * 1000
                 all_signals.extend(signals)
+                self.health.record_strategy_run(name, len(signals), _strat_dur)
             except Exception as e:
                 logger.error(f"Strategy {name} error: {e}")
                 strategy._stats["errors"] += 1
+                self.health.record_strategy_error(name, str(e))
 
         # Apply whale confirmation to directional signals
         whale: WhaleTrackingStrategy = self.strategies["whale"]
@@ -146,6 +163,7 @@ class Pipeline:
         self.dashboard_state.portfolio = self.trader.portfolio
 
         cycle_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+        self.health.record_scan(cycle_time, len(self._markets), len(all_signals), executed)
         logger.info(
             f"Scan #{self._scan_count}: {len(self._markets)} markets | "
             f"{len(all_signals)} signals | {executed} executed | "
@@ -158,9 +176,12 @@ class Pipeline:
             self._markets = await self.collector.get_all_active_markets()
             self._events = await self.collector.get_events(limit=100)
             self.dashboard_state.active_markets = len(self._markets)
+            self.health.record_api_success("gamma")
+            self.health.record_data_freshness("markets")
         except Exception as e:
             logger.error(f"Data refresh failed: {e}")
             self._errors.append(f"Data refresh: {e}")
+            self.health.record_api_error("gamma", str(e))
 
     def _build_price_map(self) -> dict[str, float]:
         """Build a token_id -> price map from current market data."""
@@ -256,6 +277,9 @@ class Pipeline:
             ],
             "performance": self.trader.get_performance_report(),
             "errors": self._errors[-10:],
+            "health": self.health.get_health_report(),
+            "slippage": self.slippage.get_stats(),
+            "ab_tests": self.ab_tester.get_report(),
             "markets_sample": [
                 {
                     "slug": m.slug,

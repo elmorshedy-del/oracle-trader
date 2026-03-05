@@ -148,16 +148,9 @@ class Pipeline:
                 strategy._stats["errors"] += 1
                 self.health.record_strategy_error(name, str(e))
 
-        # Apply whale confirmation to directional signals
-        whale: WhaleTrackingStrategy = self.strategies["whale"]
-        if whale.enabled and whale.whale_wallets:
-            for signal in all_signals:
-                if signal.source != "whale_tracking":
-                    try:
-                        whale_data = await whale.get_whale_sentiment(signal.condition_id)
-                        signal = whale.confirm_signal(signal, whale_data)
-                    except Exception:
-                        pass
+        # Skip per-signal whale confirmation (was making 600+ API calls per scan)
+        # Whale data is still loaded and available for the dashboard
+        # TODO: implement cached whale sentiment lookup instead of per-signal API calls
 
         # Sort by confidence (highest first)
         all_signals.sort(key=lambda s: s.confidence, reverse=True)

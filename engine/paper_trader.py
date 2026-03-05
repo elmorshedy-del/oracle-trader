@@ -372,13 +372,14 @@ class PaperTrader:
             logger.info(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False
 
-        # Max 30% of capital in any single strategy
+        # Max exposure per strategy (higher for hedged positions since risk is bounded)
         strategy_exposure = sum(
             p.shares * p.current_price for p in self.portfolio.positions
             if p.source == signal.source
         )
-        if strategy_exposure > self.portfolio.starting_capital * 0.30:
-            logger.info(f"[RISK] Strategy {signal.source.value} at 30% cap")
+        cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
+        if strategy_exposure > self.portfolio.starting_capital * cap:
+            logger.info(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
             return False
 
         return True

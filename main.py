@@ -167,6 +167,15 @@ async def download_logs():
     )
 
 
+@app.get("/api/reset")
+async def reset_portfolio():
+    """Reset portfolio to fresh start with current config capital."""
+    import os
+    state_path = "/data/state.json"
+    if os.path.exists(state_path):
+        os.remove(state_path)
+    return {"status": "reset", "message": "Restart the service to apply"}
+
 @app.get("/api/health/detail")
 async def health_detail():
     """Get detailed health report."""

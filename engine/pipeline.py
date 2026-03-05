@@ -19,6 +19,8 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.weather import WeatherForecastStrategy
+from strategies.crypto_arb import CryptoTemporalArbStrategy
+from strategies.weather import WeatherForecastStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester

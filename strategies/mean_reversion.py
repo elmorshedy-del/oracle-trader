@@ -140,24 +140,8 @@ class MeanReversionStrategy(BaseStrategy):
             entry["updated"] = datetime.now(timezone.utc)
             return entry["baseline"]
 
-        # First time seeing this token — try to fetch history
-        if self.collector:
-            try:
-                history = await self.collector.get_price_history(
-                    token_id, interval="1h", fidelity=self.cfg.lookback_hours
-                )
-                if history:
-                    prices = [float(h.get("p", 0)) for h in history if h.get("p")]
-                    if prices:
-                        baseline = sum(prices) / len(prices)
-                        self._baselines[token_id] = {
-                            "baseline": baseline,
-                            "prices": prices,
-                            "updated": datetime.now(timezone.utc),
-                        }
-                        return baseline
-            except Exception as e:
-                logger.debug(f"[MEAN_REV] No history for {token_id}: {e}")
+        # Skip CLOB price history (too slow on Railway, causes 5-min scans)
+        # Build baseline purely from scan-to-scan observations
 
         # Fallback: start tracking from now
         self._baselines[token_id] = {

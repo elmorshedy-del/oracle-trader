@@ -107,7 +107,7 @@ class MeanReversionConfig:
 class RiskConfig:
     """Risk management — applies across all strategies."""
     max_position_usd: float = float(os.getenv("MAX_POSITION_USD", "50"))
-    max_total_exposure_usd: float = float(os.getenv("MAX_EXPOSURE_USD", "500"))
+    max_total_exposure_usd: float = float(os.getenv("MAX_EXPOSURE_USD", "2000"))
     max_drawdown_pct: float = 0.15  # pause trading if portfolio drops 15%
     min_liquidity_usd: float = 5000.0
     max_spread_pct: float = 0.05

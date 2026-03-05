@@ -17,6 +17,8 @@ from strategies.arbitrage import ArbitrageStrategy
 from strategies.whale import WhaleTrackingStrategy
 from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
+from strategies.crypto_arb import CryptoTemporalArbStrategy
+from strategies.weather import WeatherForecastStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester
@@ -47,6 +49,8 @@ class Pipeline:
             "whale": WhaleTrackingStrategy(self.config, collector=self.collector),
             "news": NewsLatencyStrategy(self.config),
             "mean_reversion": MeanReversionStrategy(self.config, collector=self.collector),
+            "crypto_arb": CryptoTemporalArbStrategy(self.config),
+            "weather": WeatherForecastStrategy(self.config),
         }
 
         # Engine

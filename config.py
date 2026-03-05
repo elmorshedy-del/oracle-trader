@@ -94,6 +94,30 @@ class NewsConfig:
 
 
 @dataclass
+class CryptoArbConfig:
+    """Crypto temporal arbitrage — exploit exchange-to-Polymarket price lag."""
+    enabled: bool = True
+    # Min price move on exchange to trigger (0.3% = significant)
+    min_move_pct: float = 0.003
+    # Lookback window in seconds to measure the move
+    lookback_seconds: int = 120  # 2 minutes
+    # Max entry price (don't buy YES at 0.90, the edge is gone)
+    max_entry_price: float = 0.75
+    # Symbols to track
+    symbols: list = field(default_factory=lambda: ["BTC", "ETH", "SOL"])
+
+
+@dataclass
+class WeatherForecastConfig:
+    """Weather forecast arbitrage — NOAA vs Polymarket."""
+    enabled: bool = True
+    # Min edge to trade (forecast prob - market prob)
+    min_edge: float = 0.10  # 10% disagreement required
+    # Cities to track (must have NOAA coverage)
+    cities: list = field(default_factory=lambda: ["new-york", "chicago", "miami", "los-angeles"])
+
+
+@dataclass
 class MeanReversionConfig:
     """Mean reversion — competing signal strategy."""
     enabled: bool = True
@@ -122,6 +146,8 @@ class PipelineConfig:
     whale: WhaleTrackingConfig = field(default_factory=WhaleTrackingConfig)
     news: NewsConfig = field(default_factory=NewsConfig)
     mean_reversion: MeanReversionConfig = field(default_factory=MeanReversionConfig)
+    crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
+    weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     # Pipeline modes

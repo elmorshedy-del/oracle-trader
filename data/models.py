@@ -27,6 +27,8 @@ class SignalSource(str, Enum):
     WHALE = "whale_tracking"
     NEWS = "news_latency"
     MEAN_REVERSION = "mean_reversion"
+    CRYPTO_ARB = "crypto_temporal_arb"
+    WEATHER = "weather_forecast"
 
 
 class TradeStatus(str, Enum):

@@ -223,7 +223,7 @@ class PolymarketCollector:
         """Get top traders from Polymarket leaderboard."""
         try:
             resp = await self.client.get(
-                f"{self.data}/leaderboard",
+                f"{self.data}/v1/leaderboard",
                 params={"limit": limit, "window": "all"}
             )
             resp.raise_for_status()

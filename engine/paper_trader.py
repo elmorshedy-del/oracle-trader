@@ -34,7 +34,7 @@ class PaperTrader:
             logger.info(f"[PAPER] Fresh start with ${starting_capital}")
         else:
             # Fix peak_value if it was initialized with wrong default
-            if self.portfolio.peak_value > self.portfolio.starting_capital * 2.5:
+            if self.portfolio.peak_value > self.portfolio.total_value * 1.2:
                 self.portfolio.peak_value = max(self.portfolio.starting_capital, self.portfolio.total_value)
                 logger.info(f"[PAPER] Reset peak_value to ${self.portfolio.peak_value:.2f}")
             logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
@@ -300,7 +300,7 @@ class PaperTrader:
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
         # Fix stale peak_value (may be wrong from default or corrupted state)
-        if self.portfolio.peak_value > self.portfolio.starting_capital * 3:
+        if self.portfolio.peak_value > self.portfolio.total_value * 1.5:
             self.portfolio.peak_value = self.portfolio.starting_capital
         if self.portfolio.peak_value < self.portfolio.starting_capital * 0.5:
             self.portfolio.peak_value = self.portfolio.starting_capital

@@ -81,12 +81,12 @@ class NewsConfig:
     escalation_model: str = "claude-sonnet-4-5-20250929"  # for high-confidence
     # RSS / news sources
     rss_feeds: list = field(default_factory=lambda: [
-        "https://feeds.reuters.com/reuters/topNews",
-        "https://feeds.reuters.com/reuters/businessNews",
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+        "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
     ])
     # Min confidence to generate a signal (0.0 - 1.0)
-    min_confidence: float = 0.7
+    min_confidence: float = 0.5  # lowered from 0.7 — let more signals through for paper testing
     # Scan interval in seconds
     scan_interval_secs: int = 30
     # Max API calls per hour (cost control)
@@ -97,7 +97,7 @@ class NewsConfig:
 class MeanReversionConfig:
     """Mean reversion — competing signal strategy."""
     enabled: bool = True
-    drop_threshold_pct: float = 0.10
+    drop_threshold_pct: float = 0.05  # lowered: running avg smooths out moves
     lookback_hours: int = 72
     trigger_window_hours: int = 6
     exit_reversion_pct: float = 0.60  # exit at 60% reversion

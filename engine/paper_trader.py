@@ -28,11 +28,15 @@ class PaperTrader:
 
         # Try to restore state from disk, fall back to fresh start
         if not self._load_state():
-            self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital)
+            self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital, peak_value=starting_capital)
             self.trade_log: list[PaperTrade] = []
             self.signal_log: list[Signal] = []
             logger.info(f"[PAPER] Fresh start with ${starting_capital}")
         else:
+            # Fix peak_value if it was initialized with wrong default
+            if self.portfolio.peak_value > self.portfolio.starting_capital * 2.5:
+                self.portfolio.peak_value = max(self.portfolio.starting_capital, self.portfolio.total_value)
+                logger.info(f"[PAPER] Reset peak_value to ${self.portfolio.peak_value:.2f}")
             logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
 
     def _load_state(self) -> bool:
@@ -295,6 +299,12 @@ class PaperTrader:
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
+        # Fix stale peak_value (may be wrong from default or corrupted state)
+        if self.portfolio.peak_value > self.portfolio.starting_capital * 3:
+            self.portfolio.peak_value = self.portfolio.starting_capital
+        if self.portfolio.peak_value < self.portfolio.starting_capital * 0.5:
+            self.portfolio.peak_value = self.portfolio.starting_capital
+
         for pos in self.portfolio.positions:
             if pos.token_id == "ARB_ALL":
                 continue  # arb profit is fixed, no mark-to-market
@@ -355,10 +365,11 @@ class PaperTrader:
             logger.info(f"[RISK] Already have position on {signal.market_slug}")
             return False
 
-        # Max 5 positions per strategy
+        # Max positions per strategy (higher limit for hedged positions)
         same_source = [p for p in self.portfolio.positions if p.source == signal.source]
-        if len(same_source) >= 5:
-            logger.info(f"[RISK] Too many positions from {signal.source.value}")
+        max_positions = 15 if signal.action == SignalAction.HEDGE_BOTH else 5
+        if len(same_source) >= max_positions:
+            logger.info(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False
 
         # Max 30% of capital in any single strategy

@@ -218,6 +218,12 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             import json
             classification = json.loads(text)
             headline.classification = classification
+            logger.info(
+                f"[NEWS] Classified: '{headline.title[:60]}' → "
+                f"market={classification.get('market_slug', 'none')}, "
+                f"dir={classification.get('direction', '?')}, "
+                f"conf={classification.get('confidence', 0)}"
+            )
             return classification
 
         except Exception as e:

@@ -224,10 +224,16 @@ class PolymarketCollector:
         try:
             resp = await self.client.get(
                 f"{self.data}/leaderboard",
-                params={"limit": limit, "sortBy": "PERCENTPNL", "sortDirection": "DESC"}
+                params={"limit": limit, "window": "all"}
             )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Handle different response formats (list vs paginated dict)
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("results", data.get("data", data.get("leaderboard", [])))
+            return []
         except Exception as e:
             logger.error(f"Failed to fetch leaderboard: {e}")
             return []

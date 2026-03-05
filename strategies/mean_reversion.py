@@ -41,14 +41,15 @@ class MeanReversionStrategy(BaseStrategy):
             if current_price <= 0.05 or current_price >= 0.95:
                 continue  # skip extreme prices
 
-            # Resolution-aware: skip markets within 30 days of close
+            # Calculate days to resolution (must be defined before use below)
+            days_left = None
             if market.end_date:
                 try:
                     from datetime import datetime
                     end = datetime.fromisoformat(market.end_date.replace("Z", "+00:00"))
                     days_left = (end - datetime.now(timezone.utc)).days
-                    if days_left < 7:
-                        continue
+                    if days_left < 3:
+                        continue  # only skip if resolving in < 3 days
                 except Exception:
                     pass
 
@@ -113,6 +114,14 @@ class MeanReversionStrategy(BaseStrategy):
                 self._stats["signals_generated"] += 1
                 logger.info(f"[MEAN_REV] {signal.reasoning}")
 
+        if not signals and self._stats["scans_completed"] % 50 == 0:
+            # Log diagnostic every 50 scans so we can see baseline data
+            sample = list(self._baselines.items())[:3]
+            for tid, entry in sample:
+                logger.info(
+                    f"[MOMENTUM] Baseline check: {len(entry['prices'])} prices, "
+                    f"baseline={entry['baseline']:.4f}, samples={entry['prices'][-3:]}"
+                )
         return signals
 
     async def _get_baseline(self, token_id: str, current_price: float) -> float | None:

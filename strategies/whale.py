@@ -72,8 +72,8 @@ class WhaleTrackingStrategy(BaseStrategy):
                     total_trades=total_trades,
                 )
 
-                if (wallet.total_pnl >= self.cfg.min_pnl_usd and
-                        wallet.win_rate >= self.cfg.min_win_rate):
+                # API doesn't return win_rate, filter on PnL only
+                if wallet.total_pnl >= self.cfg.min_pnl_usd:
                     self.whale_wallets.append(wallet)
 
             self._last_refresh = datetime.now(timezone.utc)

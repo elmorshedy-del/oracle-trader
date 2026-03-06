@@ -188,6 +188,8 @@
   .strat-whale { background: var(--purple-dim); color: var(--purple); }
   .strat-news { background: var(--yellow-dim); color: var(--yellow); }
   .strat-mean { background: var(--red-dim); color: var(--red); }
+  .strat-crypto { background: #1de9b622; color: #1de9b6; }
+  .strat-weather { background: #ffab4022; color: #ffab40; }
 
   /* Confidence bar */
   .conf-bar {
@@ -260,6 +262,30 @@
   .perf-bar-bg { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
   .perf-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
   .perf-val { font-family: var(--mono); font-size: 11px; width: 60px; text-align: right; }
+
+  .sanity-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .sanity-left { display: flex; align-items: center; gap: 8px; }
+  .sanity-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .sanity-ok { background: var(--green-dim); color: var(--green); }
+  .sanity-bad { background: var(--red-dim); color: var(--red); }
+  .sanity-note { color: var(--text-dim); text-align: right; }
 
   /* Responsive */
   @media (max-width: 1200px) {
@@ -387,12 +413,23 @@
     </div>
   </div>
 
-  <!-- Strategy Performance -->
-  <div class="card">
+  <!-- Strategy Compare -->
+  <div class="card card-wide">
     <div class="card-header">
-      <span class="card-title">Strategy Performance</span>
+      <span class="card-title">Strategy Compare</span>
     </div>
     <div id="strategy-perf" class="scrollable"></div>
+  </div>
+
+  <!-- Sanity Panel -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Sanity Panel</span>
+      <span class="card-badge" id="sanity-badge">—</span>
+    </div>
+    <div class="scrollable" id="sanity-panel" style="font-family: var(--mono); font-size: 11px;">
+      <div style="color:var(--text-dim)">Waiting for diagnostics...</div>
+    </div>
   </div>
 
   <!-- Whale Activity -->
@@ -501,9 +538,24 @@ function stratBadge(source) {
     'whale_tracking': ['WHALE', 'strat-whale'],
     'news_latency': ['NEWS', 'strat-news'],
     'mean_reversion': ['MEAN', 'strat-mean'],
+    'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
+    'weather_forecast': ['WX', 'strat-weather'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;
+}
+
+function normalizeStrategyKey(key) {
+  const aliases = {
+    liquidity: 'liquidity_provision',
+    arbitrage: 'multi_outcome_arbitrage',
+    whale: 'whale_tracking',
+    news: 'news_latency',
+    mean_reversion: 'mean_reversion',
+    crypto_arb: 'crypto_temporal_arb',
+    weather: 'weather_forecast',
+  };
+  return aliases[key] || key;
 }
 
 function confBar(conf) {
@@ -614,19 +666,59 @@ function render(d) {
   // Strategy Performance
   const perf = d.performance?.by_strategy || {};
   const perfEl = document.getElementById('strategy-perf');
-  perfEl.innerHTML = Object.entries(perf).map(([name, s]) => {
-    const wr = s.win_rate ? (s.win_rate * 100).toFixed(0) : 0;
-    const barColor = s.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    return `
-      <div class="perf-row">
-        <div class="perf-label">${stratBadge(name)}</div>
-        <div class="perf-bar-bg">
-          <div class="perf-bar-fill" style="width:${Math.min(Math.abs(wr), 100)}%;background:${barColor}"></div>
-        </div>
-        <div class="perf-val ${pnlColor(s.total_pnl)}">$${(s.total_pnl || 0).toFixed(2)}</div>
-      </div>
-    `;
-  }).join('') || '<div style="color:var(--text-dim);padding:20px;text-align:center">No data yet</div>';
+  const positionsBySource = {};
+  for (const pos of (p.positions || [])) {
+    positionsBySource[pos.source] = (positionsBySource[pos.source] || 0) + 1;
+  }
+  const strategyStats = d.strategies || {};
+  const sources = new Set([
+    ...Object.keys(perf),
+    ...Object.keys(positionsBySource),
+    ...Object.keys(strategyStats).map(normalizeStrategyKey),
+  ]);
+  const rows = Array.from(sources).map(source => {
+    const perfStats = perf[source] || {};
+    const strategyKey = Object.keys(strategyStats).find(key => normalizeStrategyKey(key) === source);
+    const runtimeStats = strategyKey ? strategyStats[strategyKey] : {};
+    return {
+      source,
+      pnl: perfStats.total_pnl || 0,
+      winRate: perfStats.win_rate ? perfStats.win_rate * 100 : 0,
+      trades: perfStats.trades || 0,
+      open: positionsBySource[source] || 0,
+      signals: runtimeStats.signals_generated || 0,
+      errors: runtimeStats.errors || 0,
+    };
+  }).sort((a, b) => (b.pnl - a.pnl) || (b.trades - a.trades) || a.source.localeCompare(b.source));
+
+  perfEl.innerHTML = rows.length ? `
+    <table>
+      <thead>
+        <tr>
+          <th>Strategy</th>
+          <th>P&L</th>
+          <th>Win%</th>
+          <th>Trades</th>
+          <th>Open</th>
+          <th>Signals</th>
+          <th>Errors</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => `
+          <tr>
+            <td>${stratBadge(row.source)}</td>
+            <td class="${pnlColor(row.pnl)}">$${row.pnl.toFixed(2)}</td>
+            <td>${row.winRate.toFixed(0)}%</td>
+            <td>${row.trades}</td>
+            <td>${row.open}</td>
+            <td>${row.signals}</td>
+            <td class="${row.errors > 0 ? 'negative' : 'neutral'}">${row.errors}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  ` : '<div style="color:var(--text-dim);padding:20px;text-align:center">No strategy data yet</div>';
 
   // Whale wallets
   const whales = d.whale_wallets || [];
@@ -672,6 +764,7 @@ function render(d) {
   }
 
   // Health, Slippage, A/B
+  renderSanity(d);
   renderHealth(d);
   renderSlippage(d);
   renderAB(d);
@@ -728,6 +821,62 @@ function renderHealth(d) {
   }
 
   document.getElementById('health-panel').innerHTML = html;
+}
+
+function renderSanity(d) {
+  const diag = d.diagnostics || {};
+  const filtered = diag.filtered_signals || {};
+  const totalSignals = Object.values(diag.signals_by_strategy || {}).reduce((sum, val) => sum + val, 0);
+  const checks = [
+    {
+      label: 'Fresh tradeable markets',
+      ok: (diag.markets_tradeable || 0) > 0,
+      note: `${diag.markets_tradeable || 0} available`,
+    },
+    {
+      label: 'Held-market loop',
+      ok: (filtered.held_market || 0) === 0,
+      note: `${filtered.held_market || 0} filtered`,
+    },
+    {
+      label: 'Strategy caps clear',
+      ok: (filtered.source_exposure_cap || 0) === 0 && (filtered.source_position_cap || 0) === 0,
+      note: `${(filtered.source_exposure_cap || 0) + (filtered.source_position_cap || 0)} blocked`,
+    },
+    {
+      label: 'New trades this scan',
+      ok: (diag.executed || 0) > 0 || totalSignals === 0,
+      note: `${diag.executed || 0} executed / ${totalSignals} candidates`,
+    },
+    {
+      label: 'Exit flow active',
+      ok: (diag.exits || 0) > 0 || (diag.resolved || 0) > 0 || ((diag.portfolio?.open_positions || 0) === 0),
+      note: `${diag.exits || 0} exits / ${diag.resolved || 0} resolved`,
+    },
+  ];
+
+  const blockers = checks.filter(check => !check.ok).map(check => check.label);
+  const overallOk = blockers.length === 0;
+  const badge = document.getElementById('sanity-badge');
+  badge.textContent = overallOk ? 'GREEN' : 'RED';
+  badge.style.background = overallOk ? 'var(--green-dim)' : 'var(--red-dim)';
+  badge.style.color = overallOk ? 'var(--green)' : 'var(--red)';
+
+  const rows = checks.map(check => `
+    <div class="sanity-item">
+      <div class="sanity-left">
+        <span class="sanity-icon ${check.ok ? 'sanity-ok' : 'sanity-bad'}">${check.ok ? '✓' : '✕'}</span>
+        <span>${check.label}</span>
+      </div>
+      <div class="sanity-note">${check.note}</div>
+    </div>
+  `).join('');
+
+  const footer = blockers.length
+    ? `<div style="margin-top:10px;color:var(--red);font-family:var(--mono);font-size:11px">Blockers: ${blockers.join(' | ')}</div>`
+    : '<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">No immediate blockers detected in latest scan</div>';
+
+  document.getElementById('sanity-panel').innerHTML = rows + footer;
 }
 
 function renderSlippage(d) {

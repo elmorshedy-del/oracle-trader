@@ -23,6 +23,7 @@ MAX_DIRECTIONAL_POSITIONS = 10
 DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
 DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
+HEDGE_ROTATION_HOURS = 24.0
 
 
 class PaperTrader:
@@ -76,6 +77,74 @@ class PaperTrader:
         except Exception as e:
             logger.error(f"[PAPER] Failed to save state: {e}")
 
+    def reset(self, starting_capital: float | None = None):
+        """Reset paper state without wiping persisted logs."""
+        capital = starting_capital or self.portfolio.starting_capital
+        self.portfolio = Portfolio(
+            starting_capital=capital,
+            cash=capital,
+            peak_value=capital,
+        )
+        self.trade_log = []
+        self.signal_log = []
+        try:
+            self.state_path.unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning(f"[PAPER] Failed to delete state file: {e}")
+        self.save_state()
+        logger.info(f"[PAPER] Reset portfolio state to ${capital:.2f}")
+
+    def select_candidate_signals(self, signals: list[Signal]) -> tuple[list[Signal], dict[str, int]]:
+        """Drop signals that are already impossible given current holdings and source caps."""
+        selected: list[Signal] = []
+        filtered = {
+            "held_market": 0,
+            "duplicate_market": 0,
+            "source_position_cap": 0,
+            "source_exposure_cap": 0,
+        }
+        held_conditions = {p.condition_id for p in self.portfolio.positions}
+        seen_conditions: set[str] = set()
+        source_counts: dict = {}
+        source_exposure: dict = {}
+
+        for pos in self.portfolio.positions:
+            source_counts[pos.source] = source_counts.get(pos.source, 0) + 1
+            source_exposure[pos.source] = (
+                source_exposure.get(pos.source, 0.0) + (pos.shares * pos.current_price)
+            )
+
+        for signal in signals:
+            if signal.condition_id in held_conditions:
+                filtered["held_market"] += 1
+                continue
+            if signal.condition_id in seen_conditions:
+                filtered["duplicate_market"] += 1
+                continue
+
+            max_positions = (
+                MAX_HEDGE_POSITIONS
+                if signal.action == SignalAction.HEDGE_BOTH
+                else MAX_DIRECTIONAL_POSITIONS
+            )
+            if source_counts.get(signal.source, 0) >= max_positions:
+                filtered["source_position_cap"] += 1
+                continue
+
+            cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
+            current_exposure = source_exposure.get(signal.source, 0.0)
+            projected_exposure = current_exposure + max(signal.suggested_size_usd, 0.0)
+            if projected_exposure > self.portfolio.starting_capital * cap:
+                filtered["source_exposure_cap"] += 1
+                continue
+
+            selected.append(signal)
+            seen_conditions.add(signal.condition_id)
+            source_counts[signal.source] = source_counts.get(signal.source, 0) + 1
+            source_exposure[signal.source] = projected_exposure
+
+        return selected, {k: v for k, v in filtered.items() if v}
+
     def execute_signal(self, signal: Signal, current_prices: dict[str, float]) -> PaperTrade | None:
         """
         Execute a signal in paper mode.
@@ -85,8 +154,7 @@ class PaperTrader:
 
         # Risk checks
         if not self._passes_risk_checks(signal):
-            logger.info(f"[PAPER] Signal {signal.id} rejected by risk checks")
-            self._log_signal(signal, "REJECTED_RISK")
+            logger.debug(f"[PAPER] Signal {signal.id} rejected by risk checks")
             return None
 
         # Route to appropriate execution method
@@ -307,10 +375,15 @@ class PaperTrader:
     def check_exits(self, current_prices: dict[str, float]):
         """Check if any positions should be exited (take-profit, stop-loss, time)."""
         exits = []
+        now = datetime.now(timezone.utc)
 
         for pos in self.portfolio.positions[:]:
-            # Skip hedges and arbs — they resolve at market close
-            if pos.side in ("HEDGE", "ARB"):
+            if pos.side == "HEDGE":
+                age_hours = (now - pos.opened_at).total_seconds() / 3600
+                if age_hours >= HEDGE_ROTATION_HOURS:
+                    exits.append((pos, 1.0, f"HEDGE_ROTATE: {age_hours:.1f}h"))
+                continue
+            if pos.side == "ARB":
                 continue
 
             # Get current price
@@ -343,16 +416,23 @@ class PaperTrader:
         # Execute exits
         for pos, exit_price, reason in exits:
             # Calculate realized P&L
-            if pos.side == "YES":
+            if pos.side == "HEDGE":
+                pnl = 0.0
+                proceeds = pos.shares
+                fee = 0.0
+            elif pos.side == "YES":
                 pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = proceeds * EXIT_FEE_ESTIMATE_RATE
             else:  # NO
                 pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = proceeds * EXIT_FEE_ESTIMATE_RATE
 
             # Return capital + P&L to cash
-            proceeds = pos.shares * exit_price
             self.portfolio.cash += proceeds
             self.portfolio.total_realized_pnl += pnl
-            self.portfolio.total_fees_paid += proceeds * EXIT_FEE_ESTIMATE_RATE
+            self.portfolio.total_fees_paid += fee
 
             if pnl > 0:
                 self.portfolio.winning_trades += 1
@@ -365,6 +445,7 @@ class PaperTrader:
                 f"Entry: ${pos.avg_entry_price:.3f} → Exit: ${exit_price:.3f} | "
                 f"PnL: ${pnl:+.2f} | Cash freed: ${proceeds:.2f}"
             )
+        return len(exits)
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
@@ -408,7 +489,7 @@ class PaperTrader:
                 }
 
         if not closed:
-            return
+            return 0
 
         # Check each position
         resolved = []
@@ -461,6 +542,7 @@ class PaperTrader:
                 f"[RESOLVED] {pos.market_slug} | {pos.side} | "
                 f"PnL: ${pnl:+.2f} | Cash returned to portfolio"
             )
+        return len(resolved)
 
     def _update_drawdown(self):
         """Recalculate drawdown from actual portfolio value."""
@@ -481,7 +563,7 @@ class PaperTrader:
 
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:
-            logger.info("[RISK] Max exposure reached")
+            logger.debug("[RISK] Max exposure reached")
             return False
 
         # Check current drawdown (30% threshold)
@@ -491,7 +573,7 @@ class PaperTrader:
 
         # Check cash available (minimum $2 to trade, not 50% of suggested size)
         if self.portfolio.cash < MIN_TRADE_CASH_USD:
-            logger.info(
+            logger.debug(
                 f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < ${MIN_TRADE_CASH_USD}"
             )
             return False
@@ -499,7 +581,7 @@ class PaperTrader:
         # No duplicate positions on same market
         existing = [p for p in self.portfolio.positions if p.condition_id == signal.condition_id]
         if existing:
-            logger.info(f"[RISK] Already have position on {signal.market_slug}")
+            logger.debug(f"[RISK] Already have position on {signal.market_slug}")
             return False
 
         # Max positions per strategy (higher limit for hedged positions)
@@ -510,7 +592,7 @@ class PaperTrader:
             else MAX_DIRECTIONAL_POSITIONS
         )
         if len(same_source) >= max_positions:
-            logger.info(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
+            logger.debug(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False
 
         # Max exposure per strategy (higher for hedged positions since risk is bounded)
@@ -520,7 +602,7 @@ class PaperTrader:
         )
         cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
         if strategy_exposure > self.portfolio.starting_capital * cap:
-            logger.info(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
+            logger.debug(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
             return False
 
         return True

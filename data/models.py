@@ -146,6 +146,7 @@ class Position(BaseModel):
     current_price: float = 0.0
     unrealized_pnl: float = 0.0
     source: SignalSource
+    opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Portfolio(BaseModel):

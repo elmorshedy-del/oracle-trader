@@ -68,7 +68,13 @@ class HedgedLiquidityStrategy(BaseStrategy):
                 )
                 signals.append(signal)
                 self._stats["signals_generated"] += 1
-                logger.info(f"[LIQUIDITY] Signal: {market.slug} — edge ${edge:.3f}")
+
+        if signals:
+            best_edge = max(signal.expected_edge for signal in signals)
+            logger.info(
+                f"[LIQUIDITY] Generated {len(signals)} candidate signals "
+                f"(best edge: ${best_edge:.3f})"
+            )
 
         return signals
 

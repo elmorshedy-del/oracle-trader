@@ -19,14 +19,22 @@ from fastapi.staticfiles import StaticFiles
 
 from config import PipelineConfig
 from engine.pipeline import Pipeline
+from runtime_paths import LOG_DIR, STATE_PATH
 
 # Logging
+stream_handler = logging.StreamHandler()
+file_handler = logging.FileHandler(LOG_DIR / "app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
+    handlers=[stream_handler, file_handler],
+    force=True,
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 # Global pipeline instance
 pipeline: Pipeline | None = None
@@ -138,27 +146,35 @@ async def get_whales():
 async def download_logs():
     """Download all logs as a JSON bundle."""
     import json as _json
-    from pathlib import Path as _Path
-    log_dir = _Path("logs")
     bundle = {}
-    for log_file in log_dir.glob("*.jsonl"):
-        lines = []
+    for log_file in sorted(LOG_DIR.iterdir()):
+        if log_file.suffix not in {".jsonl", ".json", ".log"}:
+            continue
         try:
-            for line in log_file.read_text().strip().split("\n"):
-                if line:
-                    try:
-                        lines.append(_json.loads(line))
-                    except _json.JSONDecodeError:
-                        lines.append({"raw": line})
+            content = log_file.read_text(errors="replace").strip()
+            if log_file.suffix == ".jsonl":
+                lines = []
+                for line in content.split("\n"):
+                    if line:
+                        try:
+                            lines.append(_json.loads(line))
+                        except _json.JSONDecodeError:
+                            lines.append({"raw": line})
+                bundle[log_file.name] = lines
+            elif log_file.suffix == ".json":
+                bundle[log_file.name] = _json.loads(content) if content else {}
+            else:
+                bundle[log_file.name] = content
         except Exception:
-            pass
-        bundle[log_file.stem] = lines
+            bundle[log_file.name] = {"error": "failed to read log file"}
     # Add current state
     if pipeline:
         try:
             bundle["current_state"] = pipeline.get_state()
         except Exception:
             pass
+    bundle["log_dir"] = str(LOG_DIR)
+    bundle["state_path"] = str(STATE_PATH)
     content = _json.dumps(bundle, indent=2, default=str)
     return StreamingResponse(
         io.BytesIO(content.encode()),
@@ -170,11 +186,22 @@ async def download_logs():
 @app.get("/api/reset")
 async def reset_portfolio():
     """Reset portfolio to fresh start with current config capital."""
-    import os
-    state_path = "/data/state.json"
-    if os.path.exists(state_path):
-        os.remove(state_path)
-    return {"status": "reset", "message": "Restart the service to apply"}
+    if pipeline is not None:
+        await pipeline.reset_state()
+        return {
+            "status": "reset",
+            "message": "Portfolio and strategy caches reset in-memory and on disk",
+            "state_path": str(STATE_PATH),
+            "log_dir": str(LOG_DIR),
+        }
+
+    STATE_PATH.unlink(missing_ok=True)
+    return {
+        "status": "reset",
+        "message": "State file deleted",
+        "state_path": str(STATE_PATH),
+        "log_dir": str(LOG_DIR),
+    }
 
 @app.get("/api/health/detail")
 async def health_detail():

@@ -5,6 +5,7 @@ Runs the main algo loop: scan → signal → execute → log.
 Coordinates all strategies and the paper trading engine.
 """
 
+import json
 import asyncio
 import time as _time
 import logging
@@ -19,12 +20,11 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.weather import WeatherForecastStrategy
-from strategies.crypto_arb import CryptoTemporalArbStrategy
-from strategies.weather import WeatherForecastStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester
 from engine.health_monitor import HealthMonitor
+from runtime_paths import LOG_DIR, STATE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ class Pipeline:
         self.config = config or PipelineConfig()
         self.start_time = datetime.now(timezone.utc)
         self._running = False
+        self._cycle_lock = asyncio.Lock()
 
         # Data
         self.collector = PolymarketCollector(
@@ -58,14 +59,15 @@ class Pipeline:
         # Engine
         self.trader = PaperTrader(
             starting_capital=self.config.risk.max_total_exposure_usd,
-            log_dir="logs",
+            log_dir=str(LOG_DIR),
+            state_path=str(STATE_PATH),
         )
 
         # Slippage model (self-calibrating)
-        self.slippage = SlippageModel(initial_k=0.1, log_dir="logs")
+        self.slippage = SlippageModel(initial_k=0.1, log_dir=str(LOG_DIR))
 
         # A/B tester
-        self.ab_tester = ABTester(log_dir="logs")
+        self.ab_tester = ABTester(log_dir=str(LOG_DIR))
         self.ab_tester.create_test(
             "mean_reversion",
             "conservative", {"drop_threshold": 0.15, "exit_reversion": 0.50, "min_days_left": 30},
@@ -78,7 +80,7 @@ class Pipeline:
         )
 
         # Health monitor
-        self.health = HealthMonitor(log_dir="logs")
+        self.health = HealthMonitor(log_dir=str(LOG_DIR))
 
         # State
         self.dashboard_state = DashboardState(mode=self.config.mode)
@@ -87,6 +89,7 @@ class Pipeline:
         self._all_signals: list[Signal] = []
         self._errors: list[str] = []
         self._scan_count = 0
+        self._latest_diagnostics: dict = {}
 
     async def start(self):
         """Start the main loop."""
@@ -121,83 +124,179 @@ class Pipeline:
 
     async def _scan_cycle(self):
         """One full scan cycle: fetch data → run strategies → execute signals."""
-        self._scan_count += 1
-        cycle_start = datetime.now(timezone.utc)
+        async with self._cycle_lock:
+            self._scan_count += 1
+            cycle_start = datetime.now(timezone.utc)
 
-        # Refresh market data every cycle
-        await self._refresh_data()
+            # Refresh market data every cycle
+            await self._refresh_data()
 
-        if not self._markets:
-            logger.warning("No markets available, skipping cycle")
-            return
+            if not self._markets:
+                logger.warning("No markets available, skipping cycle")
+                return
 
-        # Run all enabled strategies
-        all_signals: list[Signal] = []
+            current_prices = self._build_price_map()
 
-        for name, strategy in self.strategies.items():
-            if not strategy.enabled:
-                continue
-            try:
-                _strat_start = _time.time()
-                signals = await strategy.scan(self._markets, self._events)
-                _strat_dur = (_time.time() - _strat_start) * 1000
-                all_signals.extend(signals)
-                self.health.record_strategy_run(name, len(signals), _strat_dur)
-            except Exception as e:
-                logger.error(f"Strategy {name} error: {e}")
-                strategy._stats["errors"] += 1
-                self.health.record_strategy_error(name, str(e))
+            # Free capacity before looking for new entries.
+            self.trader.update_positions(current_prices)
+            exit_count = self.trader.check_exits(current_prices)
+            resolved_count = self.trader.resolve_positions(self._markets)
 
-        # Skip per-signal whale confirmation (was making 600+ API calls per scan)
-        # Whale data is still loaded and available for the dashboard
-        # TODO: implement cached whale sentiment lookup instead of per-signal API calls
+            held_conditions = {p.condition_id for p in self.trader.portfolio.positions}
+            candidate_markets = [
+                market for market in self._markets if market.condition_id not in held_conditions
+            ]
 
-        # Sort by confidence (highest first)
-        all_signals.sort(key=lambda s: s.confidence, reverse=True)
+            # Run all enabled strategies on markets that are not already held.
+            all_signals: list[Signal] = []
+            strategy_signal_counts: dict[str, int] = {}
+            for name, strategy in self.strategies.items():
+                if not strategy.enabled:
+                    continue
+                try:
+                    _strat_start = _time.time()
+                    signals = await strategy.scan(candidate_markets, self._events)
+                    _strat_dur = (_time.time() - _strat_start) * 1000
+                    all_signals.extend(signals)
+                    strategy_signal_counts[name] = len(signals)
+                    self.health.record_strategy_run(name, len(signals), _strat_dur)
+                except Exception as e:
+                    logger.error(f"Strategy {name} error: {e}")
+                    strategy._stats["errors"] += 1
+                    self.health.record_strategy_error(name, str(e))
 
-        # Deduplicate: only keep highest-confidence signal per market
-        seen_markets = set()
-        deduped = []
-        for s in all_signals:
-            if s.condition_id not in seen_markets:
-                deduped.append(s)
-                seen_markets.add(s.condition_id)
-        all_signals = deduped
+            # Skip per-signal whale confirmation (was making 600+ API calls per scan)
+            # Whale data is still loaded and available for the dashboard
+            # TODO: implement cached whale sentiment lookup instead of per-signal API calls
 
-        # Execute signals through paper trader
-        current_prices = self._build_price_map()
-        executed = 0
-        for signal in all_signals:
-            trade = self.trader.execute_signal(signal, current_prices)
-            if trade:
-                executed += 1
+            # Highest-confidence signals get first claim on remaining capacity.
+            all_signals.sort(key=lambda s: s.confidence, reverse=True)
+            all_signals, filtered = self.trader.select_candidate_signals(all_signals)
+            if filtered:
+                logger.info(
+                    "[PIPELINE] Filtered signals before execution: "
+                    + ", ".join(f"{reason}={count}" for reason, count in filtered.items())
+                )
 
-        # Update positions with current prices
-        self.trader.update_positions(current_prices)
+            executed = 0
+            for signal in all_signals:
+                trade = self.trader.execute_signal(signal, current_prices)
+                if trade:
+                    executed += 1
 
-        # Check for exits (take-profit, stop-loss)
-        self.trader.check_exits(current_prices)
+            # Store signals for dashboard
+            self._all_signals = all_signals
+            self.dashboard_state.last_scan = cycle_start
+            self.dashboard_state.active_signals = all_signals[:20]
+            self.dashboard_state.recent_trades = self.trader.trade_log[-50:]
+            self.dashboard_state.portfolio = self.trader.portfolio
 
-        # Check if any positions resolved (market closed)
-        self.trader.resolve_positions(self._markets)
+            cycle_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+            self.trader.save_state()
 
-        # Store signals for dashboard
-        self._all_signals = all_signals
-        self.dashboard_state.last_scan = cycle_start
-        self.dashboard_state.active_signals = all_signals[:20]
-        self.dashboard_state.recent_trades = self.trader.trade_log[-50:]
-        self.dashboard_state.portfolio = self.trader.portfolio
+            self.health.record_scan(cycle_time, len(self._markets), len(all_signals), executed)
+            logger.info(
+                f"Scan #{self._scan_count}: {len(self._markets)} markets | "
+                f"{len(all_signals)} signals | {executed} executed | "
+                f"{cycle_time:.1f}s | Portfolio: ${self.trader.portfolio.total_value:.2f}"
+            )
+            self._write_diagnostic_entry(
+                cycle_start=cycle_start,
+                cycle_time=cycle_time,
+                candidate_markets=candidate_markets,
+                strategy_signal_counts=strategy_signal_counts,
+                filtered=filtered,
+                executed=executed,
+                exits=exit_count,
+                resolved=resolved_count,
+            )
 
-        cycle_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
-        # Persist state every scan
-        self.trader.save_state()
+    async def reset_state(self):
+        """Reset portfolio and per-strategy transient state without deleting persisted logs."""
+        async with self._cycle_lock:
+            self.trader.reset(self.config.risk.max_total_exposure_usd)
+            self._all_signals = []
+            self._errors = []
+            self._scan_count = 0
+            self._latest_diagnostics = {}
+            self.dashboard_state = DashboardState(mode=self.config.mode)
 
-        self.health.record_scan(cycle_time, len(self._markets), len(all_signals), executed)
-        logger.info(
-            f"Scan #{self._scan_count}: {len(self._markets)} markets | "
-            f"{len(all_signals)} signals | {executed} executed | "
-            f"{cycle_time:.1f}s | Portfolio: ${self.trader.portfolio.total_value:.2f}"
-        )
+            news: NewsLatencyStrategy = self.strategies["news"]
+            news._seen_headlines.clear()
+            news._recent_headlines.clear()
+            news._api_calls_this_hour = 0
+            news._hour_start = datetime.now(timezone.utc)
+            news._market_index.clear()
+
+            mean_reversion: MeanReversionStrategy = self.strategies["mean_reversion"]
+            mean_reversion._baselines.clear()
+
+            crypto: CryptoTemporalArbStrategy = self.strategies["crypto_arb"]
+            crypto._price_history = {"BTC": [], "ETH": [], "SOL": []}
+            crypto._matched_markets = {}
+            crypto._last_market_scan = 0
+
+            weather: WeatherForecastStrategy = self.strategies["weather"]
+            weather._forecasts.clear()
+            weather._matched_markets = []
+            weather._last_forecast_fetch = 0
+            weather._last_market_scan = 0
+
+            self.health = HealthMonitor(log_dir=str(LOG_DIR))
+            await self._refresh_data()
+            self.trader.save_state()
+            logger.info("[PIPELINE] Reset live paper trading state")
+
+    def _write_diagnostic_entry(
+        self,
+        *,
+        cycle_start: datetime,
+        cycle_time: float,
+        candidate_markets: list,
+        strategy_signal_counts: dict[str, int],
+        filtered: dict[str, int],
+        executed: int,
+        exits: int,
+        resolved: int,
+    ):
+        """Persist one compact diagnostic record per scan for later review."""
+        positions_by_source: dict[str, int] = {}
+        exposure_by_source: dict[str, float] = {}
+        for pos in self.trader.portfolio.positions:
+            source = pos.source.value
+            positions_by_source[source] = positions_by_source.get(source, 0) + 1
+            exposure_by_source[source] = exposure_by_source.get(source, 0.0) + (
+                pos.shares * pos.current_price
+            )
+
+        entry = {
+            "timestamp": cycle_start.isoformat(),
+            "scan": self._scan_count,
+            "duration_secs": round(cycle_time, 2),
+            "markets_total": len(self._markets),
+            "markets_tradeable": len(candidate_markets),
+            "signals_by_strategy": strategy_signal_counts,
+            "filtered_signals": filtered,
+            "executed": executed,
+            "exits": exits,
+            "resolved": resolved,
+            "portfolio": {
+                "cash": round(self.trader.portfolio.cash, 2),
+                "total_value": round(self.trader.portfolio.total_value, 2),
+                "open_positions": len(self.trader.portfolio.positions),
+                "positions_by_source": positions_by_source,
+                "exposure_by_source": {
+                    source: round(exposure, 2)
+                    for source, exposure in exposure_by_source.items()
+                },
+            },
+        }
+        self._latest_diagnostics = entry
+        try:
+            with open(LOG_DIR / "diagnostics.jsonl", "a") as f:
+                f.write(json.dumps(entry) + "\n")
+        except OSError as e:
+            logger.warning(f"[PIPELINE] Failed to write diagnostics log: {e}")
 
     async def _refresh_data(self):
         """Fetch fresh market and event data."""
@@ -321,6 +420,7 @@ class Pipeline:
             "slippage": self.slippage.get_stats(),
             "ab_tests": self.ab_tester.get_report(),
             "performance": self.trader.get_performance_report(),
+            "diagnostics": self._latest_diagnostics,
             "errors": self._errors[-10:],
             "markets_sample": [
                 {

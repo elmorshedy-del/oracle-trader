@@ -175,6 +175,12 @@ class Pipeline:
         # Update positions with current prices
         self.trader.update_positions(current_prices)
 
+        # Check for exits (take-profit, stop-loss)
+        self.trader.check_exits(current_prices)
+
+        # Check if any positions resolved (market closed)
+        self.trader.resolve_positions(self._markets)
+
         # Store signals for dashboard
         self._all_signals = all_signals
         self.dashboard_state.last_scan = cycle_start
@@ -198,6 +204,19 @@ class Pipeline:
         try:
             self._markets = await self.collector.get_all_active_markets()
             self._events = await self.collector.get_events(limit=100)
+            # Keep held markets in the working set so open positions keep receiving
+            # fresh prices and closed positions can still be resolved cleanly.
+            if self.trader.portfolio.positions:
+                seen_conditions = {m.condition_id for m in self._markets}
+                held_slugs = {p.market_slug for p in self.trader.portfolio.positions}
+                for slug in held_slugs:
+                    try:
+                        m = await self.collector.get_market_by_slug(slug)
+                        if m and m.condition_id not in seen_conditions:
+                            self._markets.append(m)
+                            seen_conditions.add(m.condition_id)
+                    except Exception:
+                        logger.debug("Held market refresh failed for slug=%s", slug, exc_info=True)
             self.dashboard_state.active_markets = len(self._markets)
             self.health.record_api_success("gamma")
             self.health.record_data_freshness("markets")

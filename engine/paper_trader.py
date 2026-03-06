@@ -16,6 +16,13 @@ from data.models import (
 logger = logging.getLogger(__name__)
 
 BASE_FEE_RATE = 0.02
+EXIT_FEE_ESTIMATE_RATE = BASE_FEE_RATE * 0.5
+MIN_TRADE_CASH_USD = 2.0
+MAX_HEDGE_POSITIONS = 30
+MAX_DIRECTIONAL_POSITIONS = 10
+DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
+DIRECTIONAL_STOP_LOSS_PCT = -0.25
+TOKEN_CONVERGENCE_PRICE = 0.95
 
 
 class PaperTrader:
@@ -297,6 +304,68 @@ class PaperTrader:
         )
         return trade
 
+    def check_exits(self, current_prices: dict[str, float]):
+        """Check if any positions should be exited (take-profit, stop-loss, time)."""
+        exits = []
+
+        for pos in self.portfolio.positions[:]:
+            # Skip hedges and arbs — they resolve at market close
+            if pos.side in ("HEDGE", "ARB"):
+                continue
+
+            # Get current price
+            current = current_prices.get(pos.token_id, pos.current_price)
+            if current <= 0:
+                continue
+
+            entry = pos.avg_entry_price
+            if entry <= 0:
+                continue
+
+            pnl_pct = (current - entry) / entry
+            reason = None
+
+            # Take profit: price moved +20% from entry
+            if pnl_pct >= DIRECTIONAL_TAKE_PROFIT_PCT:
+                reason = f"TAKE_PROFIT: +{pnl_pct:.1%}"
+
+            # Stop loss: price moved -25% from entry
+            elif pnl_pct <= DIRECTIONAL_STOP_LOSS_PCT:
+                reason = f"STOP_LOSS: {pnl_pct:.1%}"
+
+            # Close out directional bets once the held token has effectively converged.
+            elif current >= TOKEN_CONVERGENCE_PRICE:
+                reason = f"CONVERGED: {pos.side} at ${current:.3f}"
+
+            if reason:
+                exits.append((pos, current, reason))
+
+        # Execute exits
+        for pos, exit_price, reason in exits:
+            # Calculate realized P&L
+            if pos.side == "YES":
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+            else:  # NO
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+
+            # Return capital + P&L to cash
+            proceeds = pos.shares * exit_price
+            self.portfolio.cash += proceeds
+            self.portfolio.total_realized_pnl += pnl
+            self.portfolio.total_fees_paid += proceeds * EXIT_FEE_ESTIMATE_RATE
+
+            if pnl > 0:
+                self.portfolio.winning_trades += 1
+            elif pnl < 0:
+                self.portfolio.losing_trades += 1
+
+            self.portfolio.positions.remove(pos)
+            logger.info(
+                f"[EXIT] {pos.market_slug} | {pos.side} | {reason} | "
+                f"Entry: ${pos.avg_entry_price:.3f} → Exit: ${exit_price:.3f} | "
+                f"PnL: ${pnl:+.2f} | Cash freed: ${proceeds:.2f}"
+            )
+
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
         # Fix stale peak_value (may be wrong from default or corrupted state)
@@ -323,6 +392,75 @@ class PaperTrader:
             self.portfolio.current_drawdown = dd
             if dd > self.portfolio.max_drawdown:
                 self.portfolio.max_drawdown = dd
+
+    def resolve_positions(self, markets: list):
+        """Check if any positions are on resolved markets and settle them."""
+        # Build a lookup of closed markets
+        closed = {}
+        for m in markets:
+            if m.closed and m.outcomes:
+                # Determine winning outcome — price closest to 1.0
+                winner = max(m.outcomes, key=lambda o: o.price)
+                closed[m.condition_id] = {
+                    "slug": m.slug,
+                    "winner_token": winner.token_id,
+                    "winner_name": winner.name,
+                }
+
+        if not closed:
+            return
+
+        # Check each position
+        resolved = []
+        for pos in self.portfolio.positions[:]:
+            if pos.condition_id not in closed:
+                continue
+
+            result = closed[pos.condition_id]
+            pnl = 0.0
+
+            if pos.side == "ARB":
+                # Arb always wins — collect $1.00 per unit
+                payout = pos.shares * 1.0
+                cost = pos.shares * pos.avg_entry_price
+                pnl = payout - cost
+            elif pos.side == "HEDGE":
+                # Hedge collects $1.00 per share (both sides = guaranteed $1)
+                pnl = 0.0  # break even on the hedge, profit was from rewards
+                # Return the capital
+            elif pos.side in ("YES", "NO"):
+                # Directional bet
+                if pos.side == "YES" and pos.token_id == result["winner_token"]:
+                    pnl = pos.shares * (1.0 - pos.avg_entry_price)  # won
+                elif pos.side == "NO" and pos.token_id == result["winner_token"]:
+                    pnl = pos.shares * (1.0 - pos.avg_entry_price)  # won
+                else:
+                    pnl = -(pos.shares * pos.avg_entry_price)  # lost
+
+            # Return capital + P&L to cash
+            if pos.side == "HEDGE":
+                self.portfolio.cash += pos.shares  # return hedge capital
+            elif pos.side == "ARB":
+                self.portfolio.cash += pos.shares * 1.0  # arb payout
+            else:
+                self.portfolio.cash += max(0, pos.shares * pos.avg_entry_price + pnl)
+
+            # Track wins/losses
+            self.portfolio.total_realized_pnl += pnl
+            if pnl > 0:
+                self.portfolio.winning_trades += 1
+            elif pnl < 0:
+                self.portfolio.losing_trades += 1
+
+            resolved.append((pos, pnl))
+
+        # Remove resolved positions
+        for pos, pnl in resolved:
+            self.portfolio.positions.remove(pos)
+            logger.info(
+                f"[RESOLVED] {pos.market_slug} | {pos.side} | "
+                f"PnL: ${pnl:+.2f} | Cash returned to portfolio"
+            )
 
     def _update_drawdown(self):
         """Recalculate drawdown from actual portfolio value."""
@@ -351,11 +489,10 @@ class PaperTrader:
             logger.warning("[RISK] Max drawdown exceeded — pausing trading")
             return False
 
-        # Check cash available
-        if self.portfolio.cash < signal.suggested_size_usd * 0.5:
+        # Check cash available (minimum $2 to trade, not 50% of suggested size)
+        if self.portfolio.cash < MIN_TRADE_CASH_USD:
             logger.info(
-                f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < "
-                f"${signal.suggested_size_usd * 0.5:.2f} needed"
+                f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < ${MIN_TRADE_CASH_USD}"
             )
             return False
 
@@ -367,7 +504,11 @@ class PaperTrader:
 
         # Max positions per strategy (higher limit for hedged positions)
         same_source = [p for p in self.portfolio.positions if p.source == signal.source]
-        max_positions = 15 if signal.action == SignalAction.HEDGE_BOTH else 5
+        max_positions = (
+            MAX_HEDGE_POSITIONS
+            if signal.action == SignalAction.HEDGE_BOTH
+            else MAX_DIRECTIONAL_POSITIONS
+        )
         if len(same_source) >= max_positions:
             logger.info(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False

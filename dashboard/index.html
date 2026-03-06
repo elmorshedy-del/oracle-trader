@@ -826,7 +826,19 @@ function renderHealth(d) {
 function renderSanity(d) {
   const diag = d.diagnostics || {};
   const filtered = diag.filtered_signals || {};
-  const totalSignals = Object.values(diag.signals_by_strategy || {}).reduce((sum, val) => sum + val, 0);
+  const signalsByStrategy = diag.signals_by_strategy || {};
+  const executedByStrategy = diag.executed_by_strategy || {};
+  const totalSignals = Object.values(signalsByStrategy).reduce((sum, val) => sum + val, 0);
+  const activeStrategies = Object.values(signalsByStrategy).filter(val => val > 0).length;
+  const openBySource = diag.portfolio?.positions_by_source || {};
+  const executedEntries = Object.entries(executedByStrategy);
+  const dominantEntries = executedEntries.length ? executedEntries : Object.entries(openBySource);
+  const dominant = dominantEntries.sort((a, b) => b[1] - a[1])[0];
+  const dominantTotal = dominantEntries.reduce((sum, [, count]) => sum + count, 0);
+  const dominantShare = dominant && dominantTotal ? dominant[1] / dominantTotal : 0;
+  const executedSummary = executedEntries.length
+    ? executedEntries.map(([source, count]) => `${source}:${count}`).join(', ')
+    : '0 executed';
   const checks = [
     {
       label: 'Fresh tradeable markets',
@@ -844,9 +856,19 @@ function renderSanity(d) {
       note: `${(filtered.source_exposure_cap || 0) + (filtered.source_position_cap || 0)} blocked`,
     },
     {
+      label: 'Strategy coverage',
+      ok: totalSignals === 0 || activeStrategies >= 2,
+      note: `${activeStrategies} strategies firing`,
+    },
+    {
+      label: 'Strategy concentration',
+      ok: !dominant || dominantShare <= 0.8,
+      note: dominant ? `${dominant[0]} ${(dominantShare * 100).toFixed(0)}% of fills` : 'No concentration yet',
+    },
+    {
       label: 'New trades this scan',
       ok: (diag.executed || 0) > 0 || totalSignals === 0,
-      note: `${diag.executed || 0} executed / ${totalSignals} candidates`,
+      note: `${diag.executed || 0} executed / ${totalSignals} candidates | ${executedSummary}`,
     },
     {
       label: 'Exit flow active',

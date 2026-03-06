@@ -20,6 +20,9 @@ EXIT_FEE_ESTIMATE_RATE = BASE_FEE_RATE * 0.5
 MIN_TRADE_CASH_USD = 2.0
 MAX_HEDGE_POSITIONS = 30
 MAX_DIRECTIONAL_POSITIONS = 10
+MAX_NEW_HEDGE_POSITIONS_PER_SCAN = 8
+MAX_NEW_ARB_POSITIONS_PER_SCAN = 2
+MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN = 4
 DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
 DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
@@ -100,6 +103,7 @@ class PaperTrader:
         filtered = {
             "held_market": 0,
             "duplicate_market": 0,
+            "source_scan_cap": 0,
             "source_position_cap": 0,
             "source_exposure_cap": 0,
         }
@@ -107,6 +111,7 @@ class PaperTrader:
         seen_conditions: set[str] = set()
         source_counts: dict = {}
         source_exposure: dict = {}
+        selected_per_source: dict = {}
 
         for pos in self.portfolio.positions:
             source_counts[pos.source] = source_counts.get(pos.source, 0) + 1
@@ -120,6 +125,15 @@ class PaperTrader:
                 continue
             if signal.condition_id in seen_conditions:
                 filtered["duplicate_market"] += 1
+                continue
+
+            per_scan_cap = MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN
+            if signal.action == SignalAction.HEDGE_BOTH:
+                per_scan_cap = MAX_NEW_HEDGE_POSITIONS_PER_SCAN
+            elif signal.action == SignalAction.ARB_ALL:
+                per_scan_cap = MAX_NEW_ARB_POSITIONS_PER_SCAN
+            if selected_per_source.get(signal.source, 0) >= per_scan_cap:
+                filtered["source_scan_cap"] += 1
                 continue
 
             max_positions = (
@@ -140,6 +154,7 @@ class PaperTrader:
 
             selected.append(signal)
             seen_conditions.add(signal.condition_id)
+            selected_per_source[signal.source] = selected_per_source.get(signal.source, 0) + 1
             source_counts[signal.source] = source_counts.get(signal.source, 0) + 1
             source_exposure[signal.source] = projected_exposure
 

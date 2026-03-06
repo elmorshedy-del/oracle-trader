@@ -179,10 +179,13 @@ class Pipeline:
                 )
 
             executed = 0
+            executed_by_strategy: dict[str, int] = {}
             for signal in all_signals:
                 trade = self.trader.execute_signal(signal, current_prices)
                 if trade:
                     executed += 1
+                    source = trade.source.value
+                    executed_by_strategy[source] = executed_by_strategy.get(source, 0) + 1
 
             # Store signals for dashboard
             self._all_signals = all_signals
@@ -207,6 +210,7 @@ class Pipeline:
                 strategy_signal_counts=strategy_signal_counts,
                 filtered=filtered,
                 executed=executed,
+                executed_by_strategy=executed_by_strategy,
                 exits=exit_count,
                 resolved=resolved_count,
             )
@@ -256,6 +260,7 @@ class Pipeline:
         strategy_signal_counts: dict[str, int],
         filtered: dict[str, int],
         executed: int,
+        executed_by_strategy: dict[str, int],
         exits: int,
         resolved: int,
     ):
@@ -278,6 +283,7 @@ class Pipeline:
             "signals_by_strategy": strategy_signal_counts,
             "filtered_signals": filtered,
             "executed": executed,
+            "executed_by_strategy": executed_by_strategy,
             "exits": exits,
             "resolved": resolved,
             "portfolio": {

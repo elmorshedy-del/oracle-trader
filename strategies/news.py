@@ -49,8 +49,15 @@ class NewsLatencyStrategy(BaseStrategy):
         if not new_headlines:
             return []
 
-        # Pre-filter: only send to LLM if headline contains market-related keywords
-        relevant_headlines = new_headlines[:10]  # send top 10 headlines directly to Claude
+        # Pre-filter: only send relevant headlines to Claude (save API budget)
+        relevant_headlines = self._keyword_prefilter(new_headlines)
+        relevant_count = len(relevant_headlines)
+        if not relevant_headlines:
+            # If prefilter finds nothing, send top 3 as fallback
+            relevant_headlines = new_headlines[:3]
+        else:
+            # Cap at 10 most relevant
+            relevant_headlines = relevant_headlines[:10]
 
         signals = []
         for headline in relevant_headlines:
@@ -64,6 +71,14 @@ class NewsLatencyStrategy(BaseStrategy):
                 if signal:
                     signals.append(signal)
                     self._stats["signals_generated"] += 1
+
+        logger.info(
+            "[NEWS] Scan: %s new headlines | %s relevant | %s classified | %s signals",
+            len(new_headlines),
+            relevant_count,
+            len(relevant_headlines),
+            len(signals),
+        )
 
         return signals
 
@@ -151,7 +166,6 @@ class NewsLatencyStrategy(BaseStrategy):
                     break
             if matched:
                 relevant.append(h)
-        logger.info(f"[NEWS] Pre-filter: {len(relevant)}/{len(headlines)} headlines relevant")
         return relevant
 
     # ------------------------------------------------------------------
@@ -218,7 +232,7 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             import json
             classification = json.loads(text)
             headline.classification = classification
-            logger.info(
+            logger.debug(
                 f"[NEWS] Classified: '{headline.title[:60]}' → "
                 f"market={classification.get('market_slug', 'none')}, "
                 f"dir={classification.get('direction', '?')}, "

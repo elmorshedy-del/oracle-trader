@@ -56,7 +56,6 @@ class PolymarketCollector:
                 if market:
                     markets.append(market)
                     self._market_cache[market.condition_id] = market
-            logger.info(f"Fetched {len(markets)} active markets")
             return markets
         except Exception as e:
             logger.error(f"Failed to fetch markets: {e}")
@@ -67,15 +66,22 @@ class PolymarketCollector:
         all_markets = []
         offset = 0
         batch_size = 100
+        pages = 0
         while True:
             batch = await self.get_active_markets(limit=batch_size, offset=offset)
             if not batch:
                 break
             all_markets.extend(batch)
+            pages += 1
             if len(batch) < batch_size:
                 break
             offset += batch_size
             await asyncio.sleep(0.2)  # rate limit courtesy
+        logger.info(
+            "[COLLECTOR] Active markets refresh: %s markets across %s pages",
+            len(all_markets),
+            pages,
+        )
         return all_markets
 
     async def get_events(self, limit: int = 50, offset: int = 0) -> list[Event]:
@@ -91,7 +97,7 @@ class PolymarketCollector:
                 if event:
                     events.append(event)
                     self._event_cache[event.event_id] = event
-            logger.info(f"Fetched {len(events)} events")
+            logger.info("[COLLECTOR] Events refresh: %s events", len(events))
             return events
         except Exception as e:
             logger.error(f"Failed to fetch events: {e}")

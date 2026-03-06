@@ -140,7 +140,7 @@ class WeatherForecastStrategy(BaseStrategy):
                 )
                 signals.append(signal)
                 self._stats["signals_generated"] += 1
-                logger.info(
+                logger.debug(
                     f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
                     f"range={temp_range}, prob={forecast_prob:.0%} vs market={yes_price:.0%} → BUY YES"
                 )
@@ -173,11 +173,17 @@ class WeatherForecastStrategy(BaseStrategy):
                 )
                 signals.append(signal)
                 self._stats["signals_generated"] += 1
-                logger.info(
+                logger.debug(
                     f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
                     f"range={temp_range}, market overpriced → BUY NO"
                 )
 
+        if signals:
+            logger.info(
+                "[WEATHER] Generated %s signals from %s matched markets",
+                len(signals),
+                len(self._matched_markets),
+            )
         if not signals and self._stats["scans_completed"] % 30 == 0:
             logger.info(
                 f"[WEATHER] Status: {len(self._forecasts)} city forecasts, "
@@ -203,9 +209,8 @@ class WeatherForecastStrategy(BaseStrategy):
                         "periods": periods,
                         "fetched_at": datetime.now(timezone.utc),
                     }
-                    # Log the next day's forecast
                     today = periods[0] if periods else {}
-                    logger.info(
+                    logger.debug(
                         f"[WEATHER] {city}: {today.get('name', '?')} "
                         f"temp={today.get('temperature', '?')}°{today.get('temperatureUnit', 'F')} "
                         f"({today.get('shortForecast', '?')})"

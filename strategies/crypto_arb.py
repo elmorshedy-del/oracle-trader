@@ -1,19 +1,20 @@
 """
 Strategy: Crypto Temporal Arbitrage
 ====================================
-Watches BTC/ETH/SOL spot prices on Binance and trades Polymarket's
-15-minute up/down markets when exchange price confirms direction
-but Polymarket hasn't repriced yet.
+Watches BTC/ETH/SOL spot prices across public exchange feeds and trades
+Polymarket's short-duration up/down markets when exchange price confirms
+direction but Polymarket hasn't repriced yet.
 
 This is the strategy that turned $313 → $438K (0x8dxd bot).
 Our version uses REST polling (slower) but still captures lagging markets.
 
-No API key needed — Binance public API is free.
+No API key needed — all configured quote sources are public.
 """
 
 import httpx
 import asyncio
 import logging
+import statistics
 import time
 from datetime import datetime, timezone
 from data.models import Market, Event, Signal, SignalSource, SignalAction
@@ -21,15 +22,25 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-# Binance spot price endpoints (no auth needed)
-BINANCE_PRICES = {
-    "BTC": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-    "ETH": "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT",
-    "SOL": "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT",
+# Public quote endpoints (no auth needed)
+BINANCE_US_PRICES = {
+    "BTC": "https://api.binance.us/api/v3/ticker/price?symbol=BTCUSDT",
+    "ETH": "https://api.binance.us/api/v3/ticker/price?symbol=ETHUSDT",
+    "SOL": "https://api.binance.us/api/v3/ticker/price?symbol=SOLUSDT",
 }
-
-# Fallback: CoinGecko (if Binance is blocked)
+COINBASE_PRICES = {
+    "BTC": "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+    "ETH": "https://api.coinbase.com/v2/prices/ETH-USD/spot",
+    "SOL": "https://api.coinbase.com/v2/prices/SOL-USD/spot",
+}
+KRAKEN_PAIRS = {
+    "BTC": "XBTUSD",
+    "ETH": "ETHUSD",
+    "SOL": "SOLUSD",
+}
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"
+COINGECKO_IDS = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}
+REQUEST_HEADERS = {"User-Agent": "oracle-trader/1.0"}
 
 # Keywords to match Polymarket 15-min crypto markets
 CRYPTO_MARKET_PATTERNS = {
@@ -52,6 +63,12 @@ class CryptoTemporalArbStrategy(BaseStrategy):
         super().__init__(config)
         self.cfg = config.crypto_arb
         self.client = httpx.AsyncClient(timeout=10.0)
+        self._stats.update({
+            "matched_markets": 0,
+            "last_price_provider_count": 0,
+            "last_price_providers": [],
+            "last_price_error": "",
+        })
 
         # Price tracking: symbol -> list of {price, timestamp}
         self._price_history: dict[str, list[dict]] = {
@@ -233,37 +250,115 @@ class CryptoTemporalArbStrategy(BaseStrategy):
         return signals
 
     async def _fetch_spot_prices(self) -> dict[str, float]:
-        """Fetch current spot prices from Binance (primary) or CoinGecko (fallback)."""
+        """Fetch current spot prices from multiple public providers and aggregate."""
+        providers = {
+            "binance_us": self._fetch_binance_us_prices,
+            "coinbase": self._fetch_coinbase_prices,
+            "kraken": self._fetch_kraken_prices,
+            "coingecko": self._fetch_coingecko_prices,
+        }
+        results = await asyncio.gather(
+            *(fetcher() for fetcher in providers.values()),
+            return_exceptions=True,
+        )
+
+        provider_names = list(providers.keys())
+        prices_by_symbol = {symbol: [] for symbol in self.cfg.symbols}
+        healthy_providers: list[str] = []
+        failures: list[str] = []
+
+        for provider_name, result in zip(provider_names, results):
+            if isinstance(result, Exception):
+                failures.append(f"{provider_name}:{type(result).__name__}")
+                continue
+            if not result:
+                failures.append(f"{provider_name}:empty")
+                continue
+            healthy_providers.append(provider_name)
+            for symbol, price in result.items():
+                if symbol in prices_by_symbol and price > 0:
+                    prices_by_symbol[symbol].append(price)
+
+        prices = {
+            symbol: round(statistics.median(values), 8)
+            for symbol, values in prices_by_symbol.items()
+            if values
+        }
+
+        self._stats["last_price_provider_count"] = len(healthy_providers)
+        self._stats["last_price_providers"] = healthy_providers
+        self._stats["last_price_error"] = "; ".join(failures[:4])
+
+        if not prices:
+            self._stats["errors"] += 1
+            logger.error(
+                "[CRYPTO] No spot prices available | %s",
+                self._stats["last_price_error"] or "all providers unavailable",
+            )
+            return {}
+
+        if self._stats["scans_completed"] % 10 == 0:
+            logger.info(
+                "[CRYPTO] Spot prices ready from %s providers | %s",
+                len(healthy_providers),
+                ", ".join(f"{symbol}=${price:,.2f}" for symbol, price in prices.items()),
+            )
+
+        return prices
+
+    async def _fetch_binance_us_prices(self) -> dict[str, float]:
         prices = {}
-
-        # Try Binance first (faster, more reliable)
-        for symbol, url in BINANCE_PRICES.items():
+        for symbol, url in BINANCE_US_PRICES.items():
             try:
-                resp = await self.client.get(url)
+                resp = await self.client.get(url, headers=REQUEST_HEADERS)
                 resp.raise_for_status()
-                data = resp.json()
-                prices[symbol] = float(data["price"])
+                prices[symbol] = float(resp.json()["price"])
             except Exception:
-                pass
+                continue
+        return prices
 
-        if prices:
-            return prices
+    async def _fetch_coinbase_prices(self) -> dict[str, float]:
+        prices = {}
+        for symbol, url in COINBASE_PRICES.items():
+            try:
+                resp = await self.client.get(url, headers=REQUEST_HEADERS)
+                resp.raise_for_status()
+                prices[symbol] = float(resp.json()["data"]["amount"])
+            except Exception:
+                continue
+        return prices
 
-        # Fallback to CoinGecko
+    async def _fetch_kraken_prices(self) -> dict[str, float]:
+        prices = {}
+        for symbol, pair in KRAKEN_PAIRS.items():
+            try:
+                resp = await self.client.get(
+                    "https://api.kraken.com/0/public/Ticker",
+                    params={"pair": pair},
+                    headers=REQUEST_HEADERS,
+                )
+                resp.raise_for_status()
+                data = resp.json().get("result", {})
+                if not data:
+                    continue
+                first_pair = next(iter(data.values()))
+                prices[symbol] = float(first_pair["c"][0])
+            except Exception:
+                continue
+        return prices
+
+    async def _fetch_coingecko_prices(self) -> dict[str, float]:
+        prices = {}
         try:
-            resp = await self.client.get(COINGECKO_URL)
+            resp = await self.client.get(COINGECKO_URL, headers=REQUEST_HEADERS)
             resp.raise_for_status()
             data = resp.json()
-            if "bitcoin" in data:
-                prices["BTC"] = float(data["bitcoin"]["usd"])
-            if "ethereum" in data:
-                prices["ETH"] = float(data["ethereum"]["usd"])
-            if "solana" in data:
-                prices["SOL"] = float(data["solana"]["usd"])
-        except Exception as e:
-            logger.error(f"[CRYPTO] Failed to fetch prices: {e}")
-            self._stats["errors"] += 1
-
+            for symbol, coin_id in COINGECKO_IDS.items():
+                usd = data.get(coin_id, {}).get("usd")
+                if usd is not None:
+                    prices[symbol] = float(usd)
+        except Exception:
+            return {}
         return prices
 
     def _calculate_move(self, symbol: str) -> tuple[float, str] | None:
@@ -331,13 +426,14 @@ class CryptoTemporalArbStrategy(BaseStrategy):
                             "direction": "down",
                         })
                     else:
-                        # Generic crypto market — treat as "up" if question implies it
+                        # Generic "Up or Down" binary markets resolve YES on the "Up" side.
                         self._matched_markets[symbol].append({
                             "market": market,
                             "direction": "up",
                         })
 
         total = sum(len(v) for v in self._matched_markets.values())
+        self._stats["matched_markets"] = total
         if total > 0:
             logger.info(
                 f"[CRYPTO] Matched {total} crypto markets: "

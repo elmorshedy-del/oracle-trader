@@ -27,9 +27,19 @@ MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN = 4
 DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
 DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
-HEDGE_ROTATION_HOURS = 24.0
-ARB_ROTATION_HOURS = 8.0
-ARB_REENTRY_COOLDOWN_HOURS = 18.0
+HEDGE_ROTATION_HOURS = 6.0
+ARB_ROTATION_HOURS = 4.0
+ARB_REENTRY_COOLDOWN_HOURS = 4.0
+STALE_ROTATION_REENTRY_COOLDOWN_HOURS = 6.0
+STALE_DIRECTIONAL_ROTATION_HOURS = {
+    SignalSource.NEWS: 18.0,
+    SignalSource.CRYPTO_ARB: 18.0,
+    SignalSource.WEATHER: 12.0,
+    SignalSource.MEAN_REVERSION: 24.0,
+}
+STALE_DIRECTIONAL_FLAT_PNL_PCT = 0.08
+STALE_DIRECTIONAL_LOSS_CUT_HOURS = 8.0
+STALE_DIRECTIONAL_LOSS_CUT_PCT = -0.10
 WEATHER_SLUG_GROUP_RE = re.compile(
     r"highest-temperature-in-([a-z-]+)-on-([a-z]+)-(\d{1,2})-(\d{4})"
 )
@@ -570,6 +580,7 @@ class PaperTrader:
                 continue
 
             pnl_pct = (current - entry) / entry
+            age_hours = (now - pos.opened_at).total_seconds() / 3600
             reason = None
 
             # Take profit: price moved +20% from entry
@@ -583,6 +594,11 @@ class PaperTrader:
             # Close out directional bets once the held token has effectively converged.
             elif current >= TOKEN_CONVERGENCE_PRICE:
                 reason = f"CONVERGED: {pos.side} at ${current:.3f}"
+
+            else:
+                stale_reason = self._stale_directional_reason(pos, age_hours, pnl_pct)
+                if stale_reason:
+                    reason = stale_reason
 
             if reason:
                 exits.append((pos, current, reason))
@@ -692,12 +708,32 @@ class PaperTrader:
             self.portfolio.positions.remove(pos)
             if pos.side == "ARB":
                 self._set_group_cooldown(pos.group_key or pos.market_slug, ARB_REENTRY_COOLDOWN_HOURS)
+            elif reason.startswith("STALE_ROTATE") or reason.startswith("STALE_STOP"):
+                self._set_group_cooldown(
+                    pos.group_key or pos.market_slug,
+                    STALE_ROTATION_REENTRY_COOLDOWN_HOURS,
+                )
             logger.info(
                 f"[EXIT] {pos.market_slug} | {pos.side} | {reason} | "
                 f"Entry: ${pos.avg_entry_price:.3f} → Exit: ${exit_price:.3f} | "
                 f"PnL: ${pnl:+.2f} | Cash freed: ${proceeds:.2f}"
             )
         return len(exits)
+
+    def _stale_directional_reason(
+        self,
+        pos: Position,
+        age_hours: float,
+        pnl_pct: float,
+    ) -> str | None:
+        max_age = STALE_DIRECTIONAL_ROTATION_HOURS.get(pos.source)
+        if max_age is None:
+            return None
+        if pnl_pct <= STALE_DIRECTIONAL_LOSS_CUT_PCT and age_hours >= STALE_DIRECTIONAL_LOSS_CUT_HOURS:
+            return f"STALE_STOP: {age_hours:.1f}h @ {pnl_pct:+.1%}"
+        if age_hours >= max_age and abs(pnl_pct) <= STALE_DIRECTIONAL_FLAT_PNL_PCT:
+            return f"STALE_ROTATE: {age_hours:.1f}h @ {pnl_pct:+.1%}"
+        return None
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""

@@ -584,6 +584,42 @@ class PaperTrader:
                 exits.append((pos, current, reason))
                 queued_positions.add(id(pos))
 
+        # Trim legacy overlapping directional positions that now map to the same
+        # grouped thesis. This lets old weather/crypto ladders clean themselves
+        # up after deploy without requiring a portfolio reset.
+        grouped_positions: dict[str, list[Position]] = {}
+        for pos in self.portfolio.positions:
+            if id(pos) in queued_positions:
+                continue
+            if pos.source not in (SignalSource.CRYPTO_ARB, SignalSource.WEATHER):
+                continue
+            if pos.side not in {"YES", "NO"} or not pos.group_key:
+                continue
+            grouped_positions.setdefault(pos.group_key, []).append(pos)
+
+        for group_key, positions in grouped_positions.items():
+            if len(positions) <= 1:
+                continue
+            positions.sort(
+                key=lambda pos: (
+                    pos.unrealized_pnl,
+                    -pos.avg_entry_price,
+                    pos.opened_at.timestamp(),
+                ),
+                reverse=True,
+            )
+            for pos in positions[1:]:
+                exit_price = current_prices.get(pos.token_id, pos.current_price)
+                if exit_price <= 0:
+                    exit_price = pos.current_price
+                exits.append((pos, exit_price, f"GROUP_REBALANCE: {group_key}"))
+                queued_positions.add(id(pos))
+            logger.info(
+                "[RISK] Rebalancing grouped thesis %s: trimmed %s overlapping positions",
+                group_key,
+                len(positions) - 1,
+            )
+
         # Keep liquidity from monopolizing the portfolio. Trim the oldest hedge
         # positions until the source is back within its dedicated budget/slot cap.
         liquidity_positions = [

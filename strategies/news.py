@@ -11,13 +11,16 @@ import hashlib
 import logging
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import httpx
 from data.models import Market, Event, Signal, SignalSource, SignalAction, NewsHeadline
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
+ANTHROPIC_BILLING_RETRY = timedelta(minutes=5)
+ANTHROPIC_TRANSIENT_RETRY = timedelta(minutes=2)
+MAX_PENDING_HEADLINES = 200
 
 
 class NewsLatencyStrategy(BaseStrategy):
@@ -28,10 +31,13 @@ class NewsLatencyStrategy(BaseStrategy):
         super().__init__(config)
         self.cfg = config.news
         self.client = httpx.AsyncClient(timeout=15.0)
-        self._seen_headlines: set[str] = set()
+        self._processed_headlines: dict[str, None] = {}
+        self._pending_headlines: dict[str, dict] = {}
         self._recent_headlines: list[NewsHeadline] = []
         self._api_calls_this_hour: int = 0
         self._hour_start: datetime = datetime.now(timezone.utc)
+        self._anthropic_pause_until: datetime | None = None
+        self._anthropic_last_error: str = ""
         self._market_index: dict[str, set[str]] = {}  # keyword -> market_slugs
         self._market_lookup: dict[str, Market] = {}
         self._indexed_keywords: tuple[str, ...] = ()
@@ -39,6 +45,8 @@ class NewsLatencyStrategy(BaseStrategy):
             "matched_headlines": 0,
             "classified_headlines": 0,
             "last_context_markets": 0,
+            "pending_headlines": 0,
+            "anthropic_pause_until": "",
         })
 
     async def scan(self, markets: list[Market], events: list[Event]) -> list[Signal]:
@@ -52,24 +60,44 @@ class NewsLatencyStrategy(BaseStrategy):
 
         # Fetch new headlines
         headlines = await self._fetch_headlines()
-        new_headlines = [h for h in headlines if self._is_new(h)]
+        for headline in headlines:
+            self._register_headline(headline)
 
-        if not new_headlines:
+        if self._anthropic_pause_until and datetime.now(timezone.utc) >= self._anthropic_pause_until:
+            self._anthropic_pause_until = None
+            self._anthropic_last_error = ""
+
+        ready_headlines = self._ready_headlines()
+        self._stats["pending_headlines"] = len(self._pending_headlines)
+        self._stats["anthropic_pause_until"] = (
+            self._anthropic_pause_until.isoformat() if self._anthropic_pause_until else ""
+        )
+
+        if not ready_headlines:
+            return []
+
+        if self._anthropic_pause_until and datetime.now(timezone.utc) < self._anthropic_pause_until:
+            logger.warning(
+                "[NEWS] Anthropic paused until %s | pending=%s | last_error=%s",
+                self._anthropic_pause_until.isoformat(),
+                len(self._pending_headlines),
+                self._anthropic_last_error or "temporary provider issue",
+            )
             return []
 
         # Pre-filter and cache candidate markets so classification stays focused.
         headline_context = {
             headline.title: self._candidate_markets_for_headline(headline)
-            for headline in new_headlines
+            for headline in ready_headlines
         }
         relevant_headlines = [
-            headline for headline in new_headlines
+            headline for headline in ready_headlines
             if headline_context.get(headline.title)
         ]
         relevant_count = len(relevant_headlines)
         if not relevant_headlines:
             # If prefilter finds nothing, send top 3 as fallback
-            relevant_headlines = new_headlines[:3]
+            relevant_headlines = ready_headlines[:3]
         else:
             # Cap at 10 most relevant
             relevant_headlines = relevant_headlines[:10]
@@ -78,6 +106,7 @@ class NewsLatencyStrategy(BaseStrategy):
         classified_count = 0
         max_context_markets = 0
         for headline in relevant_headlines:
+            headline_id = self._headline_id(headline)
             if not self._within_rate_limit():
                 logger.warning("[NEWS] Rate limit reached, skipping remaining headlines")
                 break
@@ -85,7 +114,10 @@ class NewsLatencyStrategy(BaseStrategy):
             candidate_markets = headline_context.get(headline.title) or self._fallback_market_context(markets)
             max_context_markets = max(max_context_markets, len(candidate_markets))
             classification = await self._classify_headline(headline, candidate_markets)
+            if self._anthropic_pause_until and datetime.now(timezone.utc) < self._anthropic_pause_until:
+                break
             if classification:
+                self._mark_headline_processed(headline_id)
                 classified_count += 1
             if classification and classification.get("confidence", 0) >= self.cfg.min_confidence:
                 signal = self._build_signal(headline, classification)
@@ -99,7 +131,7 @@ class NewsLatencyStrategy(BaseStrategy):
 
         logger.info(
             "[NEWS] Scan: %s new headlines | %s relevant | %s classified | %s signals | context<=%s markets",
-            len(new_headlines),
+            len(ready_headlines),
             relevant_count,
             classified_count,
             len(signals),
@@ -151,19 +183,72 @@ class NewsLatencyStrategy(BaseStrategy):
             logger.error(f"[NEWS] RSS parse error: {e}")
         return headlines
 
-    def _is_new(self, headline: NewsHeadline) -> bool:
-        """Check if we've already seen this headline."""
-        h = hashlib.md5(headline.title.encode()).hexdigest()
-        if h in self._seen_headlines:
-            return False
-        self._seen_headlines.add(h)
+    def _headline_id(self, headline: NewsHeadline) -> str:
+        key = f"{headline.source}|{headline.title}"
+        return hashlib.md5(key.encode()).hexdigest()
+
+    def _register_headline(self, headline: NewsHeadline):
+        headline_id = self._headline_id(headline)
+        if headline_id in self._processed_headlines or headline_id in self._pending_headlines:
+            return
+
+        self._pending_headlines[headline_id] = {
+            "headline": headline,
+            "retry_after": datetime.now(timezone.utc),
+            "attempts": 0,
+        }
         self._recent_headlines.append(headline)
-        # Cap memory
-        if len(self._seen_headlines) > 10000:
-            self._seen_headlines = set(list(self._seen_headlines)[-5000:])
         if len(self._recent_headlines) > 200:
             self._recent_headlines = self._recent_headlines[-100:]
-        return True
+        while len(self._pending_headlines) > MAX_PENDING_HEADLINES:
+            oldest_id = next(iter(self._pending_headlines))
+            self._pending_headlines.pop(oldest_id, None)
+
+    def _ready_headlines(self) -> list[NewsHeadline]:
+        now = datetime.now(timezone.utc)
+        ready = []
+        for item in self._pending_headlines.values():
+            retry_after = item.get("retry_after") or now
+            if retry_after <= now:
+                ready.append(item["headline"])
+        return ready
+
+    def _mark_headline_processed(self, headline_id: str):
+        self._pending_headlines.pop(headline_id, None)
+        self._processed_headlines[headline_id] = None
+        while len(self._processed_headlines) > 5000:
+            oldest_id = next(iter(self._processed_headlines))
+            self._processed_headlines.pop(oldest_id, None)
+
+    def _defer_headline(self, headline: NewsHeadline, delay: timedelta):
+        headline_id = self._headline_id(headline)
+        entry = self._pending_headlines.get(headline_id)
+        if not entry:
+            self._register_headline(headline)
+            entry = self._pending_headlines.get(headline_id)
+        if not entry:
+            return
+        entry["retry_after"] = datetime.now(timezone.utc) + delay
+        entry["attempts"] = int(entry.get("attempts", 0)) + 1
+
+    def _pause_anthropic(self, delay: timedelta, message: str):
+        pause_until = datetime.now(timezone.utc) + delay
+        if not self._anthropic_pause_until or pause_until > self._anthropic_pause_until:
+            self._anthropic_pause_until = pause_until
+        self._anthropic_last_error = message[:200]
+        self._stats["anthropic_pause_until"] = self._anthropic_pause_until.isoformat()
+
+    def _anthropic_retry_delay(self, exc: Exception) -> timedelta:
+        if isinstance(exc, httpx.HTTPStatusError):
+            status = exc.response.status_code
+            body = exc.response.text.lower()
+            if "credit balance is too low" in body or "billing" in body or "upgrade or purchase credits" in body:
+                return ANTHROPIC_BILLING_RETRY
+            if status in {408, 409, 429, 500, 502, 503, 504, 529}:
+                return ANTHROPIC_TRANSIENT_RETRY
+        if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)):
+            return ANTHROPIC_TRANSIENT_RETRY
+        return timedelta()
 
     # ------------------------------------------------------------------
     # Keyword Pre-Filter (saves API calls)
@@ -319,8 +404,26 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             )
             return classification
 
+        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.NetworkError) as e:
+            self._stats["errors"] += 1
+            delay = self._anthropic_retry_delay(e)
+            if delay > timedelta():
+                self._defer_headline(headline, delay)
+                message = e.response.text if isinstance(e, httpx.HTTPStatusError) else str(e)
+                self._pause_anthropic(delay, message)
+                logger.warning(
+                    "[NEWS] Anthropic unavailable, retrying after %ss | pending=%s | %s",
+                    int(delay.total_seconds()),
+                    len(self._pending_headlines),
+                    message[:180],
+                )
+                return None
+            logger.error(f"[NEWS] LLM classification failed: {e}")
+            self._defer_headline(headline, ANTHROPIC_TRANSIENT_RETRY)
+            return None
         except Exception as e:
             self._stats["errors"] += 1
+            self._defer_headline(headline, ANTHROPIC_TRANSIENT_RETRY)
             logger.error(f"[NEWS] LLM classification failed: {e}")
             return None
 

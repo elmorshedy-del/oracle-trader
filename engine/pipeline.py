@@ -283,10 +283,13 @@ class Pipeline:
                 trader.reset(self.config.risk.max_total_exposure_usd)
 
             news: NewsLatencyStrategy = self.strategies["news"]
-            news._seen_headlines.clear()
+            news._processed_headlines.clear()
+            news._pending_headlines.clear()
             news._recent_headlines.clear()
             news._api_calls_this_hour = 0
             news._hour_start = datetime.now(timezone.utc)
+            news._anthropic_pause_until = None
+            news._anthropic_last_error = ""
             news._market_index.clear()
 
             mean_reversion: MeanReversionStrategy = self.strategies["mean_reversion"]

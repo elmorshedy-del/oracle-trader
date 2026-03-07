@@ -77,8 +77,8 @@ class NewsConfig:
     """News-to-price latency engine (optional — requires LLM API key)."""
     enabled: bool = bool(os.getenv("ANTHROPIC_API_KEY", ""))
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    model: str = "claude-sonnet-4-5-20250929"  # cheap first pass
-    escalation_model: str = "claude-sonnet-4-5-20250929"  # for high-confidence
+    model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    escalation_model: str = os.getenv("ANTHROPIC_ESCALATION_MODEL", "claude-sonnet-4-6")
     # RSS / news sources
     rss_feeds: list = field(default_factory=lambda: [
         "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",

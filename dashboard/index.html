@@ -905,6 +905,107 @@ function renderHealth(d) {
 }
 
 function renderSanity(d) {
+  const activeView = getActiveView(d);
+  if (activeView.key !== 'all') {
+    const strategyKeyMap = {
+      news: 'news',
+      bitcoin: 'crypto_arb',
+      weather: 'weather',
+      arbitrage: 'arbitrage',
+      momentum: 'mean_reversion',
+    };
+    const runtime = d.strategies?.[strategyKeyMap[activeView.key]] || {};
+    const p = activeView.portfolio || {};
+    const signals = activeView.signals || [];
+    const positions = p.positions || [];
+    const checks = [
+      {
+        label: 'Portfolio funded',
+        ok: (p.total_value || 0) > 0,
+        note: `$${(p.cash || 0).toFixed(0)} cash`,
+      },
+      {
+        label: 'Strategy loop alive',
+        ok: (runtime.scans_completed || 0) > 0 && (runtime.errors || 0) === 0,
+        note: `${runtime.scans_completed || 0} scans / ${runtime.errors || 0} errors`,
+      },
+      {
+        label: 'Signal or trade flow',
+        ok: signals.length > 0 || (p.total_trades || 0) > 0 || (runtime.signals_generated || 0) > 0,
+        note: `${signals.length} live / ${p.total_trades || 0} trades`,
+      },
+      {
+        label: 'Capacity available',
+        ok: (p.cash || 0) > 100 || positions.length < 10,
+        note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open`,
+      },
+    ];
+
+    if (activeView.key === 'bitcoin') {
+      checks.splice(2, 0, {
+        label: 'Market match + price feed',
+        ok: (runtime.matched_markets || 0) > 0 && (runtime.last_price_provider_count || 0) > 0,
+        note: `${runtime.matched_markets || 0} markets / ${runtime.last_price_provider_count || 0} providers`,
+      });
+    }
+
+    if (activeView.key === 'news') {
+      checks.splice(2, 0, {
+        label: 'Headline intake',
+        ok: (d.recent_news || []).length > 0,
+        note: `${(d.recent_news || []).length} recent headlines`,
+      });
+    }
+
+    if (activeView.key === 'weather') {
+      checks.splice(2, 0, {
+        label: 'Forecast loop alive',
+        ok: (runtime.scans_completed || 0) > 0 && (runtime.errors || 0) === 0,
+        note: `${runtime.signals_generated || 0} signals generated`,
+      });
+    }
+
+    if (activeView.key === 'arbitrage') {
+      checks.splice(2, 0, {
+        label: 'Opportunity flow',
+        ok: (runtime.signals_generated || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.signals_generated || 0} raw opportunities`,
+      });
+    }
+
+    if (activeView.key === 'momentum') {
+      checks.splice(2, 0, {
+        label: 'Momentum flow',
+        ok: (runtime.signals_generated || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.signals_generated || 0} generated`,
+      });
+    }
+
+    const blockers = checks.filter(check => !check.ok).map(check => check.label);
+    const overallOk = blockers.length === 0;
+    const badge = document.getElementById('sanity-badge');
+    badge.textContent = overallOk ? 'GREEN' : 'RED';
+    badge.style.background = overallOk ? 'var(--green-dim)' : 'var(--red-dim)';
+    badge.style.color = overallOk ? 'var(--green)' : 'var(--red)';
+
+    const rows = checks.map(check => `
+      <div class="sanity-item">
+        <div class="sanity-left">
+          <span class="sanity-icon ${check.ok ? 'sanity-ok' : 'sanity-bad'}">${check.ok ? '✓' : '✕'}</span>
+          <span>${check.label}</span>
+        </div>
+        <div class="sanity-note">${check.note}</div>
+      </div>
+    `).join('');
+
+    const footer = blockers.length
+      ? `<div style="margin-top:10px;color:var(--red);font-family:var(--mono);font-size:11px">${activeView.label} blockers: ${blockers.join(' | ')}</div>`
+      : `<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">${activeView.label} checks look healthy</div>`;
+
+    document.getElementById('sanity-panel').innerHTML = rows + footer;
+    return;
+  }
+
   const diag = d.diagnostics || {};
   const filtered = diag.filtered_signals || {};
   const signalsByStrategy = diag.signals_by_strategy || {};

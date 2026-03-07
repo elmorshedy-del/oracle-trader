@@ -59,6 +59,18 @@ TEMP_BELOW_PATTERNS = (
 )
 WEATHER_DISCOVERY_REFRESH_SECS = 1800
 WEATHER_MARKET_LOOKAHEAD_DAYS = 4
+WEATHER_MAX_SIGNAL_HORIZON_DAYS = 2
+WEATHER_BASE_STD_DEV_F = 2.8
+WEATHER_STD_DEV_PER_DAY_F = 0.8
+WEATHER_NARROW_RANGE_STD_DEV_F = 0.35
+WEATHER_BOUNDARY_BUFFER_F = 2.0
+WEATHER_OPEN_THRESHOLD_BUFFER_F = 3.0
+WEATHER_FEE_BUFFER = 0.012
+WEATHER_MIN_CLOSED_RANGE_YES_PROB = 0.18
+WEATHER_MIN_CLOSED_RANGE_NO_PROB = 0.08
+WEATHER_CITY_ALIASES = {
+    "nyc": "new-york",
+}
 
 
 class WeatherForecastStrategy(BaseStrategy):
@@ -111,6 +123,7 @@ class WeatherForecastStrategy(BaseStrategy):
             market = match["market"]
             city = match["city"]
             temp_range = match.get("temp_range")  # e.g., (40, 45) for "40-45°F"
+            range_kind = match.get("range_kind", "bounded")
 
             if not market.outcomes or len(market.outcomes) < 2:
                 continue
@@ -119,86 +132,69 @@ class WeatherForecastStrategy(BaseStrategy):
             if not forecast:
                 continue
 
+            horizon_days = self._forecast_horizon_days(match.get("target_date"))
+            if horizon_days is None or horizon_days > WEATHER_MAX_SIGNAL_HORIZON_DAYS:
+                continue
+
             # Get forecast temperature for the matching day
             forecast_temp = self._get_forecast_temp(forecast, match.get("target_date"))
             if forecast_temp is None:
                 continue
 
             yes_price = market.outcomes[0].price
+            no_price = market.outcomes[1].price if len(market.outcomes) > 1 else None
+            if no_price is None:
+                continue
+            settlement_range = self._settlement_temp_range(temp_range, range_kind)
 
             # Calculate forecast probability that temperature falls in this range
-            if temp_range:
+            if settlement_range:
                 forecast_prob = self._temp_in_range_probability(
-                    forecast_temp, temp_range[0], temp_range[1]
+                    forecast_temp,
+                    settlement_range[0],
+                    settlement_range[1],
+                    horizon_days=horizon_days,
                 )
             else:
                 # Generic temperature market — just compare direction
                 continue
 
-            # The edge: forecast says 80% probability but market says 30%
-            edge = forecast_prob - yes_price
+            if not self._is_tradeable_setup(
+                forecast_temp=forecast_temp,
+                temp_range=settlement_range,
+                forecast_prob=forecast_prob,
+            ):
+                continue
 
-            if edge > self.cfg.min_edge:
-                # Forecast says more likely than market — buy YES
-                confidence = min(abs(edge) * 2, 0.95)
+            required_edge = self.cfg.min_edge + WEATHER_FEE_BUFFER
+            candidate_signal = self._build_signal(
+                market=market,
+                city=city,
+                raw_range=temp_range,
+                range_kind=range_kind,
+                target_date=match.get("target_date"),
+                forecast_temp=forecast_temp,
+                forecast_prob=forecast_prob,
+                yes_price=yes_price,
+                no_price=no_price,
+                horizon_days=horizon_days,
+                required_edge=required_edge,
+            )
+            if not candidate_signal:
+                continue
 
-                signal = Signal(
-                    source=SignalSource.WEATHER,
-                    action=SignalAction.BUY_YES,
-                    market_slug=market.slug,
-                    condition_id=market.condition_id,
-                    token_id=market.outcomes[0].token_id,
-                    confidence=confidence,
-                    expected_edge=edge * 100,
-                    group_key=self._weather_group_key(city, match.get("target_date")),
-                    reasoning=(
-                        f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} | "
-                        f"Range {temp_range[0]}-{temp_range[1]}°F: forecast prob={forecast_prob:.0%} "
-                        f"vs market={yes_price:.0%} | Edge: {edge:.0%}"
-                    ),
-                    suggested_size_usd=min(
-                        self.config.risk.max_position_usd * confidence,
-                        self.config.risk.max_position_usd,
-                    ),
-                )
-                self._track_best_signal(best_signals, signal)
-                logger.debug(
-                    f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
-                    f"range={temp_range}, prob={forecast_prob:.0%} vs market={yes_price:.0%} → BUY YES"
-                )
-
-            elif edge < -self.cfg.min_edge:
-                # Forecast says less likely than market — buy NO
-                no_price = market.outcomes[1].price if len(market.outcomes) > 1 else None
-                if no_price is None:
-                    continue
-
-                confidence = min(abs(edge) * 2, 0.95)
-
-                signal = Signal(
-                    source=SignalSource.WEATHER,
-                    action=SignalAction.BUY_NO,
-                    market_slug=market.slug,
-                    condition_id=market.condition_id,
-                    token_id=market.outcomes[1].token_id if len(market.outcomes) > 1 else None,
-                    confidence=confidence,
-                    expected_edge=abs(edge) * 100,
-                    group_key=self._weather_group_key(city, match.get("target_date")),
-                    reasoning=(
-                        f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} | "
-                        f"Range {temp_range[0]}-{temp_range[1]}°F: forecast prob={forecast_prob:.0%} "
-                        f"vs market={yes_price:.0%} | Market overpriced → BUY NO"
-                    ),
-                    suggested_size_usd=min(
-                        self.config.risk.max_position_usd * confidence,
-                        self.config.risk.max_position_usd,
-                    ),
-                )
-                self._track_best_signal(best_signals, signal)
-                logger.debug(
-                    f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
-                    f"range={temp_range}, market overpriced → BUY NO"
-                )
+            self._track_best_signal(best_signals, candidate_signal)
+            logger.debug(
+                "[WEATHER] %s %s: NOAA=%.0f°F raw_range=%s prob=%.0f%% yes=%.0f%% no=%.0f%% → %s",
+                city,
+                match.get("target_date"),
+                forecast_temp,
+                temp_range,
+                forecast_prob * 100,
+                yes_price * 100,
+                no_price * 100,
+                candidate_signal.action.value,
+            )
 
         signals = sorted(
             best_signals.values(),
@@ -222,7 +218,8 @@ class WeatherForecastStrategy(BaseStrategy):
         return signals
 
     def _weather_group_key(self, city: str, target_date: str | None) -> str:
-        return f"weather:{city}:{target_date or 'unknown'}"
+        canonical_city = WEATHER_CITY_ALIASES.get(city, city)
+        return f"weather:{canonical_city}:{target_date or 'unknown'}"
 
     def _track_best_signal(self, best_signals: dict[str, Signal], signal: Signal):
         group_key = signal.group_key or signal.condition_id
@@ -235,6 +232,119 @@ class WeatherForecastStrategy(BaseStrategy):
         )
         if existing is None or candidate_rank > existing_rank:
             best_signals[group_key] = signal
+
+    def _build_signal(
+        self,
+        *,
+        market: Market,
+        city: str,
+        raw_range: tuple[float, float],
+        range_kind: str,
+        target_date: str | None,
+        forecast_temp: float,
+        forecast_prob: float,
+        yes_price: float,
+        no_price: float,
+        horizon_days: int,
+        required_edge: float,
+    ) -> Signal | None:
+        closed_range = range_kind in {"bounded", "exact"}
+        yes_edge = forecast_prob - yes_price - self._fee_buffer(yes_price)
+        no_edge = (1.0 - forecast_prob) - no_price - self._fee_buffer(no_price)
+
+        if closed_range and forecast_prob < WEATHER_MIN_CLOSED_RANGE_YES_PROB:
+            yes_edge = float("-inf")
+        if closed_range and forecast_prob < WEATHER_MIN_CLOSED_RANGE_NO_PROB:
+            no_edge = float("-inf")
+
+        if yes_edge < required_edge and no_edge < required_edge:
+            return None
+
+        if yes_edge >= no_edge:
+            action = SignalAction.BUY_YES
+            token_id = market.outcomes[0].token_id
+            net_edge = yes_edge
+            reasoning = (
+                f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} {target_date or ''} | "
+                f"Range {raw_range[0]}-{raw_range[1]}°F in {horizon_days}d: fair={forecast_prob:.0%} "
+                f"vs market YES={yes_price:.0%} | Net edge={net_edge:.0%}"
+            ).strip()
+        else:
+            action = SignalAction.BUY_NO
+            token_id = market.outcomes[1].token_id
+            net_edge = no_edge
+            reasoning = (
+                f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} {target_date or ''} | "
+                f"Range {raw_range[0]}-{raw_range[1]}°F in {horizon_days}d: fair YES={forecast_prob:.0%} "
+                f"vs market YES={yes_price:.0%} | Net edge on NO={net_edge:.0%}"
+            ).strip()
+
+        confidence = min(max(net_edge, 0.0) * 3.0, 0.95)
+        return Signal(
+            source=SignalSource.WEATHER,
+            action=action,
+            market_slug=market.slug,
+            condition_id=market.condition_id,
+            token_id=token_id,
+            confidence=confidence,
+            expected_edge=net_edge * 100,
+            group_key=self._weather_group_key(city, target_date),
+            reasoning=reasoning,
+            suggested_size_usd=min(
+                self.config.risk.max_position_usd * confidence,
+                self.config.risk.max_position_usd,
+            ),
+        )
+
+    def _fee_buffer(self, price: float) -> float:
+        price = max(0.01, min(0.99, price))
+        return WEATHER_FEE_BUFFER * min(price, 1.0 - price)
+
+    def _settlement_temp_range(
+        self,
+        temp_range: tuple[float, float],
+        range_kind: str,
+    ) -> tuple[float, float]:
+        low, high = temp_range
+        if range_kind == "above":
+            return (low - 0.5, high)
+        if range_kind == "below":
+            return (low, high + 0.5)
+        if range_kind == "exact":
+            return (low, high)
+        return (low - 0.5, high + 0.5)
+
+    def _forecast_horizon_days(self, target_date: str | None) -> int | None:
+        if not target_date:
+            return None
+        try:
+            target = datetime.fromisoformat(target_date).date()
+        except ValueError:
+            return None
+        today = datetime.now(timezone.utc).date()
+        return (target - today).days
+
+    def _is_tradeable_setup(
+        self,
+        *,
+        forecast_temp: float,
+        temp_range: tuple[float, float],
+        forecast_prob: float,
+    ) -> bool:
+        low, high = temp_range
+        range_width = high - low
+        open_ended = range_width >= 80 or low <= -40 or high >= 140
+
+        if open_ended:
+            threshold = low if high >= 140 else high
+            if abs(forecast_temp - threshold) < WEATHER_OPEN_THRESHOLD_BUFFER_F:
+                return False
+            return True
+
+        nearest_edge = min(abs(forecast_temp - low), abs(forecast_temp - high))
+        if nearest_edge < WEATHER_BOUNDARY_BUFFER_F and 0.15 < forecast_prob < 0.85:
+            return False
+        return True
 
     async def get_supplemental_markets(self) -> list[Market]:
         """Fetch weather markets that the generic active-market feed misses."""
@@ -316,17 +426,19 @@ class WeatherForecastStrategy(BaseStrategy):
 
             # Try to extract temperature range from the market question
             temp_range = self._extract_temp_range(market.question)
+            range_kind = self._temp_range_kind(market.question)
 
             # Try to extract target date
             target_date = self._extract_date(market.question)
 
-            if temp_range is None or target_date is None:
+            if temp_range is None or target_date is None or range_kind is None:
                 continue
 
             self._matched_markets.append({
                 "market": market,
                 "city": matched_city,
                 "temp_range": temp_range,
+                "range_kind": range_kind,
                 "target_date": target_date,
             })
 
@@ -365,6 +477,21 @@ class WeatherForecastStrategy(BaseStrategy):
             exact = float(exact_match.group(1))
             return (exact - 0.5, exact + 0.5)
 
+        return None
+
+    def _temp_range_kind(self, question: str) -> str | None:
+        question_lower = question.lower()
+        for pattern in TEMP_ABOVE_PATTERNS:
+            if pattern.search(question_lower):
+                return "above"
+        for pattern in TEMP_BELOW_PATTERNS:
+            if pattern.search(question_lower):
+                return "below"
+        if TEMP_EXACT_PATTERN.search(question_lower):
+            return "exact"
+        for pattern in TEMP_RANGE_PATTERNS:
+            if pattern.search(question_lower):
+                return "bounded"
         return None
 
     def _extract_date(self, question: str) -> str | None:
@@ -433,7 +560,12 @@ class WeatherForecastStrategy(BaseStrategy):
         return None
 
     def _temp_in_range_probability(
-        self, forecast_temp: float, range_low: float, range_high: float
+        self,
+        forecast_temp: float,
+        range_low: float,
+        range_high: float,
+        *,
+        horizon_days: int = 0,
     ) -> float:
         """
         Estimate probability that actual temperature falls in range,
@@ -444,8 +576,10 @@ class WeatherForecastStrategy(BaseStrategy):
         """
         import math
 
-        # Standard deviation of NOAA forecast error (°F)
-        std_dev = 3.0  # for 1-day forecast
+        # Scale uncertainty with forecast horizon and penalize narrow one-degree bands.
+        std_dev = WEATHER_BASE_STD_DEV_F + (max(horizon_days, 0) * WEATHER_STD_DEV_PER_DAY_F)
+        if (range_high - range_low) <= 1.5:
+            std_dev += WEATHER_NARROW_RANGE_STD_DEV_F
 
         # Center of the range
         center = forecast_temp
@@ -460,7 +594,7 @@ class WeatherForecastStrategy(BaseStrategy):
 
         probability = norm_cdf(z_high) - norm_cdf(z_low)
 
-        return max(0.01, min(0.99, probability))
+        return max(0.0001, min(0.9999, probability))
 
     async def _discover_weather_markets(self) -> list[Market]:
         """Page active events and extract upcoming temperature markets."""
@@ -602,5 +736,5 @@ class WeatherForecastStrategy(BaseStrategy):
         for city, keywords in CITY_KEYWORDS.items():
             for keyword in keywords:
                 if re.search(rf"\b{re.escape(keyword)}\b", text):
-                    return city
+                    return WEATHER_CITY_ALIASES.get(city, city)
         return None

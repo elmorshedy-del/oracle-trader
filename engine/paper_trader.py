@@ -48,6 +48,9 @@ MONTHS = {
     "november": 11,
     "december": 12,
 }
+WEATHER_CITY_GROUP_ALIASES = {
+    "nyc": "new-york",
+}
 STRATEGY_EXPOSURE_CAPS = {
     SignalSource.LIQUIDITY: 0.25,
     SignalSource.ARBITRAGE: 0.20,
@@ -163,6 +166,7 @@ class PaperTrader:
             if not match:
                 return None
             city, month_name, day, year = match.groups()
+            city = WEATHER_CITY_GROUP_ALIASES.get(city, city)
             month_num = MONTHS.get(month_name)
             if not month_num:
                 return None

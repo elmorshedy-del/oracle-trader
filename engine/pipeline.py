@@ -9,6 +9,7 @@ import json
 import asyncio
 import time as _time
 import logging
+import re
 from datetime import datetime, timezone
 from config import PipelineConfig
 from data.collector import PolymarketCollector
@@ -27,6 +28,7 @@ from engine.health_monitor import HealthMonitor
 from runtime_paths import LOG_DIR, STATE_PATH
 
 logger = logging.getLogger(__name__)
+BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
@@ -226,7 +228,10 @@ class Pipeline:
                     continue
 
                 trader = self.comparison_traders[view_key]
-                view_signals = list(strategy_signals.get(strategy_name, []))
+                view_signals = self._filter_comparison_signals(
+                    view_key=view_key,
+                    signals=strategy_signals.get(strategy_name, []),
+                )
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
                 self._latest_comparison_signals[view_key] = view_signals[:30]
@@ -302,6 +307,16 @@ class Pipeline:
             await self._refresh_data()
             self.trader.save_state()
             logger.info("[PIPELINE] Reset live paper trading state")
+
+    def _filter_comparison_signals(self, *, view_key: str, signals: list[Signal]) -> list[Signal]:
+        filtered = list(signals)
+        if view_key == "bitcoin":
+            filtered = [
+                signal for signal in filtered
+                if BITCOIN_SIGNAL_PATTERN.search(signal.market_slug)
+                or BITCOIN_SIGNAL_PATTERN.search(signal.reasoning)
+            ]
+        return filtered
 
     def _write_diagnostic_entry(
         self,

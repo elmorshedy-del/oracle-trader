@@ -44,7 +44,7 @@ class PaperTrader:
     def __init__(self, starting_capital: float = 1000.0, log_dir: str = "logs", state_path: str = "/data/state.json"):
         self.state_path = Path(state_path)
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(exist_ok=True)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Try to restore state from disk, fall back to fresh start
         if not self._load_state():

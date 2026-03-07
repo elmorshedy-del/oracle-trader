@@ -287,6 +287,39 @@
   .sanity-bad { background: var(--red-dim); color: var(--red); }
   .sanity-note { color: var(--text-dim); text-align: right; }
 
+  .view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 8px;
+  }
+  .view-tab {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .view-tab:hover {
+    border-color: var(--blue);
+    color: var(--text);
+  }
+  .view-tab.active {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+  .view-meta {
+    margin-bottom: 14px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
   /* Responsive */
   @media (max-width: 1200px) {
     .grid { grid-template-columns: 1fr 1fr; }
@@ -339,6 +372,9 @@
     <div class="stat-sub" id="signal-count">0 signals</div>
   </div>
 </div>
+
+<div class="view-tabs" id="view-tabs"></div>
+<div class="view-meta" id="view-meta">Viewing all strategies</div>
 
 <!-- Main Grid -->
 <div class="grid">
@@ -530,6 +566,7 @@
 <script>
 const API = window.location.origin + '/api/state';
 let lastState = null;
+let selectedView = 'all';
 
 function stratBadge(source) {
   const map = {
@@ -582,6 +619,49 @@ function truncate(s, n) {
   return s && s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+function viewBadge(view) {
+  if (!view || view.source === 'all') {
+    return '<span class="strat-badge">ALL</span>';
+  }
+  return stratBadge(view.source);
+}
+
+function getActiveView(d) {
+  const views = d.comparison_views || {};
+  if (!views[selectedView]) {
+    selectedView = 'all';
+  }
+  return views[selectedView] || views.all || {
+    key: 'all',
+    label: 'All',
+    source: 'all',
+    portfolio: d.portfolio || {},
+    signals: d.signals || [],
+    trades: d.trades || [],
+    performance: d.performance || {},
+  };
+}
+
+function renderViewTabs(d) {
+  const views = d.comparison_views || {};
+  const order = ['all', 'news', 'bitcoin', 'weather', 'arbitrage', 'momentum'];
+  const tabs = order
+    .filter(key => views[key])
+    .map(key => {
+      const view = views[key];
+      return `<button class="view-tab ${key === selectedView ? 'active' : ''}" onclick="selectView('${key}')">${view.label}</button>`;
+    })
+    .join('');
+  document.getElementById('view-tabs').innerHTML = tabs;
+}
+
+function selectView(key) {
+  selectedView = key;
+  if (lastState) render(lastState);
+}
+
+window.selectView = selectView;
+
 async function fetchState() {
   try {
     const resp = await fetch(API);
@@ -599,15 +679,19 @@ async function fetchState() {
 }
 
 function render(d) {
+  renderViewTabs(d);
+  const activeView = getActiveView(d);
+
   // Header
   const badge = document.getElementById('mode-badge');
   badge.textContent = d.mode.toUpperCase();
   badge.className = `mode-badge mode-${d.mode}`;
   document.getElementById('uptime').textContent = `Uptime: ${d.uptime_human || '--'}`;
   document.getElementById('scan-count').textContent = `Scans: ${d.scan_count || 0}`;
+  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} paper portfolio</span>`;
 
   // Stats
-  const p = d.portfolio || {};
+  const p = activeView.portfolio || {};
   document.getElementById('total-value').textContent = `$${(p.total_value || 0).toFixed(2)}`;
   const pnlEl = document.getElementById('total-pnl');
   pnlEl.textContent = `${p.total_pnl >= 0 ? '+' : ''}$${(p.total_pnl || 0).toFixed(2)} (${(p.total_pnl_pct || 0).toFixed(1)}%)`;
@@ -618,10 +702,10 @@ function render(d) {
   document.getElementById('drawdown').textContent = `${(p.max_drawdown || 0).toFixed(1)}%`;
   document.getElementById('fees-paid').textContent = `Fees: $${(p.total_fees || 0).toFixed(2)}`;
   document.getElementById('market-count').textContent = d.active_markets || 0;
-  document.getElementById('signal-count').textContent = `${(d.signals || []).length} signals`;
+  document.getElementById('signal-count').textContent = `${(activeView.signals || []).length} signals`;
 
   // Signals
-  const signals = d.signals || [];
+  const signals = activeView.signals || [];
   document.getElementById('signal-badge').textContent = signals.length;
   document.getElementById('signals-table').innerHTML = signals.map(s => `
     <tr>
@@ -636,9 +720,9 @@ function render(d) {
   `).join('');
 
   // Trades
-  const trades = d.trades || [];
+  const trades = activeView.trades || [];
   document.getElementById('trade-badge').textContent = trades.length;
-  document.getElementById('trades-table').innerHTML = trades.reverse().map(t => `
+  document.getElementById('trades-table').innerHTML = trades.slice().reverse().map(t => `
     <tr>
       <td>${timeAgo(t.time)}</td>
       <td>${stratBadge(t.source)}</td>
@@ -664,56 +748,53 @@ function render(d) {
   `).join('');
 
   // Strategy Performance
-  const perf = d.performance?.by_strategy || {};
   const perfEl = document.getElementById('strategy-perf');
-  const positionsBySource = {};
-  for (const pos of (p.positions || [])) {
-    positionsBySource[pos.source] = (positionsBySource[pos.source] || 0) + 1;
-  }
-  const strategyStats = d.strategies || {};
-  const sources = new Set([
-    ...Object.keys(perf),
-    ...Object.keys(positionsBySource),
-    ...Object.keys(strategyStats).map(normalizeStrategyKey),
-  ]);
-  const rows = Array.from(sources).map(source => {
-    const perfStats = perf[source] || {};
-    const strategyKey = Object.keys(strategyStats).find(key => normalizeStrategyKey(key) === source);
-    const runtimeStats = strategyKey ? strategyStats[strategyKey] : {};
+  const comparisonViews = d.comparison_views || {};
+  const order = ['all', 'news', 'bitcoin', 'weather', 'arbitrage', 'momentum'];
+  const rows = order.filter(key => comparisonViews[key]).map(key => {
+    const view = comparisonViews[key];
+    const perfStats = view.performance || {};
+    const portfolio = view.portfolio || {};
     return {
-      source,
+      key,
+      label: view.label,
+      source: view.source,
       pnl: perfStats.total_pnl || 0,
-      winRate: perfStats.win_rate ? perfStats.win_rate * 100 : 0,
-      trades: perfStats.trades || 0,
-      open: positionsBySource[source] || 0,
-      signals: runtimeStats.signals_generated || 0,
-      errors: runtimeStats.errors || 0,
+      winRate: (perfStats.win_rate || 0) * 100,
+      trades: perfStats.total_trades || portfolio.total_trades || 0,
+      open: (portfolio.positions || []).length,
+      signals: (view.signals || []).length,
+      cash: portfolio.cash || 0,
     };
-  }).sort((a, b) => (b.pnl - a.pnl) || (b.trades - a.trades) || a.source.localeCompare(b.source));
+  }).sort((a, b) => {
+    if (a.key === 'all') return -1;
+    if (b.key === 'all') return 1;
+    return (b.pnl - a.pnl) || (b.trades - a.trades) || a.label.localeCompare(b.label);
+  });
 
   perfEl.innerHTML = rows.length ? `
     <table>
       <thead>
         <tr>
-          <th>Strategy</th>
+          <th>Tab</th>
           <th>P&L</th>
           <th>Win%</th>
           <th>Trades</th>
           <th>Open</th>
           <th>Signals</th>
-          <th>Errors</th>
+          <th>Cash</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(row => `
           <tr>
-            <td>${stratBadge(row.source)}</td>
+            <td>${viewBadge({source: row.source})} <span style="margin-left:6px">${row.label}</span></td>
             <td class="${pnlColor(row.pnl)}">$${row.pnl.toFixed(2)}</td>
             <td>${row.winRate.toFixed(0)}%</td>
             <td>${row.trades}</td>
             <td>${row.open}</td>
             <td>${row.signals}</td>
-            <td class="${row.errors > 0 ? 'negative' : 'neutral'}">${row.errors}</td>
+            <td>$${row.cash.toFixed(2)}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -748,7 +829,7 @@ function render(d) {
   const news = d.recent_news || [];
   const newsFeed = document.getElementById('news-feed');
   if (news.length > 0) {
-    newsFeed.innerHTML = news.reverse().map(n => {
+    newsFeed.innerHTML = news.slice().reverse().map(n => {
       const cls = n.classification;
       let classLabel = '';
       if (cls && cls.direction && cls.direction !== 'neutral') {

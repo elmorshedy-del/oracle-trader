@@ -28,6 +28,15 @@ from runtime_paths import LOG_DIR, STATE_PATH
 
 logger = logging.getLogger(__name__)
 
+COMPARISON_VIEW_CONFIG = {
+    "all": {"label": "All", "strategy": None, "source": "all"},
+    "news": {"label": "News", "strategy": "news", "source": "news_latency"},
+    "bitcoin": {"label": "Bitcoin", "strategy": "crypto_arb", "source": "crypto_temporal_arb"},
+    "weather": {"label": "Weather", "strategy": "weather", "source": "weather_forecast"},
+    "arbitrage": {"label": "Arbitrage", "strategy": "arbitrage", "source": "multi_outcome_arbitrage"},
+    "momentum": {"label": "Momentum", "strategy": "mean_reversion", "source": "mean_reversion"},
+}
+
 
 class Pipeline:
     """Main orchestrator — runs everything."""
@@ -62,6 +71,15 @@ class Pipeline:
             log_dir=str(LOG_DIR),
             state_path=str(STATE_PATH),
         )
+        self.comparison_traders = {
+            view_key: PaperTrader(
+                starting_capital=self.config.risk.max_total_exposure_usd,
+                log_dir=str(LOG_DIR / "comparison" / view_key),
+                state_path=str(STATE_PATH.with_name(f"{STATE_PATH.stem}-{view_key}{STATE_PATH.suffix}")),
+            )
+            for view_key, meta in COMPARISON_VIEW_CONFIG.items()
+            if meta["strategy"] is not None
+        }
 
         # Slippage model (self-calibrating)
         self.slippage = SlippageModel(initial_k=0.1, log_dir=str(LOG_DIR))
@@ -87,6 +105,9 @@ class Pipeline:
         self._markets = []
         self._events = []
         self._all_signals: list[Signal] = []
+        self._latest_comparison_signals: dict[str, list[Signal]] = {
+            key: [] for key in COMPARISON_VIEW_CONFIG
+        }
         self._errors: list[str] = []
         self._scan_count = 0
         self._latest_diagnostics: dict = {}
@@ -119,6 +140,8 @@ class Pipeline:
         """Stop the pipeline gracefully."""
         self._running = False
         self.trader.save_state()
+        for trader in self.comparison_traders.values():
+            trader.save_state()
         await self.collector.close()
         logger.info("Pipeline stopped")
 
@@ -141,6 +164,10 @@ class Pipeline:
             self.trader.update_positions(current_prices)
             exit_count = self.trader.check_exits(current_prices)
             resolved_count = self.trader.resolve_positions(self._markets)
+            for trader in self.comparison_traders.values():
+                trader.update_positions(current_prices)
+                trader.check_exits(current_prices)
+                trader.resolve_positions(self._markets)
 
             held_conditions = {p.condition_id for p in self.trader.portfolio.positions}
             candidate_markets = [
@@ -150,19 +177,24 @@ class Pipeline:
             # Run all enabled strategies on markets that are not already held.
             all_signals: list[Signal] = []
             strategy_signal_counts: dict[str, int] = {}
+            strategy_signals: dict[str, list[Signal]] = {}
             for name, strategy in self.strategies.items():
                 if not strategy.enabled:
+                    strategy_signals[name] = []
                     continue
                 try:
                     _strat_start = _time.time()
-                    signals = await strategy.scan(candidate_markets, self._events)
+                    signals = await strategy.scan(self._markets, self._events)
                     _strat_dur = (_time.time() - _strat_start) * 1000
                     all_signals.extend(signals)
                     strategy_signal_counts[name] = len(signals)
+                    strategy_signals[name] = signals
                     self.health.record_strategy_run(name, len(signals), _strat_dur)
                 except Exception as e:
                     logger.error(f"Strategy {name} error: {e}")
                     strategy._stats["errors"] += 1
+                    strategy_signal_counts[name] = 0
+                    strategy_signals[name] = []
                     self.health.record_strategy_error(name, str(e))
 
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
@@ -186,6 +218,21 @@ class Pipeline:
                     executed += 1
                     source = trade.source.value
                     executed_by_strategy[source] = executed_by_strategy.get(source, 0) + 1
+
+            for view_key, meta in COMPARISON_VIEW_CONFIG.items():
+                strategy_name = meta["strategy"]
+                if strategy_name is None:
+                    self._latest_comparison_signals[view_key] = all_signals[:30]
+                    continue
+
+                trader = self.comparison_traders[view_key]
+                view_signals = list(strategy_signals.get(strategy_name, []))
+                view_signals.sort(key=lambda s: s.confidence, reverse=True)
+                view_signals, _ = trader.select_candidate_signals(view_signals)
+                self._latest_comparison_signals[view_key] = view_signals[:30]
+                for signal in view_signals:
+                    trader.execute_signal(signal, current_prices)
+                trader.save_state()
 
             # Store signals for dashboard
             self._all_signals = all_signals
@@ -220,10 +267,15 @@ class Pipeline:
         async with self._cycle_lock:
             self.trader.reset(self.config.risk.max_total_exposure_usd)
             self._all_signals = []
+            self._latest_comparison_signals = {
+                key: [] for key in COMPARISON_VIEW_CONFIG
+            }
             self._errors = []
             self._scan_count = 0
             self._latest_diagnostics = {}
             self.dashboard_state = DashboardState(mode=self.config.mode)
+            for trader in self.comparison_traders.values():
+                trader.reset(self.config.risk.max_total_exposure_usd)
 
             news: NewsLatencyStrategy = self.strategies["news"]
             news._seen_headlines.clear()
@@ -343,6 +395,24 @@ class Pipeline:
         uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds()
         news_strat: NewsLatencyStrategy = self.strategies["news"]
         whale_strat: WhaleTrackingStrategy = self.strategies["whale"]
+        comparison_views = {}
+        comparison_views["all"] = self._serialize_view(
+            view_key="all",
+            label=COMPARISON_VIEW_CONFIG["all"]["label"],
+            source=COMPARISON_VIEW_CONFIG["all"]["source"],
+            trader=self.trader,
+            signals=self._all_signals[:30],
+        )
+        for view_key, meta in COMPARISON_VIEW_CONFIG.items():
+            if view_key == "all":
+                continue
+            comparison_views[view_key] = self._serialize_view(
+                view_key=view_key,
+                label=meta["label"],
+                source=meta["source"],
+                trader=self.comparison_traders[view_key],
+                signals=self._latest_comparison_signals.get(view_key, []),
+            )
 
         return {
             "mode": self.config.mode,
@@ -350,58 +420,9 @@ class Pipeline:
             "uptime_human": self._format_uptime(uptime),
             "scan_count": self._scan_count,
             "active_markets": len(self._markets),
-            "portfolio": {
-                "total_value": round(self.trader.portfolio.total_value, 2),
-                "cash": round(self.trader.portfolio.cash, 2),
-                "positions_value": round(self.trader.portfolio.positions_value, 2),
-                "total_pnl": round(self.trader.portfolio.total_pnl, 2),
-                "total_pnl_pct": round(self.trader.portfolio.total_pnl_pct, 2),
-                "total_trades": self.trader.portfolio.total_trades,
-                "win_rate": round(self.trader.portfolio.win_rate * 100, 1),
-                "max_drawdown": round(getattr(self.trader.portfolio, "current_drawdown", self.trader.portfolio.max_drawdown) * 100, 2),
-                "total_fees": round(self.trader.portfolio.total_fees_paid, 2),
-                "positions": [
-                    {
-                        "market": p.market_slug,
-                        "side": p.side,
-                        "shares": round(p.shares, 2),
-                        "entry": round(p.avg_entry_price, 3),
-                        "current": round(p.current_price, 3),
-                        "pnl": round(p.unrealized_pnl, 2),
-                        "source": p.source.value,
-                    }
-                    for p in self.trader.portfolio.positions
-                ],
-            },
-            "signals": [
-                {
-                    "id": s.id,
-                    "time": s.timestamp.isoformat(),
-                    "source": s.source.value,
-                    "action": s.action.value,
-                    "market": s.market_slug,
-                    "confidence": round(s.confidence, 2),
-                    "edge": round(s.expected_edge, 2),
-                    "size": round(s.suggested_size_usd, 2),
-                    "whale": s.whale_confirmed,
-                    "reasoning": s.reasoning,
-                }
-                for s in self._all_signals[:30]
-            ],
-            "trades": [
-                {
-                    "id": t.id,
-                    "time": t.timestamp.isoformat(),
-                    "source": t.source.value,
-                    "market": t.market_slug,
-                    "side": t.side.value,
-                    "price": round(t.price, 3),
-                    "shares": round(t.size_shares, 2),
-                    "usd": round(t.size_usd, 2),
-                    "pnl": round(t.realized_pnl, 2) if t.realized_pnl else None,
-                }
-                for t in self.trader.trade_log[-30:]
-            ],
+            "portfolio": comparison_views["all"]["portfolio"],
+            "signals": comparison_views["all"]["signals"],
+            "trades": comparison_views["all"]["trades"],
             "strategies": {
                 name: strat.stats for name, strat in self.strategies.items()
             },
@@ -426,6 +447,7 @@ class Pipeline:
             "slippage": self.slippage.get_stats(),
             "ab_tests": self.ab_tester.get_report(),
             "performance": self.trader.get_performance_report(),
+            "comparison_views": comparison_views,
             "diagnostics": self._latest_diagnostics,
             "errors": self._errors[-10:],
             "markets_sample": [
@@ -440,6 +462,78 @@ class Pipeline:
                 }
                 for m in sorted(self._markets, key=lambda x: x.volume_24h, reverse=True)[:20]
             ],
+        }
+
+    def _serialize_view(
+        self,
+        *,
+        view_key: str,
+        label: str,
+        source: str,
+        trader: PaperTrader,
+        signals: list[Signal],
+    ) -> dict:
+        return {
+            "key": view_key,
+            "label": label,
+            "source": source,
+            "portfolio": {
+                "total_value": round(trader.portfolio.total_value, 2),
+                "cash": round(trader.portfolio.cash, 2),
+                "positions_value": round(trader.portfolio.positions_value, 2),
+                "total_pnl": round(trader.portfolio.total_pnl, 2),
+                "total_pnl_pct": round(trader.portfolio.total_pnl_pct, 2),
+                "total_trades": trader.portfolio.total_trades,
+                "win_rate": round(trader.portfolio.win_rate * 100, 1),
+                "max_drawdown": round(
+                    getattr(trader.portfolio, "current_drawdown", trader.portfolio.max_drawdown)
+                    * 100,
+                    2,
+                ),
+                "total_fees": round(trader.portfolio.total_fees_paid, 2),
+                "positions": [
+                    {
+                        "market": p.market_slug,
+                        "side": p.side,
+                        "shares": round(p.shares, 2),
+                        "entry": round(p.avg_entry_price, 3),
+                        "current": round(p.current_price, 3),
+                        "pnl": round(p.unrealized_pnl, 2),
+                        "source": p.source.value,
+                    }
+                    for p in trader.portfolio.positions
+                ],
+            },
+            "signals": [
+                {
+                    "id": s.id,
+                    "time": s.timestamp.isoformat(),
+                    "source": s.source.value,
+                    "action": s.action.value,
+                    "market": s.market_slug,
+                    "confidence": round(s.confidence, 2),
+                    "edge": round(s.expected_edge, 2),
+                    "size": round(s.suggested_size_usd, 2),
+                    "whale": s.whale_confirmed,
+                    "reasoning": s.reasoning,
+                }
+                for s in signals[:30]
+            ],
+            "trades": [
+                {
+                    "id": t.id,
+                    "time": t.timestamp.isoformat(),
+                    "source": t.source.value,
+                    "market": t.market_slug,
+                    "side": t.side.value,
+                    "price": round(t.price, 3),
+                    "shares": round(t.size_shares, 2),
+                    "usd": round(t.size_usd, 2),
+                    "pnl": round(t.realized_pnl, 2) if t.realized_pnl else None,
+                }
+                for t in trader.trade_log[-30:]
+            ],
+            "performance": trader.get_performance_report(),
         }
 
     @staticmethod

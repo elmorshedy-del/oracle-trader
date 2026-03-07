@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from data.models import (
-    Signal, PaperTrade, Position, Portfolio, Side, TradeStatus, SignalAction
+    Signal, PaperTrade, Position, Portfolio, Side, TradeStatus, SignalAction, SignalSource
 )
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 BASE_FEE_RATE = 0.02
 EXIT_FEE_ESTIMATE_RATE = BASE_FEE_RATE * 0.5
 MIN_TRADE_CASH_USD = 2.0
-MAX_HEDGE_POSITIONS = 30
+MAX_HEDGE_POSITIONS = 10
 MAX_DIRECTIONAL_POSITIONS = 10
 MAX_NEW_HEDGE_POSITIONS_PER_SCAN = 8
 MAX_NEW_ARB_POSITIONS_PER_SCAN = 2
@@ -27,6 +27,15 @@ DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
 DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
 HEDGE_ROTATION_HOURS = 24.0
+STRATEGY_EXPOSURE_CAPS = {
+    SignalSource.LIQUIDITY: 0.25,
+    SignalSource.ARBITRAGE: 0.20,
+    SignalSource.NEWS: 0.15,
+    SignalSource.MEAN_REVERSION: 0.20,
+    SignalSource.CRYPTO_ARB: 0.20,
+    SignalSource.WEATHER: 0.15,
+    SignalSource.WHALE: 0.10,
+}
 
 
 class PaperTrader:
@@ -97,6 +106,23 @@ class PaperTrader:
         self.save_state()
         logger.info(f"[PAPER] Reset portfolio state to ${capital:.2f}")
 
+    def _strategy_exposure_cap_pct(
+        self, source: SignalSource, action: SignalAction | None = None
+    ) -> float:
+        if action == SignalAction.HEDGE_BOTH:
+            return STRATEGY_EXPOSURE_CAPS[SignalSource.LIQUIDITY]
+        return STRATEGY_EXPOSURE_CAPS.get(source, 0.20)
+
+    def _position_value(self, pos: Position) -> float:
+        return pos.shares * pos.current_price
+
+    def _strategy_exposure(self, source: SignalSource) -> float:
+        return sum(
+            self._position_value(pos)
+            for pos in self.portfolio.positions
+            if pos.source == source
+        )
+
     def select_candidate_signals(self, signals: list[Signal]) -> tuple[list[Signal], dict[str, int]]:
         """Drop signals that are already impossible given current holdings and source caps."""
         selected: list[Signal] = []
@@ -145,7 +171,7 @@ class PaperTrader:
                 filtered["source_position_cap"] += 1
                 continue
 
-            cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
+            cap = self._strategy_exposure_cap_pct(signal.source, signal.action)
             current_exposure = source_exposure.get(signal.source, 0.0)
             projected_exposure = current_exposure + max(signal.suggested_size_usd, 0.0)
             if projected_exposure > self.portfolio.starting_capital * cap:
@@ -390,6 +416,7 @@ class PaperTrader:
     def check_exits(self, current_prices: dict[str, float]):
         """Check if any positions should be exited (take-profit, stop-loss, time)."""
         exits = []
+        queued_positions: set[int] = set()
         now = datetime.now(timezone.utc)
 
         for pos in self.portfolio.positions[:]:
@@ -397,6 +424,7 @@ class PaperTrader:
                 age_hours = (now - pos.opened_at).total_seconds() / 3600
                 if age_hours >= HEDGE_ROTATION_HOURS:
                     exits.append((pos, 1.0, f"HEDGE_ROTATE: {age_hours:.1f}h"))
+                    queued_positions.add(id(pos))
                 continue
             if pos.side == "ARB":
                 continue
@@ -427,6 +455,42 @@ class PaperTrader:
 
             if reason:
                 exits.append((pos, current, reason))
+                queued_positions.add(id(pos))
+
+        # Keep liquidity from monopolizing the portfolio. Trim the oldest hedge
+        # positions until the source is back within its dedicated budget/slot cap.
+        liquidity_positions = [
+            pos
+            for pos in self.portfolio.positions
+            if pos.source == SignalSource.LIQUIDITY
+            and pos.side == "HEDGE"
+            and id(pos) not in queued_positions
+        ]
+        liquidity_cap_usd = (
+            self.portfolio.starting_capital
+            * self._strategy_exposure_cap_pct(SignalSource.LIQUIDITY)
+        )
+        liquidity_exposure = sum(self._position_value(pos) for pos in liquidity_positions)
+        if liquidity_positions and (
+            liquidity_exposure > liquidity_cap_usd
+            or len(liquidity_positions) > MAX_HEDGE_POSITIONS
+        ):
+            liquidity_positions.sort(key=lambda pos: pos.opened_at)
+            trimmed = 0
+            while liquidity_positions and (
+                liquidity_exposure > liquidity_cap_usd
+                or len(liquidity_positions) > MAX_HEDGE_POSITIONS
+            ):
+                pos = liquidity_positions.pop(0)
+                exits.append((pos, 1.0, "REBALANCE: liquidity reserve"))
+                queued_positions.add(id(pos))
+                liquidity_exposure -= self._position_value(pos)
+                trimmed += 1
+            logger.info(
+                "[RISK] Rebalancing liquidity: trimmed %s hedge positions to %.0f%% cap",
+                trimmed,
+                self._strategy_exposure_cap_pct(SignalSource.LIQUIDITY) * 100,
+            )
 
         # Execute exits
         for pos, exit_price, reason in exits:
@@ -612,10 +676,10 @@ class PaperTrader:
 
         # Max exposure per strategy (higher for hedged positions since risk is bounded)
         strategy_exposure = sum(
-            p.shares * p.current_price for p in self.portfolio.positions
+            self._position_value(p) for p in self.portfolio.positions
             if p.source == signal.source
         )
-        cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
+        cap = self._strategy_exposure_cap_pct(signal.source, signal.action)
         if strategy_exposure > self.portfolio.starting_capital * cap:
             logger.debug(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
             return False

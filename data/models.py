@@ -106,6 +106,7 @@ class Signal(BaseModel):
     reasoning: str = ""
     whale_confirmed: bool = False
     suggested_size_usd: float = 0.0
+    group_key: Optional[str] = None
 
     # For arbitrage signals
     arb_outcomes: list[str] = Field(default_factory=list)  # token_ids
@@ -146,6 +147,7 @@ class Position(BaseModel):
     current_price: float = 0.0
     unrealized_pnl: float = 0.0
     source: SignalSource
+    group_key: Optional[str] = None
     opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

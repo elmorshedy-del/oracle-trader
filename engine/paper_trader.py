@@ -7,7 +7,8 @@ Every decision is logged with full context for later analysis.
 
 import json
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from data.models import (
     Signal, PaperTrade, Position, Portfolio, Side, TradeStatus, SignalAction, SignalSource
@@ -27,6 +28,26 @@ DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
 DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
 HEDGE_ROTATION_HOURS = 24.0
+ARB_ROTATION_HOURS = 8.0
+ARB_REENTRY_COOLDOWN_HOURS = 18.0
+WEATHER_SLUG_GROUP_RE = re.compile(
+    r"highest-temperature-in-([a-z-]+)-on-([a-z]+)-(\d{1,2})-(\d{4})"
+)
+CRYPTO_EXPIRY_RE = re.compile(r"by-([a-z]+)-(\d{1,2})-(\d{4})")
+MONTHS = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
 STRATEGY_EXPOSURE_CAPS = {
     SignalSource.LIQUIDITY: 0.25,
     SignalSource.ARBITRAGE: 0.20,
@@ -51,12 +72,14 @@ class PaperTrader:
             self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital, peak_value=starting_capital)
             self.trade_log: list[PaperTrade] = []
             self.signal_log: list[Signal] = []
+            self._group_cooldowns: dict[str, datetime] = {}
             logger.info(f"[PAPER] Fresh start with ${starting_capital}")
         else:
             # Fix peak_value if it was initialized with wrong default
             if self.portfolio.peak_value > self.portfolio.total_value * 1.2:
                 self.portfolio.peak_value = max(self.portfolio.starting_capital, self.portfolio.total_value)
                 logger.info(f"[PAPER] Reset peak_value to ${self.portfolio.peak_value:.2f}")
+            self._backfill_position_groups()
             logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
 
     def _load_state(self) -> bool:
@@ -68,6 +91,7 @@ class PaperTrader:
                 # Reconstruct positions (they're nested in portfolio)
                 self.trade_log = [PaperTrade(**t) for t in data.get("trade_log", [])]
                 self.signal_log = []  # don't restore signals, they're transient
+                self._group_cooldowns = {}
                 return True
         except Exception as e:
             logger.warning(f"[PAPER] Failed to load state: {e}")
@@ -99,12 +123,91 @@ class PaperTrader:
         )
         self.trade_log = []
         self.signal_log = []
+        self._group_cooldowns = {}
         try:
             self.state_path.unlink(missing_ok=True)
         except OSError as e:
             logger.warning(f"[PAPER] Failed to delete state file: {e}")
         self.save_state()
         logger.info(f"[PAPER] Reset portfolio state to ${capital:.2f}")
+
+    def _cleanup_cooldowns(self):
+        now = datetime.now(timezone.utc)
+        self._group_cooldowns = {
+            key: expires_at
+            for key, expires_at in self._group_cooldowns.items()
+            if expires_at > now
+        }
+
+    def _set_group_cooldown(self, group_key: str | None, hours: float):
+        if not group_key or hours <= 0:
+            return
+        self._group_cooldowns[group_key] = datetime.now(timezone.utc) + timedelta(hours=hours)
+
+    def _backfill_position_groups(self):
+        for pos in self.portfolio.positions:
+            if pos.group_key:
+                continue
+            pos.group_key = self._infer_group_key(pos)
+
+    def _infer_group_key(self, pos: Position) -> str | None:
+        slug = (pos.market_slug or "").lower()
+        if not slug:
+            return None
+
+        if pos.source == SignalSource.ARBITRAGE:
+            return f"arb:{slug}"
+
+        if pos.source == SignalSource.WEATHER:
+            match = WEATHER_SLUG_GROUP_RE.search(slug)
+            if not match:
+                return None
+            city, month_name, day, year = match.groups()
+            month_num = MONTHS.get(month_name)
+            if not month_num:
+                return None
+            try:
+                target_date = datetime(int(year), month_num, int(day)).strftime("%Y-%m-%d")
+            except ValueError:
+                return None
+            return f"weather:{city}:{target_date}"
+
+        if pos.source != SignalSource.CRYPTO_ARB:
+            return None
+
+        symbol = None
+        if "bitcoin" in slug or "btc" in slug:
+            symbol = "BTC"
+        elif "ethereum" in slug or "eth" in slug:
+            symbol = "ETH"
+        elif "solana" in slug or "sol" in slug:
+            symbol = "SOL"
+        if not symbol:
+            return None
+
+        expiry_bucket = "unknown"
+        expiry_match = CRYPTO_EXPIRY_RE.search(slug)
+        if expiry_match:
+            month_name, day, year = expiry_match.groups()
+            month_num = MONTHS.get(month_name)
+            if month_num:
+                try:
+                    expiry_bucket = datetime(int(year), month_num, int(day)).strftime("%Y-%m-%d")
+                except ValueError:
+                    expiry_bucket = "unknown"
+
+        is_temporal = any(token in slug for token in ("5-minute", "5-min", "15-minute", "15-min", "hour"))
+        if is_temporal:
+            direction = "up" if pos.side == "YES" else "down"
+            return f"crypto:{symbol}:temporal:{direction}:{expiry_bucket}"
+
+        kind = "dip" if any(token in slug for token in ("dip", "below")) else "reach"
+        bullish = (
+            (kind == "reach" and pos.side == "YES")
+            or (kind == "dip" and pos.side == "NO")
+        )
+        thesis = "bull" if bullish else "bear"
+        return f"crypto:{symbol}:barrier:{thesis}:{expiry_bucket}"
 
     def _strategy_exposure_cap_pct(
         self, source: SignalSource, action: SignalAction | None = None
@@ -125,16 +228,22 @@ class PaperTrader:
 
     def select_candidate_signals(self, signals: list[Signal]) -> tuple[list[Signal], dict[str, int]]:
         """Drop signals that are already impossible given current holdings and source caps."""
+        self._cleanup_cooldowns()
         selected: list[Signal] = []
         filtered = {
             "held_market": 0,
+            "held_group": 0,
             "duplicate_market": 0,
+            "duplicate_group": 0,
+            "cooldown": 0,
             "source_scan_cap": 0,
             "source_position_cap": 0,
             "source_exposure_cap": 0,
         }
         held_conditions = {p.condition_id for p in self.portfolio.positions}
+        held_groups = {p.group_key for p in self.portfolio.positions if p.group_key}
         seen_conditions: set[str] = set()
+        seen_groups: set[str] = set()
         source_counts: dict = {}
         source_exposure: dict = {}
         selected_per_source: dict = {}
@@ -149,8 +258,17 @@ class PaperTrader:
             if signal.condition_id in held_conditions:
                 filtered["held_market"] += 1
                 continue
+            if signal.group_key and signal.group_key in held_groups:
+                filtered["held_group"] += 1
+                continue
             if signal.condition_id in seen_conditions:
                 filtered["duplicate_market"] += 1
+                continue
+            if signal.group_key and signal.group_key in seen_groups:
+                filtered["duplicate_group"] += 1
+                continue
+            if signal.group_key and signal.group_key in self._group_cooldowns:
+                filtered["cooldown"] += 1
                 continue
 
             per_scan_cap = MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN
@@ -180,6 +298,8 @@ class PaperTrader:
 
             selected.append(signal)
             seen_conditions.add(signal.condition_id)
+            if signal.group_key:
+                seen_groups.add(signal.group_key)
             selected_per_source[signal.source] = selected_per_source.get(signal.source, 0) + 1
             source_counts[signal.source] = source_counts.get(signal.source, 0) + 1
             source_exposure[signal.source] = projected_exposure
@@ -266,6 +386,7 @@ class PaperTrader:
             avg_entry_price=fill_price,
             current_price=fill_price,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -310,6 +431,7 @@ class PaperTrader:
             avg_entry_price=1.0,
             current_price=1.0,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -387,6 +509,7 @@ class PaperTrader:
             current_price=signal.arb_guaranteed_payout,
             unrealized_pnl=net_profit,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -427,6 +550,10 @@ class PaperTrader:
                     queued_positions.add(id(pos))
                 continue
             if pos.side == "ARB":
+                age_hours = (now - pos.opened_at).total_seconds() / 3600
+                if age_hours >= ARB_ROTATION_HOURS:
+                    exits.append((pos, pos.current_price or 1.0, f"ARB_ROTATE: {age_hours:.1f}h"))
+                    queued_positions.add(id(pos))
                 continue
 
             # Get current price
@@ -499,6 +626,10 @@ class PaperTrader:
                 pnl = 0.0
                 proceeds = pos.shares
                 fee = 0.0
+            elif pos.side == "ARB":
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = 0.0
             elif pos.side == "YES":
                 pnl = (exit_price - pos.avg_entry_price) * pos.shares
                 proceeds = pos.shares * exit_price
@@ -519,6 +650,8 @@ class PaperTrader:
                 self.portfolio.losing_trades += 1
 
             self.portfolio.positions.remove(pos)
+            if pos.side == "ARB":
+                self._set_group_cooldown(pos.group_key or pos.market_slug, ARB_REENTRY_COOLDOWN_HOURS)
             logger.info(
                 f"[EXIT] {pos.market_slug} | {pos.side} | {reason} | "
                 f"Entry: ${pos.avg_entry_price:.3f} → Exit: ${exit_price:.3f} | "
@@ -639,6 +772,7 @@ class PaperTrader:
     def _passes_risk_checks(self, signal: Signal) -> bool:
         """Check if a signal passes risk management rules."""
         self._update_drawdown()
+        self._cleanup_cooldowns()
 
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:
@@ -662,6 +796,15 @@ class PaperTrader:
         if existing:
             logger.debug(f"[RISK] Already have position on {signal.market_slug}")
             return False
+
+        if signal.group_key:
+            same_group = [p for p in self.portfolio.positions if p.group_key == signal.group_key]
+            if same_group:
+                logger.debug(f"[RISK] Already have grouped thesis on {signal.group_key}")
+                return False
+            if signal.group_key in self._group_cooldowns:
+                logger.debug(f"[RISK] Group cooldown active on {signal.group_key}")
+                return False
 
         # Max positions per strategy (higher limit for hedged positions)
         same_source = [p for p in self.portfolio.positions if p.source == signal.source]

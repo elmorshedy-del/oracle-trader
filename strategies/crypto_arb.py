@@ -112,7 +112,7 @@ class CryptoTemporalArbStrategy(BaseStrategy):
             return []
 
         self._stats["scans_completed"] += 1
-        signals = []
+        best_signals: dict[str, Signal] = {}
 
         # Step 1: Fetch current exchange prices
         prices = await self._fetch_spot_prices()
@@ -161,8 +161,14 @@ class CryptoTemporalArbStrategy(BaseStrategy):
                     )
 
                 if signal:
-                    signals.append(signal)
-                    self._stats["signals_generated"] += 1
+                    self._track_best_signal(best_signals, signal)
+
+        signals = sorted(
+            best_signals.values(),
+            key=lambda signal: (signal.expected_edge, signal.confidence),
+            reverse=True,
+        )
+        self._stats["signals_generated"] += len(signals)
 
         if signals:
             logger.info(f"[CRYPTO] Generated {len(signals)} crypto arb signals")
@@ -484,6 +490,7 @@ class CryptoTemporalArbStrategy(BaseStrategy):
             token_id=target_outcome.token_id,
             confidence=confidence,
             expected_edge=edge * 100,
+            group_key=self._temporal_group_key(symbol, market, direction),
             reasoning=(
                 f"CRYPTO TEMPORAL: {symbol} moved {signed_move} across spot feeds | "
                 f"buying {target_outcome.name.upper()} at {target_price:.3f} on '{market.slug}'"
@@ -566,6 +573,7 @@ class CryptoTemporalArbStrategy(BaseStrategy):
             token_id=target_outcome.token_id,
             confidence=confidence,
             expected_edge=edge * 100,
+            group_key=self._barrier_group_key(symbol, market, match["kind"], action),
             reasoning=(
                 f"CRYPTO BARRIER: {symbol} spot ${spot_price:,.2f} vs {match['kind']} "
                 f"${match['barrier_price']:,.0f} on '{market.slug}' | "
@@ -635,3 +643,34 @@ class CryptoTemporalArbStrategy(BaseStrategy):
         if seconds_left <= 0:
             return None
         return seconds_left / (365.25 * 24 * 3600)
+
+    def _track_best_signal(self, best_signals: dict[str, Signal], signal: Signal):
+        group_key = signal.group_key or signal.condition_id
+        existing = best_signals.get(group_key)
+        candidate_rank = (signal.expected_edge, signal.confidence)
+        existing_rank = (
+            (existing.expected_edge, existing.confidence)
+            if existing
+            else (-1.0, -1.0)
+        )
+        if existing is None or candidate_rank > existing_rank:
+            best_signals[group_key] = signal
+
+    def _temporal_group_key(self, symbol: str, market: Market, direction: str) -> str:
+        expiry_bucket = (market.end_date or "unknown")[:10]
+        return f"crypto:{symbol}:temporal:{direction}:{expiry_bucket}"
+
+    def _barrier_group_key(
+        self,
+        symbol: str,
+        market: Market,
+        kind: str,
+        action: SignalAction,
+    ) -> str:
+        expiry_bucket = (market.end_date or "unknown")[:10]
+        bullish = (
+            (kind in {"reach", "ath"} and action == SignalAction.BUY_YES)
+            or (kind == "dip" and action == SignalAction.BUY_NO)
+        )
+        thesis = "bull" if bullish else "bear"
+        return f"crypto:{symbol}:barrier:{thesis}:{expiry_bucket}"

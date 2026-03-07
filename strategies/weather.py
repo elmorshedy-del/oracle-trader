@@ -92,7 +92,7 @@ class WeatherForecastStrategy(BaseStrategy):
             return []
 
         self._stats["scans_completed"] += 1
-        signals = []
+        best_signals: dict[str, Signal] = {}
 
         now = datetime.now(timezone.utc).timestamp()
 
@@ -150,6 +150,7 @@ class WeatherForecastStrategy(BaseStrategy):
                     token_id=market.outcomes[0].token_id,
                     confidence=confidence,
                     expected_edge=edge * 100,
+                    group_key=self._weather_group_key(city, match.get("target_date")),
                     reasoning=(
                         f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} | "
                         f"Range {temp_range[0]}-{temp_range[1]}°F: forecast prob={forecast_prob:.0%} "
@@ -160,8 +161,7 @@ class WeatherForecastStrategy(BaseStrategy):
                         self.config.risk.max_position_usd,
                     ),
                 )
-                signals.append(signal)
-                self._stats["signals_generated"] += 1
+                self._track_best_signal(best_signals, signal)
                 logger.debug(
                     f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
                     f"range={temp_range}, prob={forecast_prob:.0%} vs market={yes_price:.0%} → BUY YES"
@@ -183,6 +183,7 @@ class WeatherForecastStrategy(BaseStrategy):
                     token_id=market.outcomes[1].token_id if len(market.outcomes) > 1 else None,
                     confidence=confidence,
                     expected_edge=abs(edge) * 100,
+                    group_key=self._weather_group_key(city, match.get("target_date")),
                     reasoning=(
                         f"WEATHER: NOAA forecast {forecast_temp:.0f}°F for {city} | "
                         f"Range {temp_range[0]}-{temp_range[1]}°F: forecast prob={forecast_prob:.0%} "
@@ -193,12 +194,18 @@ class WeatherForecastStrategy(BaseStrategy):
                         self.config.risk.max_position_usd,
                     ),
                 )
-                signals.append(signal)
-                self._stats["signals_generated"] += 1
+                self._track_best_signal(best_signals, signal)
                 logger.debug(
                     f"[WEATHER] {city}: NOAA={forecast_temp:.0f}°F, "
                     f"range={temp_range}, market overpriced → BUY NO"
                 )
+
+        signals = sorted(
+            best_signals.values(),
+            key=lambda signal: (signal.expected_edge, signal.confidence),
+            reverse=True,
+        )
+        self._stats["signals_generated"] += len(signals)
 
         if signals:
             logger.info(
@@ -213,6 +220,21 @@ class WeatherForecastStrategy(BaseStrategy):
             )
 
         return signals
+
+    def _weather_group_key(self, city: str, target_date: str | None) -> str:
+        return f"weather:{city}:{target_date or 'unknown'}"
+
+    def _track_best_signal(self, best_signals: dict[str, Signal], signal: Signal):
+        group_key = signal.group_key or signal.condition_id
+        existing = best_signals.get(group_key)
+        candidate_rank = (signal.expected_edge, signal.confidence)
+        existing_rank = (
+            (existing.expected_edge, existing.confidence)
+            if existing
+            else (-1.0, -1.0)
+        )
+        if existing is None or candidate_rank > existing_rank:
+            best_signals[group_key] = signal
 
     async def get_supplemental_markets(self) -> list[Market]:
         """Fetch weather markets that the generic active-market feed misses."""

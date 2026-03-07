@@ -1008,6 +1008,7 @@ function renderSanity(d) {
 
   const diag = d.diagnostics || {};
   const filtered = diag.filtered_signals || {};
+  const heldLoopCount = (filtered.held_market || 0) + (filtered.held_group || 0);
   const signalsByStrategy = diag.signals_by_strategy || {};
   const executedByStrategy = diag.executed_by_strategy || {};
   const totalSignals = Object.values(signalsByStrategy).reduce((sum, val) => sum + val, 0);
@@ -1028,9 +1029,9 @@ function renderSanity(d) {
       note: `${diag.markets_tradeable || 0} available`,
     },
     {
-      label: 'Held-market loop',
-      ok: (filtered.held_market || 0) === 0,
-      note: `${filtered.held_market || 0} filtered`,
+      label: 'Held-thesis loop',
+      ok: heldLoopCount === 0,
+      note: `${heldLoopCount} filtered`,
     },
     {
       label: 'Strategy caps clear',
@@ -1050,7 +1051,7 @@ function renderSanity(d) {
     {
       label: 'New trades this scan',
       ok: (diag.executed || 0) > 0 || totalSignals === 0,
-      note: `${diag.executed || 0} executed / ${totalSignals} candidates | ${executedSummary}`,
+      note: `${diag.executed || 0} executed / ${totalSignals} candidates | ${executedSummary} | cooldown ${(filtered.cooldown || 0)}`,
     },
     {
       label: 'Exit flow active',

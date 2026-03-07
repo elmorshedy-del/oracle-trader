@@ -64,7 +64,7 @@ class Pipeline:
             "news": NewsLatencyStrategy(self.config),
             "mean_reversion": MeanReversionStrategy(self.config, collector=self.collector),
             "crypto_arb": CryptoTemporalArbStrategy(self.config),
-            "weather": WeatherForecastStrategy(self.config),
+            "weather": WeatherForecastStrategy(self.config, collector=self.collector),
         }
 
         # Engine
@@ -300,8 +300,10 @@ class Pipeline:
             weather: WeatherForecastStrategy = self.strategies["weather"]
             weather._forecasts.clear()
             weather._matched_markets = []
+            weather._supplemental_markets = []
             weather._last_forecast_fetch = 0
             weather._last_market_scan = 0
+            weather._last_supplemental_fetch = 0
 
             self.health = HealthMonitor(log_dir=str(LOG_DIR))
             await self._refresh_data()
@@ -376,6 +378,14 @@ class Pipeline:
         try:
             self._markets = await self.collector.get_all_active_markets()
             self._events = await self.collector.get_events(limit=100)
+            weather: WeatherForecastStrategy = self.strategies["weather"]
+            extra_weather_markets = await weather.get_supplemental_markets()
+            if extra_weather_markets:
+                seen_conditions = {m.condition_id for m in self._markets}
+                for market in extra_weather_markets:
+                    if market.condition_id not in seen_conditions:
+                        self._markets.append(market)
+                        seen_conditions.add(market.condition_id)
             # Keep held markets in the working set so open positions keep receiving
             # fresh prices and closed positions can still be resolved cleanly.
             if self.trader.portfolio.positions:

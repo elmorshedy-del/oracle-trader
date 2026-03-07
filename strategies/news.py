@@ -7,12 +7,13 @@ and generates signals before the market fully prices in the information.
 Requires ANTHROPIC_API_KEY environment variable.
 """
 
-import httpx
-import asyncio
 import hashlib
 import logging
+import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+
+import httpx
 from data.models import Market, Event, Signal, SignalSource, SignalAction, NewsHeadline
 from strategies.base import BaseStrategy
 
@@ -31,7 +32,14 @@ class NewsLatencyStrategy(BaseStrategy):
         self._recent_headlines: list[NewsHeadline] = []
         self._api_calls_this_hour: int = 0
         self._hour_start: datetime = datetime.now(timezone.utc)
-        self._market_index: dict[str, str] = {}  # keyword -> market_slug
+        self._market_index: dict[str, set[str]] = {}  # keyword -> market_slugs
+        self._market_lookup: dict[str, Market] = {}
+        self._indexed_keywords: tuple[str, ...] = ()
+        self._stats.update({
+            "matched_headlines": 0,
+            "classified_headlines": 0,
+            "last_context_markets": 0,
+        })
 
     async def scan(self, markets: list[Market], events: list[Event]) -> list[Signal]:
         if not self.cfg.enabled or not self.cfg.anthropic_api_key:
@@ -49,8 +57,15 @@ class NewsLatencyStrategy(BaseStrategy):
         if not new_headlines:
             return []
 
-        # Pre-filter: only send relevant headlines to Claude (save API budget)
-        relevant_headlines = self._keyword_prefilter(new_headlines)
+        # Pre-filter and cache candidate markets so classification stays focused.
+        headline_context = {
+            headline.title: self._candidate_markets_for_headline(headline)
+            for headline in new_headlines
+        }
+        relevant_headlines = [
+            headline for headline in new_headlines
+            if headline_context.get(headline.title)
+        ]
         relevant_count = len(relevant_headlines)
         if not relevant_headlines:
             # If prefilter finds nothing, send top 3 as fallback
@@ -60,24 +75,35 @@ class NewsLatencyStrategy(BaseStrategy):
             relevant_headlines = relevant_headlines[:10]
 
         signals = []
+        classified_count = 0
+        max_context_markets = 0
         for headline in relevant_headlines:
             if not self._within_rate_limit():
                 logger.warning("[NEWS] Rate limit reached, skipping remaining headlines")
                 break
 
-            classification = await self._classify_headline(headline, markets)
+            candidate_markets = headline_context.get(headline.title) or self._fallback_market_context(markets)
+            max_context_markets = max(max_context_markets, len(candidate_markets))
+            classification = await self._classify_headline(headline, candidate_markets)
+            if classification:
+                classified_count += 1
             if classification and classification.get("confidence", 0) >= self.cfg.min_confidence:
-                signal = self._build_signal(headline, classification, markets)
+                signal = self._build_signal(headline, classification)
                 if signal:
                     signals.append(signal)
                     self._stats["signals_generated"] += 1
 
+        self._stats["matched_headlines"] = relevant_count
+        self._stats["classified_headlines"] = classified_count
+        self._stats["last_context_markets"] = max_context_markets
+
         logger.info(
-            "[NEWS] Scan: %s new headlines | %s relevant | %s classified | %s signals",
+            "[NEWS] Scan: %s new headlines | %s relevant | %s classified | %s signals | context<=%s markets",
             len(new_headlines),
             relevant_count,
-            len(relevant_headlines),
+            classified_count,
             len(signals),
+            max_context_markets,
         )
 
         return signals
@@ -146,27 +172,80 @@ class NewsLatencyStrategy(BaseStrategy):
     def _build_market_index(self, markets: list[Market]):
         """Build a keyword -> market mapping for fast filtering."""
         self._market_index.clear()
+        self._market_lookup.clear()
         for m in markets:
-            keywords = m.question.lower().split()
+            if m.closed or not m.active or not m.outcomes:
+                continue
+            self._market_lookup[m.slug] = m
+            keywords = self._tokenize(f"{m.question} {m.slug} {' '.join(m.tags)}")
             for kw in keywords:
-                if len(kw) > 3:  # skip short words
-                    self._market_index[kw] = m.slug
+                self._market_index.setdefault(kw, set()).add(m.slug)
+        self._indexed_keywords = tuple(self._market_index.keys())
 
-    def _keyword_prefilter(self, headlines: list[NewsHeadline]) -> list[NewsHeadline]:
-        """Only keep headlines that match keywords from active markets."""
-        relevant = []
-        market_keywords = set(self._market_index.keys())
-        for h in headlines:
-            title_lower = h.title.lower()
-            matched = False
-            for kw in market_keywords:
-                # Substring match: "iran" matches keyword "iranian" and vice versa
-                if kw in title_lower or any(w in kw for w in title_lower.split() if len(w) > 3):
-                    matched = True
-                    break
-            if matched:
-                relevant.append(h)
-        return relevant
+    def _candidate_markets_for_headline(
+        self, headline: NewsHeadline, limit: int = 15
+    ) -> list[Market]:
+        """Rank candidate markets by keyword overlap with the headline."""
+        tokens = self._tokenize(headline.title)
+        if not tokens:
+            return []
+
+        scores: dict[str, int] = {}
+        for token in tokens:
+            for slug in self._market_index.get(token, set()):
+                scores[slug] = scores.get(slug, 0) + 4
+
+        # Allow loose prefix matches so "iran" can still find "iranian" markets.
+        fuzzy_tokens = [token for token in tokens if len(token) >= 4]
+        if fuzzy_tokens:
+            for indexed in self._indexed_keywords:
+                if len(indexed) < 4:
+                    continue
+                if not any(
+                    token.startswith(indexed)
+                    or indexed.startswith(token)
+                    for token in fuzzy_tokens
+                ):
+                    continue
+                for slug in self._market_index.get(indexed, set()):
+                    scores[slug] = scores.get(slug, 0) + 1
+
+        ranked = sorted(
+            (
+                self._market_lookup[slug]
+                for slug in scores
+                if slug in self._market_lookup
+            ),
+            key=lambda market: (
+                scores.get(market.slug, 0),
+                market.volume_24h,
+                market.liquidity,
+            ),
+            reverse=True,
+        )
+        return ranked[:limit]
+
+    def _fallback_market_context(self, markets: list[Market], limit: int = 15) -> list[Market]:
+        """Fallback to the most active markets when a headline has no direct keyword match."""
+        active = [
+            market for market in markets
+            if market.active and not market.closed and market.outcomes
+        ]
+        return sorted(
+            active,
+            key=lambda market: (market.volume_24h, market.liquidity),
+            reverse=True,
+        )[:limit]
+
+    def _tokenize(self, text: str) -> set[str]:
+        tokens = set()
+        for token in re.findall(r"[a-z0-9]+", text.lower()):
+            if len(token) < 4:
+                continue
+            tokens.add(token)
+            if token.endswith("s") and len(token) > 4:
+                tokens.add(token[:-1])
+        return tokens
 
     # ------------------------------------------------------------------
     # LLM Classification
@@ -178,7 +257,7 @@ class NewsLatencyStrategy(BaseStrategy):
         """Use Claude API to classify a headline against active markets."""
         market_list = "\n".join(
             f"- {m.slug}: \"{m.question}\" (current YES: {m.outcomes[0].price:.2f})"
-            for m in markets[:50]  # limit context size
+            for m in markets[:15]
             if m.outcomes
         )
 
@@ -249,16 +328,14 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
     # Signal Building
     # ------------------------------------------------------------------
 
-    def _build_signal(
-        self, headline: NewsHeadline, classification: dict, markets: list[Market]
-    ) -> Signal | None:
+    def _build_signal(self, headline: NewsHeadline, classification: dict) -> Signal | None:
         """Convert a classification into a tradeable signal."""
         slug = classification.get("market_slug")
         if not slug:
             return None
 
         # Find the market
-        market = next((m for m in markets if m.slug == slug), None)
+        market = self._market_lookup.get(slug)
         if not market or not market.outcomes:
             return None
 

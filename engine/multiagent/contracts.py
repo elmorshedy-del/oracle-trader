@@ -330,6 +330,7 @@ class ScanCycleReport:
     module_health: dict[str, ModuleHealth] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    candidates_detail: list[SignalCandidate] = field(default_factory=list)
     rejected_signals_detail: list[RejectedSignal] = field(default_factory=list)
     allocation_rejections_detail: list[AllocationRejection] = field(default_factory=list)
     execution_results_detail: list[ExecutionResult] = field(default_factory=list)

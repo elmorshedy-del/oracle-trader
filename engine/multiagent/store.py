@@ -68,9 +68,9 @@ class RuntimeMetricsStore:
                 conn.execute(
                     """
                     INSERT INTO fills (
-                        scan_id, timestamp, market_id, strategy_name, outcome,
+                        scan_id, timestamp, market_id, market_question, strategy_name, direction, outcome,
                         fill_price, shares, executed, error, edge_estimate, rationale
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     _execution_row(scan_id, result),
                 )
@@ -169,10 +169,11 @@ class RuntimeMetricsStore:
 
             fills = conn.execute(
                 """
-                SELECT timestamp, market_id, strategy_name, executed, fill_price, shares, edge_estimate, rationale
+                SELECT timestamp, market_id, market_question, strategy_name, direction, outcome,
+                       executed, fill_price, shares, edge_estimate, rationale
                 FROM fills
                 ORDER BY id DESC
-                LIMIT 20
+                LIMIT 60
                 """
             ).fetchall()
 
@@ -221,7 +222,9 @@ class RuntimeMetricsStore:
                     scan_id INTEGER,
                     timestamp TEXT,
                     market_id TEXT,
+                    market_question TEXT,
                     strategy_name TEXT,
+                    direction TEXT,
                     outcome TEXT,
                     fill_price REAL,
                     shares REAL,
@@ -261,6 +264,14 @@ class RuntimeMetricsStore:
                 );
                 """
             )
+            fill_columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(fills)").fetchall()
+            }
+            if "market_question" not in fill_columns:
+                conn.execute("ALTER TABLE fills ADD COLUMN market_question TEXT")
+            if "direction" not in fill_columns:
+                conn.execute("ALTER TABLE fills ADD COLUMN direction TEXT")
             conn.commit()
 
 
@@ -270,7 +281,9 @@ def _execution_row(scan_id: int, result: ExecutionResult) -> tuple[Any, ...]:
         scan_id,
         result.executed_at.isoformat(),
         signal.market_id if signal else "",
+        signal.market_snapshot.question if signal and signal.market_snapshot else "",
         signal.strategy_name if signal else "",
+        signal.direction.value if signal else "",
         signal.outcome if signal else "",
         result.fill_price,
         result.shares_filled,

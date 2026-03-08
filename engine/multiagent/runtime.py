@@ -59,6 +59,15 @@ DEFAULT_EXIT_MAX_HOLD_HOURS = 8.0
 DEFAULT_EXIT_STOP_LOSS_PCT = -0.18
 METRICS_LOG_PATH = LOG_DIR / "multiagent_metrics.jsonl"
 METRICS_DB_PATH = LOG_DIR / "multiagent_runtime.sqlite"
+COMPARISON_VIEW_ORDER = [
+    ("all", "All Opus", "all"),
+    ("relationship_arbitrage", "Arbitrage", "relationship_arbitrage"),
+    ("weather_sniper", "Weather Sniper", "weather_sniper"),
+    ("weather_latency", "Weather Latency", "weather_latency"),
+    ("weather_swing", "Weather Swing", "weather_swing"),
+    ("crypto_latency", "Crypto Latency", "crypto_latency"),
+    ("news_signal", "News", "news_signal"),
+]
 
 
 @dataclass(frozen=True)
@@ -450,6 +459,7 @@ class MultiagentRuntime:
         portfolio = self.state.snapshot()
         state_perf = self.state.performance_summary()
         blockers = self._build_blockers(report)
+        comparison_views = self._build_comparison_views(report, portfolio, state_perf)
         return {
             "bridge": {
                 "mode": "isolated_runtime",
@@ -471,19 +481,15 @@ class MultiagentRuntime:
             "market_preview": self._build_market_preview(),
             "module_cards": self._build_module_cards(report),
             "strategy_cards": self._build_strategy_cards(report),
-            "comparison_views": [
-                {
-                    "key": "opus",
-                    "label": "Opus",
-                    "source": "isolated_runtime",
-                    "total_value": portfolio.total_capital,
-                    "total_pnl": portfolio.total_unrealized_pnl + portfolio.total_realized_pnl,
-                    "cash": portfolio.available_capital,
-                    "open_positions": portfolio.position_count,
-                    "total_trades": portfolio.position_count + state_perf["closed_positions"],
-                    "win_rate": state_perf["win_rate"],
-                }
-            ],
+            "comparison_views": comparison_views,
+            "recent_trades": self._recent_trade_rows(limit=20),
+            "recent_closed": state_perf["recent_closed"],
+            "export": {
+                "logs_url": "/api/multiagent/logs/export",
+                "metrics_log_path": str(METRICS_LOG_PATH),
+                "metrics_db_path": str(METRICS_DB_PATH),
+                "snapshot_dir": str(self.snapshot_store.config.snapshot_dir),
+            },
             "blockers": blockers,
         }
 
@@ -716,6 +722,170 @@ class MultiagentRuntime:
                 }
             )
         return preview
+
+    def _build_comparison_views(
+        self,
+        report: ScanCycleReport | None,
+        portfolio: PortfolioSnapshot,
+        state_perf: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        candidates = list(report.candidates_detail) if report else []
+        positions = list(portfolio.positions)
+        closed = list(self.state.closed_positions(120))
+        trades = self._recent_trade_rows(limit=60)
+        views: list[dict[str, Any]] = []
+
+        for key, label, source in COMPARISON_VIEW_ORDER:
+            if key == "all":
+                view_positions = positions
+                view_closed = closed
+                view_trades = trades
+                view_signals = candidates
+                realized_pnl = portfolio.total_realized_pnl
+                unrealized_pnl = portfolio.total_unrealized_pnl
+                exposure = portfolio.deployed_capital
+                win_rate = state_perf.get("win_rate", 0.0)
+                view_portfolio = {
+                    "scope": "aggregate",
+                    "starting_capital": self.starting_capital,
+                    "total_value": portfolio.total_capital,
+                    "cash": portfolio.available_capital,
+                    "positions_value": portfolio.deployed_capital,
+                    "total_pnl": realized_pnl + unrealized_pnl,
+                    "total_pnl_pct": ((realized_pnl + unrealized_pnl) / self.starting_capital * 100)
+                    if self.starting_capital
+                    else 0.0,
+                    "win_rate": win_rate,
+                    "total_trades": portfolio.position_count + state_perf.get("closed_positions", 0),
+                    "open_positions": portfolio.position_count,
+                    "positions": [self._serialize_position(position) for position in view_positions],
+                }
+            else:
+                view_positions = [position for position in positions if position.strategy_name == source]
+                view_closed = [event for event in closed if event.get("strategy_name") == source]
+                view_trades = [trade for trade in trades if trade.get("source") == source]
+                view_signals = [candidate for candidate in candidates if candidate.strategy_name == source]
+                realized_pnl = sum(float(event.get("realized_pnl", 0.0) or 0.0) for event in view_closed)
+                unrealized_pnl = sum(position.unrealized_pnl for position in view_positions)
+                exposure = sum(position.current_price * position.shares for position in view_positions)
+                wins = sum(1 for event in view_closed if float(event.get("realized_pnl", 0.0) or 0.0) > 0)
+                win_rate = (wins / len(view_closed) * 100) if view_closed else 0.0
+                view_portfolio = {
+                    "scope": "strategy_filter",
+                    "starting_capital": None,
+                    "total_value": exposure + realized_pnl,
+                    "cash": None,
+                    "positions_value": exposure,
+                    "total_pnl": realized_pnl + unrealized_pnl,
+                    "total_pnl_pct": 0.0,
+                    "win_rate": win_rate,
+                    "total_trades": len(view_positions) + len(view_closed),
+                    "open_positions": len(view_positions),
+                    "positions": [self._serialize_position(position) for position in view_positions],
+                }
+
+            views.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "source": source,
+                    "portfolio": view_portfolio,
+                    "signals": [self._serialize_candidate(candidate) for candidate in view_signals[:18]],
+                    "trades": view_trades[:25],
+                    "performance": {
+                        "realized_pnl": realized_pnl,
+                        "unrealized_pnl": unrealized_pnl,
+                        "total_pnl": realized_pnl + unrealized_pnl,
+                        "win_rate": win_rate,
+                        "total_trades": len(view_positions) + len(view_closed),
+                        "signals": len(view_signals),
+                        "open_positions": len(view_positions),
+                        "exposure": exposure,
+                        "closed_positions": len(view_closed),
+                    },
+                }
+            )
+
+        return views
+
+    def _serialize_position(self, position: PositionState) -> dict[str, Any]:
+        return {
+            "market": position.market_question,
+            "side": position.outcome,
+            "shares": position.shares,
+            "entry": position.entry_price,
+            "current": position.current_price,
+            "pnl": position.unrealized_pnl,
+            "source": position.strategy_name,
+            "opened_at": position.opened_at.isoformat(),
+        }
+
+    def _serialize_candidate(self, candidate: Any) -> dict[str, Any]:
+        return {
+            "source": candidate.strategy_name,
+            "market": candidate.market_snapshot.question if candidate.market_snapshot else candidate.market_id,
+            "action": candidate.direction.value,
+            "confidence": min(max(float(candidate.edge_estimate or 0.0) * 4.0, 0.05), 0.99),
+            "edge": float(candidate.edge_estimate or 0.0) * 100.0,
+            "size": 0.0,
+            "whale": False,
+            "reasoning": candidate.reasoning,
+        }
+
+    def _recent_trade_rows(self, limit: int = 20) -> list[dict[str, Any]]:
+        summary = self.metrics_store.llm_summary(recent_scans=12, recent_closes=40)
+        fills = summary.get("recent_fills", [])
+        question_map = self._market_question_map()
+        open_position_map = {
+            (position.market_id, position.strategy_name): position
+            for position in self.state.snapshot().positions
+        }
+        closed_map: dict[tuple[str, str], dict[str, Any]] = {}
+        for event in self.state.closed_positions(120):
+            closed_map[(event.get("market_id", ""), event.get("strategy_name", ""))] = event
+
+        rows: list[dict[str, Any]] = []
+        for fill in fills:
+            if not fill.get("executed"):
+                continue
+            market_id = fill.get("market_id") or ""
+            strategy_name = fill.get("strategy_name") or ""
+            open_position = open_position_map.get((market_id, strategy_name))
+            closed_event = closed_map.get((market_id, strategy_name))
+            pnl = None
+            if closed_event is not None:
+                pnl = float(closed_event.get("realized_pnl", 0.0) or 0.0)
+            elif open_position is not None:
+                pnl = float(open_position.unrealized_pnl)
+
+            fill_price = float(fill.get("fill_price", 0.0) or 0.0)
+            shares = float(fill.get("shares", 0.0) or 0.0)
+            rows.append(
+                {
+                    "time": fill.get("timestamp"),
+                    "source": strategy_name,
+                    "market": fill.get("market_question") or question_map.get(market_id) or market_id,
+                    "side": (fill.get("direction") or fill.get("outcome") or "").replace("_", " ").upper(),
+                    "price": fill_price,
+                    "usd": fill_price * shares,
+                    "pnl": pnl,
+                    "edge": float(fill.get("edge_estimate", 0.0) or 0.0),
+                    "rationale": fill.get("rationale") or "",
+                }
+            )
+
+        return rows[:limit]
+
+    def _market_question_map(self) -> dict[str, str]:
+        question_map = {market.market_id: market.question for market in self._last_markets}
+        for position in self.state.snapshot().positions:
+            question_map[position.market_id] = position.market_question
+        for event in self.state.closed_positions(120):
+            market_id = event.get("market_id")
+            question = event.get("market_question")
+            if market_id and question:
+                question_map[market_id] = question
+        return question_map
 
     def _build_performance(self, report: ScanCycleReport | None) -> dict[str, Any]:
         portfolio = self.state.snapshot()

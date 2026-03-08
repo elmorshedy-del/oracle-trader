@@ -79,6 +79,7 @@ class ScanCycleTracer:
     def record_signals(self, candidates: list[Any]) -> None:
         report = self._require_report()
         report.candidates_generated = len(candidates)
+        report.candidates_detail = list(candidates[:40])
 
     def record_validation(
         self,

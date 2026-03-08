@@ -597,6 +597,7 @@ let LIVE_STATUS_LOADED_AT = null;
 let CONSULT_LOADING = false;
 let CONSULT_RESPONSE = null;
 let CONSULT_QUESTION = "";
+let selectedRuntimeView = "all";
 
 function renderMetrics() {
   const metrics = buildMetrics();
@@ -648,6 +649,7 @@ function renderSectionControls() {
   document.querySelectorAll("[data-section]").forEach((button) => {
     button.addEventListener("click", () => {
       activeSection = button.getAttribute("data-section");
+      renderMetrics();
       renderActiveSection();
       renderSectionControls();
     });
@@ -681,9 +683,120 @@ function renderStrategyCards(strategies, subtitle) {
   `;
 }
 
+function pnlColor(value) {
+  if (Number(value || 0) > 0) {
+    return "positive";
+  }
+  if (Number(value || 0) < 0) {
+    return "negative";
+  }
+  return "neutral";
+}
+
+function timeAgo(iso) {
+  if (!iso) {
+    return "--";
+  }
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) {
+    return `${Math.floor(diff)}s ago`;
+  }
+  if (diff < 3600) {
+    return `${Math.floor(diff / 60)}m ago`;
+  }
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+function truncate(value, length) {
+  if (!value) {
+    return "";
+  }
+  return value.length > length ? `${value.slice(0, length)}…` : value;
+}
+
+function getRuntimeViews() {
+  const views = LIVE_STATUS?.comparison_views || [];
+  if (!views.length) {
+    return [];
+  }
+  if (!views.some((view) => view.key === selectedRuntimeView)) {
+    selectedRuntimeView = views[0].key;
+  }
+  return views;
+}
+
+function getActiveRuntimeView() {
+  const views = getRuntimeViews();
+  return (
+    views.find((view) => view.key === selectedRuntimeView) ||
+    views[0] || {
+      key: "all",
+      label: "All Opus",
+      source: "all",
+      portfolio: {},
+      performance: {},
+      signals: [],
+      trades: [],
+    }
+  );
+}
+
 function buildMetrics() {
   if (!LIVE_STATUS) {
     return DATA.metrics;
+  }
+
+  if (activeSection === "runtime") {
+    const view = getActiveRuntimeView();
+    const portfolio = view.portfolio || {};
+    const performance = view.performance || {};
+    const scope = portfolio.scope || "aggregate";
+    if (scope === "aggregate") {
+      return [
+        {
+          label: "Total Value",
+          value: formatUsd(portfolio.total_value || 0),
+          tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
+        },
+        {
+          label: "Total PnL",
+          value: `${Number(portfolio.total_pnl || 0) >= 0 ? "+" : ""}${formatUsd(portfolio.total_pnl || 0)}`,
+          tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
+        },
+        {
+          label: "Trades",
+          value: String(portfolio.total_trades || 0),
+          tone: "good",
+        },
+        {
+          label: "Open Positions",
+          value: String(portfolio.open_positions || 0),
+          tone: "good",
+        },
+      ];
+    }
+    return [
+      {
+        label: "Strategy PnL",
+        value: `${Number(portfolio.total_pnl || 0) >= 0 ? "+" : ""}${formatUsd(portfolio.total_pnl || 0)}`,
+        tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
+      },
+      {
+        label: "Exposure",
+        value: formatUsd(performance.exposure || portfolio.positions_value || 0),
+        tone: "good",
+      },
+      {
+        label: "Trades",
+        value: String(portfolio.total_trades || 0),
+        tone: "good",
+      },
+      {
+        label: "Signals",
+        value: String(performance.signals || (view.signals || []).length || 0),
+        tone: "good",
+      },
+    ];
   }
 
   return [
@@ -842,6 +955,212 @@ function sumRecordValues(record) {
   return Object.values(record || {}).reduce((sum, value) => sum + Number(value || 0), 0);
 }
 
+function renderRuntimeViewTabs() {
+  const views = getRuntimeViews();
+  return `
+    <div class="runtime-toolbar">
+      <div class="runtime-view-tabs">
+        ${views
+          .map(
+            (view) => `
+              <button type="button" class="view-tab ${view.key === selectedRuntimeView ? "active" : ""}" data-runtime-view="${escapeHtml(view.key)}">
+                ${escapeHtml(view.label)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="runtime-actions">
+        <a href="/api/multiagent/logs/export" class="header-link">Export Opus Logs</a>
+      </div>
+    </div>
+  `;
+}
+
+function renderRuntimeSignalsTable(view) {
+  const signals = view.signals || [];
+  return `
+    <article class="content-card">
+      <div class="card-header">
+        <div class="card-title">Signals</div>
+        <div class="card-badge">${signals.length}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Market</th>
+              <th>Action</th>
+              <th>Edge</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              signals.length
+                ? signals
+                    .map(
+                      (signal) => `
+                        <tr>
+                          <td><span class="strat-badge">${escapeHtml(signal.source)}</span></td>
+                          <td title="${escapeHtml(signal.market)}">${escapeHtml(truncate(signal.market, 36))}</td>
+                          <td>${escapeHtml((signal.action || "").replaceAll("_", " "))}</td>
+                          <td>${Number(signal.edge || 0).toFixed(1)}¢</td>
+                          <td title="${escapeHtml(signal.reasoning || "")}">${escapeHtml(truncate(signal.reasoning || "", 44))}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : `<tr><td colspan="5" class="table-empty">No signals in the latest Opus scan for this view.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderRuntimeTradesTable(view) {
+  const trades = view.trades || [];
+  return `
+    <article class="content-card">
+      <div class="card-header">
+        <div class="card-title">Trades</div>
+        <div class="card-badge">${trades.length}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Strategy</th>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Price</th>
+              <th>USD</th>
+              <th>PnL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              trades.length
+                ? trades
+                    .map(
+                      (trade) => `
+                        <tr>
+                          <td>${escapeHtml(timeAgo(trade.time))}</td>
+                          <td><span class="strat-badge">${escapeHtml(trade.source)}</span></td>
+                          <td title="${escapeHtml(trade.market)}">${escapeHtml(truncate(trade.market, 28))}</td>
+                          <td>${escapeHtml(trade.side || "")}</td>
+                          <td>${formatPrice(trade.price)}</td>
+                          <td>${formatUsd(trade.usd || 0)}</td>
+                          <td class="${pnlColor(trade.pnl)}">${trade.pnl === null || trade.pnl === undefined ? "—" : formatUsd(trade.pnl)}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : `<tr><td colspan="7" class="table-empty">No Opus trades recorded for this view yet.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderRuntimePositionsTable(view) {
+  const positions = view.portfolio?.positions || [];
+  return `
+    <article class="content-card">
+      <div class="card-header">
+        <div class="card-title">Open Positions</div>
+        <div class="card-badge">${positions.length}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Shares</th>
+              <th>Entry</th>
+              <th>Current</th>
+              <th>PnL</th>
+              <th>Strategy</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              positions.length
+                ? positions
+                    .map(
+                      (position) => `
+                        <tr>
+                          <td title="${escapeHtml(position.market)}">${escapeHtml(truncate(position.market, 34))}</td>
+                          <td>${escapeHtml(position.side || "")}</td>
+                          <td>${Number(position.shares || 0).toFixed(1)}</td>
+                          <td>${formatPrice(position.entry)}</td>
+                          <td>${formatPrice(position.current)}</td>
+                          <td class="${pnlColor(position.pnl)}">${formatUsd(position.pnl || 0)}</td>
+                          <td><span class="strat-badge">${escapeHtml(position.source)}</span></td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : `<tr><td colspan="7" class="table-empty">No open Opus positions for this view.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderRuntimeComparisonTable() {
+  const views = getRuntimeViews();
+  return `
+    <article class="content-card">
+      <div class="card-header">
+        <div class="card-title">Strategy Comparison</div>
+        <div class="card-badge">${Math.max(views.length - 1, 0)} sleeves</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>View</th>
+              <th>PnL</th>
+              <th>Win%</th>
+              <th>Trades</th>
+              <th>Open</th>
+              <th>Signals</th>
+              <th>Exposure</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${views
+              .map(
+                (view) => `
+                  <tr>
+                    <td>${escapeHtml(view.label)}</td>
+                    <td class="${pnlColor(view.performance?.total_pnl)}">${formatUsd(view.performance?.total_pnl || 0)}</td>
+                    <td>${formatPct(view.performance?.win_rate || 0)}</td>
+                    <td>${escapeHtml(String(view.performance?.total_trades || 0))}</td>
+                    <td>${escapeHtml(String(view.performance?.open_positions || 0))}</td>
+                    <td>${escapeHtml(String(view.performance?.signals || 0))}</td>
+                    <td>${formatUsd(view.performance?.exposure || view.portfolio?.positions_value || 0)}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
 function renderRuntimeSection() {
   if (LIVE_STATUS_ERROR) {
     return `
@@ -870,24 +1189,33 @@ function renderRuntimeSection() {
   const blockers = LIVE_STATUS.blockers || [];
   const moduleCards = LIVE_STATUS.module_cards || [];
   const strategyCards = LIVE_STATUS.strategy_cards || [];
-  const comparisonViews = LIVE_STATUS.comparison_views || [];
   const marketMix = LIVE_STATUS.market_mix || {};
   const marketPreview = LIVE_STATUS.market_preview || [];
+  const activeView = getActiveRuntimeView();
+  const activePortfolio = activeView.portfolio || {};
+  const activePerformance = activeView.performance || {};
   const loadedAt = LIVE_STATUS_LOADED_AT
     ? new Date(LIVE_STATUS_LOADED_AT).toLocaleTimeString()
     : "unknown";
 
   return `
-    ${renderWorkflowIllustration()}
-    ${renderSanityPanel()}
     <article class="content-card">
       <div class="panel-eyebrow">Live runtime</div>
-      <h3 style="margin-top:10px">Isolated Opus runtime</h3>
+      <h3 style="margin-top:10px">Opus runtime operator view</h3>
       <p>
-        This page is now driven by a separate Opus runtime inside Oracle.
-        The old engine keeps running untouched, and this section owns its own scanner, cycle reports, and paper book state.
+        Same reading pattern as the old Oracle dashboard: switch the active sleeve, read the top PnL and trade counts first,
+        inspect signals, trades, and open positions, then use the Opus-only sanity, blockers, workflow, and consult layers below.
       </p>
+      ${renderRuntimeViewTabs()}
       <div class="contract-meta">
+        <div class="meta-box">
+          <div class="meta-label">Active view</div>
+          <div class="meta-value">${escapeHtml(activeView.label)}</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">View scope</div>
+          <div class="meta-value">${escapeHtml(activePortfolio.scope === "aggregate" ? "full opus book" : "strategy filter on shared opus book")}</div>
+        </div>
         <div class="meta-box">
           <div class="meta-label">Overall health</div>
           <div class="meta-value">${escapeHtml(health.overall_status || "unknown")}</div>
@@ -901,12 +1229,12 @@ function renderRuntimeSection() {
 
     <div class="content-grid three">
       <article class="content-card">
-        <div class="panel-eyebrow">Portfolio</div>
-        <h3 style="margin-top:10px">${formatUsd(portfolio.total_capital || 0)}</h3>
+        <div class="panel-eyebrow">Selected view</div>
+        <h3 style="margin-top:10px">${formatUsd(activePortfolio.total_pnl || 0)}</h3>
         <div class="soft-stack">
-          <div class="soft-row">Available capital: ${formatUsd(portfolio.available_capital || 0)}</div>
-          <div class="soft-row">Deployed capital: ${formatUsd(portfolio.deployed_capital || 0)}</div>
-          <div class="soft-row">Utilization: ${formatPct((portfolio.capital_utilization_pct || 0) * 100)}</div>
+          <div class="soft-row">Realized PnL: ${formatUsd(activePerformance.realized_pnl || 0)}</div>
+          <div class="soft-row">Unrealized PnL: ${formatUsd(activePerformance.unrealized_pnl || 0)}</div>
+          <div class="soft-row">Exposure: ${formatUsd(activePerformance.exposure || activePortfolio.positions_value || 0)}</div>
         </div>
       </article>
       <article class="content-card">
@@ -919,15 +1247,27 @@ function renderRuntimeSection() {
         </div>
       </article>
       <article class="content-card">
-        <div class="panel-eyebrow">Runtime mode</div>
-        <h3 style="margin-top:10px">${escapeHtml(LIVE_STATUS.bridge?.mode || "unknown")}</h3>
+        <div class="panel-eyebrow">Performance</div>
+        <h3 style="margin-top:10px">${escapeHtml(String(activePerformance.total_trades || activePortfolio.total_trades || 0))} trades</h3>
         <div class="soft-stack">
-          <div class="soft-row">State: ${escapeHtml(LIVE_STATUS.bridge?.state || "unknown")}</div>
-          <div class="soft-row">Next step: ${escapeHtml(LIVE_STATUS.bridge?.next_step || "n/a")}</div>
-          <div class="soft-row">Reserve target: ${formatUsd(portfolio.reserved_capital || 0)}</div>
+          <div class="soft-row">Win rate: ${formatPct(activePerformance.win_rate || activePortfolio.win_rate || 0)}</div>
+          <div class="soft-row">Signals: ${escapeHtml(String(activePerformance.signals || (activeView.signals || []).length || 0))}</div>
+          <div class="soft-row">Open positions: ${escapeHtml(String(activePerformance.open_positions || activePortfolio.open_positions || 0))}</div>
         </div>
       </article>
     </div>
+
+    <div class="content-grid two">
+      ${renderRuntimeSignalsTable(activeView)}
+      ${renderRuntimeTradesTable(activeView)}
+    </div>
+
+    <div class="content-grid two">
+      ${renderRuntimePositionsTable(activeView)}
+      ${renderRuntimeComparisonTable()}
+    </div>
+
+    ${renderSanityPanel()}
 
     <article class="content-card">
       <div class="panel-eyebrow">Quiet-cycle blockers</div>
@@ -953,7 +1293,7 @@ function renderRuntimeSection() {
 
     <div class="content-grid two">
       <article class="content-card">
-        <div class="panel-eyebrow">Performance</div>
+        <div class="panel-eyebrow">Runtime totals</div>
         <h3 style="margin-top:10px">Isolated runtime metrics</h3>
         <div class="soft-stack">
           <div class="soft-row">Total candidates: ${escapeHtml(String(performance.total_candidates || 0))}</div>
@@ -1005,44 +1345,34 @@ function renderRuntimeSection() {
         </div>
       </article>
       <article class="content-card">
-        <div class="panel-eyebrow">Strategies</div>
-        <h3 style="margin-top:10px">Current strategy health</h3>
+        <div class="panel-eyebrow">Runtime mode</div>
+        <h3 style="margin-top:10px">${escapeHtml(LIVE_STATUS.bridge?.mode || "unknown")}</h3>
         <div class="soft-stack">
-          ${strategyCards
-            .map(
-              (card) => `
-                <div class="soft-row">
-                  <div class="row-split">
-                    <strong>${escapeHtml(card.name)}</strong>
-                    <span class="status-badge ${escapeHtml(card.status)}">${escapeHtml(card.status)}</span>
-                  </div>
-                  <div class="inline-meta">runs ${escapeHtml(String(card.runs || 0))} | signals ${escapeHtml(String(card.signals || 0))} | errors ${escapeHtml(String(card.errors || 0))}</div>
-                  ${card.last_error ? `<div class="inline-error">${escapeHtml(card.last_error)}</div>` : ""}
-                </div>
-              `
-            )
-            .join("")}
+          <div class="soft-row">State: ${escapeHtml(LIVE_STATUS.bridge?.state || "unknown")}</div>
+          <div class="soft-row">Next step: ${escapeHtml(LIVE_STATUS.bridge?.next_step || "n/a")}</div>
+          <div class="soft-row">Reserve target: ${formatUsd(portfolio.reserved_capital || 0)}</div>
+          <div class="soft-row">Logs export: <a href="/api/multiagent/logs/export" class="inline-link">download zip</a></div>
         </div>
       </article>
     </div>
 
     <article class="content-card">
-      <div class="panel-eyebrow">Comparison sleeves</div>
-      <h3 style="margin-top:10px">Isolated paper books</h3>
+      <div class="panel-eyebrow">Strategies</div>
+      <h3 style="margin-top:10px">Current strategy health</h3>
       <div class="content-grid three">
-        ${comparisonViews
+        ${strategyCards
           .map(
-            (view) => `
+            (card) => `
               <article class="content-card">
                 <div class="row-split">
-                  <h4>${escapeHtml(view.label)}</h4>
-                  <span class="module-badge">${escapeHtml(view.source)}</span>
+                  <h4>${escapeHtml(card.name)}</h4>
+                  <span class="status-badge ${escapeHtml(card.status)}">${escapeHtml(card.status)}</span>
                 </div>
                 <div class="soft-stack">
-                  <div class="soft-row">Value: ${formatUsd(view.total_value || 0)}</div>
-                  <div class="soft-row">PnL: ${formatUsd(view.total_pnl || 0)}</div>
-                  <div class="soft-row">Open positions: ${escapeHtml(String(view.open_positions || 0))}</div>
-                  <div class="soft-row">Trades: ${escapeHtml(String(view.total_trades || 0))} | Win rate: ${formatPct(view.win_rate || 0)}</div>
+                  <div class="soft-row">Runs: ${escapeHtml(String(card.runs || 0))}</div>
+                  <div class="soft-row">Signals: ${escapeHtml(String(card.signals || 0))}</div>
+                  <div class="soft-row">Errors: ${escapeHtml(String(card.errors || 0))}</div>
+                  <div class="soft-row">${card.last_error ? escapeHtml(card.last_error) : "No surfaced strategy error."}</div>
                 </div>
               </article>
             `
@@ -1050,6 +1380,8 @@ function renderRuntimeSection() {
           .join("")}
       </div>
     </article>
+
+    ${renderWorkflowIllustration()}
 
     <div class="content-grid two">
       <article class="content-card">
@@ -1307,6 +1639,14 @@ async function submitConsult(question) {
 }
 
 function bindRuntimeActions() {
+  document.querySelectorAll("[data-runtime-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedRuntimeView = button.getAttribute("data-runtime-view") || "all";
+      renderMetrics();
+      renderActiveSection();
+    });
+  });
+
   const form = document.getElementById("consult-form");
   if (!form) {
     return;

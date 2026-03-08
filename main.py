@@ -6,8 +6,10 @@ Runs the algo pipeline in background tasks.
 """
 
 import asyncio
+import json
 import logging
 import os
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -298,6 +300,66 @@ async def multiagent_status():
             }
         )
     return JSONResponse(multiagent_runtime.get_status())
+
+
+@app.get("/api/multiagent/logs/export")
+async def multiagent_logs_export():
+    """Export compact Opus runtime logs, metrics, and snapshots."""
+    if multiagent_runtime is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "multiagent runtime not initialized",
+            },
+            status_code=503,
+        )
+
+    bundle = io.BytesIO()
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "status.json",
+            json.dumps(multiagent_runtime.get_status(), indent=2, default=str),
+        )
+        archive.writestr(
+            "llm_context.json",
+            json.dumps(multiagent_runtime.llm_context(), indent=2, default=str),
+        )
+        archive.writestr(
+            "README.txt",
+            "\n".join(
+                [
+                    "Oracle Opus runtime export",
+                    "",
+                    "Contents:",
+                    "- status.json: current runtime payload used by /multiagent",
+                    "- llm_context.json: compact diagnostic context for on-request LLM review",
+                    "- logs/multiagent_metrics.jsonl: compact per-cycle metrics log",
+                    "- logs/multiagent_runtime.sqlite: persisted compact runtime database",
+                    "- snapshots/: recent scan-cycle snapshots",
+                ]
+            ),
+        )
+
+        log_path = Path(multiagent_runtime.llm_context()["metrics_log_path"])
+        db_path = Path(multiagent_runtime.llm_context()["metrics_db_path"])
+        if log_path.exists():
+            archive.write(log_path, arcname=f"logs/{log_path.name}")
+        if db_path.exists():
+            archive.write(db_path, arcname=f"logs/{db_path.name}")
+
+        for snapshot in sorted(
+            multiagent_runtime.snapshot_store.config.snapshot_dir.glob("cycle_*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )[:50]:
+            archive.write(snapshot, arcname=f"snapshots/{snapshot.name}")
+
+    bundle.seek(0)
+    return StreamingResponse(
+        bundle,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=oracle-opus-runtime-export.zip"},
+    )
 
 
 @app.post("/api/multiagent/consult")

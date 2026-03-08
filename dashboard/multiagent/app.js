@@ -615,6 +615,9 @@ function renderMetrics() {
 
 function renderNonNegotiables() {
   const list = document.getElementById("non-negotiables");
+  if (!list) {
+    return;
+  }
   list.innerHTML = DATA.nonNegotiables.map((item) => `<li>${item}</li>`).join("");
 }
 
@@ -622,28 +625,24 @@ function renderSectionControls() {
   const nav = document.getElementById("section-nav");
   const tabs = document.getElementById("section-tabs");
 
-  const navHtml = SECTION_ORDER.map((key) => {
-    const section = DATA.sections[key];
-    const active = key === activeSection ? "active" : "";
-    return `
-      <button class="section-button ${active}" data-section="${key}">
-        ${section.label}
-        <small>${section.description}</small>
-      </button>
-    `;
-  }).join("");
+  if (nav) {
+    nav.innerHTML = "";
+  }
+
+  if (!tabs) {
+    return;
+  }
 
   const tabHtml = SECTION_ORDER.map((key) => {
     const section = DATA.sections[key];
     const active = key === activeSection ? "active" : "";
     return `
-      <button class="segment-button ${active}" data-section="${key}">
+      <button class="view-tab ${active}" data-section="${key}">
         ${section.label}
       </button>
     `;
   }).join("");
 
-  nav.innerHTML = navHtml;
   tabs.innerHTML = tabHtml;
 
   document.querySelectorAll("[data-section]").forEach((button) => {

@@ -70,6 +70,14 @@
   .mode-paper { background: var(--yellow-dim); color: var(--yellow); border: 1px solid var(--yellow); }
   .mode-live { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); animation: pulse 2s infinite; }
   .header-right { display: flex; align-items: center; gap: 16px; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .header-link {
+    color: var(--blue);
+    text-decoration: none;
+    border: 1px solid var(--blue);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
 
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -344,7 +352,8 @@
     <span>|</span>
     <span id="scan-count">Scans: 0</span>
     <span>|</span>
-    <a href="/api/logs/download" style="color:var(--blue);text-decoration:none;border:1px solid var(--blue);padding:2px 8px;border-radius:3px;font-size:11px">⬇ LOGS</a>
+    <a href="/multiagent" class="header-link">OPUS LAB</a>
+    <a href="/api/logs/download" class="header-link">⬇ LOGS</a>
     <span id="last-update" class="dot-pulse">Connecting...</span>
   </div>
 </div>

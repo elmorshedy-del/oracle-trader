@@ -11,65 +11,35 @@
 </head>
 <body>
   <div class="multiagent-app">
-    <header class="hero-card">
-      <div class="hero-copy">
-        <div class="eyebrow">Oracle / Separate Section</div>
-        <div class="title-row">
-          <h1>Oracle Multi-Agent Lab</h1>
-          <span class="hero-pill">Built inside oracle-trader</span>
-        </div>
-        <p class="hero-text">
-          This route is the clean implementation surface for the Opus architecture inside
-          the Oracle repo. It stays separate from the current trading dashboard and keeps
-          the engine plan, contracts, risk model, and weather/crypto strategy design in
-          one place.
-        </p>
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">ORACLE / OPUS</div>
+        <span class="mode-badge mode-paper">ISOLATED</span>
       </div>
-
-      <div class="hero-actions">
-        <a href="/" class="button button-secondary">Back to current dashboard</a>
-        <a href="https://docs.polymarket.com" class="button button-primary" target="_blank" rel="noreferrer">Polymarket docs</a>
+      <div class="header-right">
+        <a href="/" class="header-link">Current Dashboard</a>
+        <a href="/multiagent" class="header-link header-link-active">Opus Lab</a>
+        <a href="https://docs.polymarket.com" class="header-link" target="_blank" rel="noreferrer">Docs</a>
+        <span id="last-update" class="dot-pulse">Connecting...</span>
       </div>
-    </header>
-
-    <section class="metrics-grid" id="metrics-grid"></section>
-
-    <div class="workspace">
-      <aside class="system-rail">
-        <section class="panel">
-          <div class="panel-eyebrow">Control Rail</div>
-          <h2>Separate app surface</h2>
-          <p>
-            This route owns its own layout, styling, and architecture narrative. It does not
-            reuse the current Oracle dashboard grid or try to wedge the Opus plan into the old
-            trading view.
-          </p>
-        </section>
-
-        <section class="panel">
-          <div class="panel-title">Sections</div>
-          <div id="section-nav" class="section-nav"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-title">Non-negotiables</div>
-          <ul class="bullet-list" id="non-negotiables"></ul>
-        </section>
-      </aside>
-
-      <main class="content-stage">
-        <section class="active-header panel">
-          <div>
-            <div class="panel-eyebrow">Active Section</div>
-            <h2 id="active-title">Overview</h2>
-            <p id="active-description"></p>
-          </div>
-          <div class="segmented" id="section-tabs"></div>
-        </section>
-
-        <div id="section-content" class="section-content"></div>
-      </main>
     </div>
+
+    <div class="section-banner">
+      <div class="section-banner-left">
+        <div class="panel-eyebrow">Separate Oracle Surface</div>
+        <div class="section-title-row">
+          <h1 id="active-title">Runtime</h1>
+          <span class="hero-pill">Opus architecture</span>
+        </div>
+        <p id="active-description" class="section-description"></p>
+      </div>
+    </div>
+
+    <section class="stats-row" id="metrics-grid"></section>
+
+    <div class="view-tabs" id="section-tabs"></div>
+
+    <main id="section-content" class="section-content"></main>
   </div>
 
   <script src="/multiagent-assets/app.js"></script>

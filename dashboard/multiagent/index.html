@@ -17,8 +17,13 @@
         <span class="mode-badge mode-paper">ISOLATED</span>
       </div>
       <div class="header-right">
+        <span id="runtime-state-meta">State: connecting</span>
+        <span>|</span>
+        <span id="runtime-scan-meta">Scans: 0</span>
+        <span>|</span>
         <a href="/" class="header-link">Current Dashboard</a>
         <a href="/multiagent" class="header-link header-link-active">Opus Lab</a>
+        <a href="/api/multiagent/logs/export" class="header-link">⬇ Export</a>
         <a href="https://docs.polymarket.com" class="header-link" target="_blank" rel="noreferrer">Docs</a>
         <span id="last-update" class="dot-pulse">Connecting...</span>
       </div>
@@ -38,6 +43,7 @@
     <section class="stats-row" id="metrics-grid"></section>
 
     <div class="view-tabs" id="section-tabs"></div>
+    <div class="runtime-view-meta" id="runtime-view-meta"></div>
 
     <main id="section-content" class="section-content"></main>
   </div>

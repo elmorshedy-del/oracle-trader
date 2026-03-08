@@ -714,6 +714,28 @@ function truncate(value, length) {
   return value.length > length ? `${value.slice(0, length)}…` : value;
 }
 
+function stratClass(source) {
+  const key = String(source || "")
+    .toLowerCase()
+    .replaceAll(" ", "_");
+  if (key === "relationship_arbitrage") {
+    return "strat-arbitrage";
+  }
+  if (key.startsWith("weather")) {
+    return "strat-weather";
+  }
+  if (key.startsWith("crypto")) {
+    return "strat-crypto";
+  }
+  if (key.startsWith("news")) {
+    return "strat-news";
+  }
+  if (key === "all") {
+    return "strat-all";
+  }
+  return "strat-neutral";
+}
+
 function getRuntimeViews() {
   const views = LIVE_STATUS?.comparison_views || [];
   if (!views.length) {
@@ -982,7 +1004,7 @@ function renderRuntimeSignalsTable(view) {
   return `
     <article class="content-card">
       <div class="card-header">
-        <div class="card-title">Signals</div>
+        <div class="card-title">Active Signals</div>
         <div class="card-badge">${signals.length}</div>
       </div>
       <div class="table-wrap">
@@ -1003,7 +1025,7 @@ function renderRuntimeSignalsTable(view) {
                     .map(
                       (signal) => `
                         <tr>
-                          <td><span class="strat-badge">${escapeHtml(signal.source)}</span></td>
+                          <td><span class="strat-badge ${stratClass(signal.source)}">${escapeHtml(signal.source)}</span></td>
                           <td title="${escapeHtml(signal.market)}">${escapeHtml(truncate(signal.market, 36))}</td>
                           <td>${escapeHtml((signal.action || "").replaceAll("_", " "))}</td>
                           <td>${Number(signal.edge || 0).toFixed(1)}¢</td>
@@ -1026,7 +1048,7 @@ function renderRuntimeTradesTable(view) {
   return `
     <article class="content-card">
       <div class="card-header">
-        <div class="card-title">Trades</div>
+        <div class="card-title">Trade History</div>
         <div class="card-badge">${trades.length}</div>
       </div>
       <div class="table-wrap">
@@ -1050,7 +1072,7 @@ function renderRuntimeTradesTable(view) {
                       (trade) => `
                         <tr>
                           <td>${escapeHtml(timeAgo(trade.time))}</td>
-                          <td><span class="strat-badge">${escapeHtml(trade.source)}</span></td>
+                          <td><span class="strat-badge ${stratClass(trade.source)}">${escapeHtml(trade.source)}</span></td>
                           <td title="${escapeHtml(trade.market)}">${escapeHtml(truncate(trade.market, 28))}</td>
                           <td>${escapeHtml(trade.side || "")}</td>
                           <td>${formatPrice(trade.price)}</td>
@@ -1103,7 +1125,7 @@ function renderRuntimePositionsTable(view) {
                           <td>${formatPrice(position.entry)}</td>
                           <td>${formatPrice(position.current)}</td>
                           <td class="${pnlColor(position.pnl)}">${formatUsd(position.pnl || 0)}</td>
-                          <td><span class="strat-badge">${escapeHtml(position.source)}</span></td>
+                          <td><span class="strat-badge ${stratClass(position.source)}">${escapeHtml(position.source)}</span></td>
                         </tr>
                       `
                     )
@@ -1143,7 +1165,7 @@ function renderRuntimeComparisonTable() {
               .map(
                 (view) => `
                   <tr>
-                    <td>${escapeHtml(view.label)}</td>
+                    <td><span class="strat-badge ${stratClass(view.source)}">${escapeHtml(view.label)}</span></td>
                     <td class="${pnlColor(view.performance?.total_pnl)}">${formatUsd(view.performance?.total_pnl || 0)}</td>
                     <td>${formatPct(view.performance?.win_rate || 0)}</td>
                     <td>${escapeHtml(String(view.performance?.total_trades || 0))}</td>
@@ -1159,6 +1181,29 @@ function renderRuntimeComparisonTable() {
       </div>
     </article>
   `;
+}
+
+function renderRuntimeHeaderMeta() {
+  const stateMeta = document.getElementById("runtime-state-meta");
+  const scanMeta = document.getElementById("runtime-scan-meta");
+  const viewMeta = document.getElementById("runtime-view-meta");
+  if (!stateMeta || !scanMeta || !viewMeta) {
+    return;
+  }
+
+  if (!LIVE_STATUS || activeSection !== "runtime") {
+    stateMeta.textContent = "State: connecting";
+    scanMeta.textContent = "Scans: 0";
+    viewMeta.textContent = "";
+    return;
+  }
+
+  const activeView = getActiveRuntimeView();
+  const label = escapeHtml(activeView.label);
+  const scope = activeView.portfolio?.scope === "aggregate" ? "full opus portfolio" : "strategy-filtered view";
+  stateMeta.textContent = `State: ${LIVE_STATUS.bridge?.state || "unknown"}`;
+  scanMeta.textContent = `Scans: ${LIVE_STATUS.summary?.scan_count ?? 0}`;
+  viewMeta.innerHTML = `Viewing <span class="strat-badge ${stratClass(activeView.source)}">${label}</span> ${escapeHtml(scope)}`;
 }
 
 function renderRuntimeSection() {
@@ -1606,6 +1651,7 @@ async function loadLiveStatus() {
   }
 
   renderMetrics();
+  renderRuntimeHeaderMeta();
   renderActiveSection();
 }
 
@@ -1643,6 +1689,7 @@ function bindRuntimeActions() {
     button.addEventListener("click", () => {
       selectedRuntimeView = button.getAttribute("data-runtime-view") || "all";
       renderMetrics();
+      renderRuntimeHeaderMeta();
       renderActiveSection();
     });
   });
@@ -1668,6 +1715,7 @@ function renderActiveSection() {
   document.getElementById("active-title").textContent = section.label;
   document.getElementById("active-description").textContent = section.description;
   document.getElementById("section-content").innerHTML = section.render();
+  renderRuntimeHeaderMeta();
   bindRuntimeActions();
 }
 

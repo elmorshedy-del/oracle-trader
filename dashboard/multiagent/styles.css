@@ -254,6 +254,16 @@ textarea {
   margin: 14px 0 10px;
 }
 
+.runtime-view-meta {
+  color: var(--text-dim);
+  font-family: var(--sans);
+  margin: -2px 0 14px;
+}
+
+.runtime-view-meta .strat-badge {
+  margin: 0 6px;
+}
+
 .runtime-toolbar {
   display: flex;
   align-items: center;
@@ -409,6 +419,40 @@ textarea {
   font-family: var(--mono);
   font-size: 10px;
   text-transform: uppercase;
+}
+
+.strat-badge.strat-all {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.strat-badge.strat-arbitrage {
+  background: var(--green-dim);
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.strat-badge.strat-weather {
+  background: #ffab4022;
+  color: #ffab40;
+  border-color: #ffab40;
+}
+
+.strat-badge.strat-crypto {
+  background: #1de9b622;
+  color: #1de9b6;
+  border-color: #1de9b6;
+}
+
+.strat-badge.strat-news {
+  background: var(--yellow-dim);
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.strat-badge.strat-neutral {
+  background: var(--surface2);
+  color: var(--text-dim);
 }
 
 .table-wrap {

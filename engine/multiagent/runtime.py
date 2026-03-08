@@ -925,9 +925,14 @@ class MultiagentRuntime:
 
         blockers: list[dict[str, str]] = []
         if report.zero_trade_explanation:
+            historical_trade_count = self.state.snapshot().position_count + self.state.performance_summary().get(
+                "closed_positions", 0
+            )
             blockers.append(
                 {
-                    "title": "No Opus trades yet",
+                    "title": "No new Opus trades this scan"
+                    if historical_trade_count > 0
+                    else "No Opus trades yet",
                     "detail": report.zero_trade_explanation,
                     "severity": "warn",
                 }

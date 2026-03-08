@@ -13,7 +13,7 @@ import re
 from datetime import datetime, timezone
 from config import PipelineConfig
 from data.collector import PolymarketCollector
-from data.models import DashboardState, Signal
+from data.models import DashboardState, Signal, SignalSource
 from strategies.liquidity import HedgedLiquidityStrategy
 from strategies.arbitrage import ArbitrageStrategy
 from strategies.whale import WhaleTrackingStrategy
@@ -32,9 +32,36 @@ BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
+    "weather_all": {
+        "label": "Weather All",
+        "strategy": "weather",
+        "source": "weather_all",
+        "signal_sources": (
+            SignalSource.WEATHER_SNIPER.value,
+            SignalSource.WEATHER_LATENCY.value,
+            SignalSource.WEATHER_SWING.value,
+        ),
+    },
+    "weather_sniper": {
+        "label": "Sniper",
+        "strategy": "weather",
+        "source": SignalSource.WEATHER_SNIPER.value,
+        "signal_sources": (SignalSource.WEATHER_SNIPER.value,),
+    },
+    "weather_latency": {
+        "label": "Latency Hunter",
+        "strategy": "weather",
+        "source": SignalSource.WEATHER_LATENCY.value,
+        "signal_sources": (SignalSource.WEATHER_LATENCY.value,),
+    },
+    "weather_swing": {
+        "label": "Swing Trader",
+        "strategy": "weather",
+        "source": SignalSource.WEATHER_SWING.value,
+        "signal_sources": (SignalSource.WEATHER_SWING.value,),
+    },
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
     "bitcoin": {"label": "Bitcoin", "strategy": "crypto_arb", "source": "crypto_temporal_arb"},
-    "weather": {"label": "Weather", "strategy": "weather", "source": "weather_forecast"},
     "arbitrage": {"label": "Arbitrage", "strategy": "arbitrage", "source": "multi_outcome_arbitrage"},
     "momentum": {"label": "Momentum", "strategy": "mean_reversion", "source": "mean_reversion"},
 }
@@ -64,7 +91,11 @@ class Pipeline:
             "news": NewsLatencyStrategy(self.config),
             "mean_reversion": MeanReversionStrategy(self.config, collector=self.collector),
             "crypto_arb": CryptoTemporalArbStrategy(self.config),
-            "weather": WeatherForecastStrategy(self.config, collector=self.collector),
+            "weather": WeatherForecastStrategy(
+                self.config,
+                collector=self.collector,
+                state_path=str(STATE_PATH.with_name("weather_state.json")),
+            ),
         }
 
         # Engine
@@ -75,7 +106,7 @@ class Pipeline:
         )
         self.comparison_traders = {
             view_key: PaperTrader(
-                starting_capital=self.config.risk.max_total_exposure_usd,
+                starting_capital=self._comparison_starting_capital(view_key),
                 log_dir=str(LOG_DIR / "comparison" / view_key),
                 state_path=str(STATE_PATH.with_name(f"{STATE_PATH.stem}-{view_key}{STATE_PATH.suffix}")),
             )
@@ -144,6 +175,8 @@ class Pipeline:
         self.trader.save_state()
         for trader in self.comparison_traders.values():
             trader.save_state()
+        weather: WeatherForecastStrategy = self.strategies["weather"]
+        weather.save_state()
         await self.collector.close()
         logger.info("Pipeline stopped")
 
@@ -266,6 +299,8 @@ class Pipeline:
                 exits=exit_count,
                 resolved=resolved_count,
             )
+            weather: WeatherForecastStrategy = self.strategies["weather"]
+            weather.save_state()
 
     async def reset_state(self):
         """Reset portfolio and per-strategy transient state without deleting persisted logs."""
@@ -279,8 +314,8 @@ class Pipeline:
             self._scan_count = 0
             self._latest_diagnostics = {}
             self.dashboard_state = DashboardState(mode=self.config.mode)
-            for trader in self.comparison_traders.values():
-                trader.reset(self.config.risk.max_total_exposure_usd)
+            for view_key, trader in self.comparison_traders.items():
+                trader.reset(self._comparison_starting_capital(view_key))
 
             news: NewsLatencyStrategy = self.strategies["news"]
             news._processed_headlines.clear()
@@ -301,12 +336,7 @@ class Pipeline:
             crypto._last_market_scan = 0
 
             weather: WeatherForecastStrategy = self.strategies["weather"]
-            weather._forecasts.clear()
-            weather._matched_markets = []
-            weather._supplemental_markets = []
-            weather._last_forecast_fetch = 0
-            weather._last_market_scan = 0
-            weather._last_supplemental_fetch = 0
+            weather.reset_state()
 
             self.health = HealthMonitor(log_dir=str(LOG_DIR))
             await self._refresh_data()
@@ -315,6 +345,9 @@ class Pipeline:
 
     def _filter_comparison_signals(self, *, view_key: str, signals: list[Signal]) -> list[Signal]:
         filtered = list(signals)
+        allowed_sources = COMPARISON_VIEW_CONFIG.get(view_key, {}).get("signal_sources")
+        if allowed_sources:
+            filtered = [signal for signal in filtered if signal.source.value in allowed_sources]
         if view_key == "bitcoin":
             filtered = [
                 signal for signal in filtered
@@ -322,6 +355,17 @@ class Pipeline:
                 or BITCOIN_SIGNAL_PATTERN.search(signal.reasoning)
             ]
         return filtered
+
+    def _comparison_starting_capital(self, view_key: str) -> float:
+        if view_key == "weather_all":
+            return self.config.weather.combined_budget_usd
+        if view_key == "weather_sniper":
+            return self.config.weather.sniper_budget_usd
+        if view_key == "weather_latency":
+            return self.config.weather.latency_budget_usd
+        if view_key == "weather_swing":
+            return self.config.weather.swing_budget_usd
+        return self.config.risk.max_total_exposure_usd
 
     def _write_diagnostic_entry(
         self,
@@ -506,6 +550,7 @@ class Pipeline:
             "label": label,
             "source": source,
             "portfolio": {
+                "starting_capital": round(trader.portfolio.starting_capital, 2),
                 "total_value": round(trader.portfolio.total_value, 2),
                 "cash": round(trader.portfolio.cash, 2),
                 "positions_value": round(trader.portfolio.positions_value, 2),

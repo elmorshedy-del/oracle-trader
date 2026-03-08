@@ -56,6 +56,16 @@ TIME_PATTERNS = ["5-minute", "5-min", "5m", "15-minute", "15-min", "15m", "1-hou
 TEMPORAL_MARKET_HINTS = ("up or down", "updown", "up-down")
 DIRECTION_UP = ("up", "higher", "increase", "above", "rise")
 DIRECTION_DOWN = ("down", "lower", "decrease", "below", "drop", "fall")
+NON_SPOT_CRYPTO_KEYWORDS = (
+    "gas price",
+    "gwei",
+    "fees",
+    "dominance",
+    "hashrate",
+    "staking",
+    "validator",
+    "transaction",
+)
 
 # Barrier market parsing
 UPPER_BARRIER_PATTERNS = (
@@ -82,6 +92,10 @@ MAX_THRESHOLD_HORIZON_DAYS = 400
 MAX_MODELED_PROBABILITY = 0.98
 MIN_THRESHOLD_CONFIDENCE = 0.55
 MOVE_ALIGNMENT_BONUS = 0.08
+STRUCTURE_BASE_CONFIDENCE = 0.58
+STRUCTURE_MAX_CONFIDENCE = 0.92
+STRUCTURE_ALIGNMENT_BONUS = 0.05
+ATH_IMPLICATION_BUFFER_USD = 250.0
 
 
 class CryptoTemporalArbStrategy(BaseStrategy):
@@ -97,6 +111,9 @@ class CryptoTemporalArbStrategy(BaseStrategy):
             "last_price_provider_count": 0,
             "last_price_providers": [],
             "last_price_error": "",
+            "structure_candidates": 0,
+            "structure_signals": 0,
+            "structure_buckets": 0,
         })
 
         # Price tracking: symbol -> list of {price, timestamp}
@@ -113,6 +130,8 @@ class CryptoTemporalArbStrategy(BaseStrategy):
 
         self._stats["scans_completed"] += 1
         best_signals: dict[str, Signal] = {}
+        structure_candidates = 0
+        structure_buckets = 0
 
         # Step 1: Fetch current exchange prices
         prices = await self._fetch_spot_prices()
@@ -163,12 +182,27 @@ class CryptoTemporalArbStrategy(BaseStrategy):
                 if signal:
                     self._track_best_signal(best_signals, signal)
 
+            structure = self._build_structure_signals(
+                symbol=symbol,
+                move_pct=move_pct,
+                direction=direction,
+            )
+            structure_candidates += structure["candidates"]
+            structure_buckets += structure["buckets"]
+            for signal in structure["signals"]:
+                self._track_best_signal(best_signals, signal)
+
         signals = sorted(
             best_signals.values(),
             key=lambda signal: (signal.expected_edge, signal.confidence),
             reverse=True,
         )
         self._stats["signals_generated"] += len(signals)
+        self._stats["structure_candidates"] = structure_candidates
+        self._stats["structure_buckets"] = structure_buckets
+        self._stats["structure_signals"] = sum(
+            1 for signal in signals if signal.source == SignalSource.CRYPTO_STRUCTURE
+        )
 
         if signals:
             logger.info(f"[CRYPTO] Generated {len(signals)} crypto arb signals")
@@ -182,6 +216,257 @@ class CryptoTemporalArbStrategy(BaseStrategy):
                     logger.info(f"[CRYPTO] {sym}: ${latest:,.2f} | {n} price points | {matched_n} matched markets")
 
         return signals
+
+    def _build_structure_signals(
+        self,
+        *,
+        symbol: str,
+        move_pct: float,
+        direction: str,
+    ) -> dict:
+        if not self.cfg.structure_enabled:
+            return {"signals": [], "candidates": 0, "buckets": 0}
+
+        barrier_matches = [
+            match for match in self._matched_markets.get(symbol, [])
+            if match["kind"] in {"reach", "dip", "ath"}
+        ]
+        if not barrier_matches:
+            return {"signals": [], "candidates": 0, "buckets": 0}
+
+        buckets: dict[tuple[str, str], list[dict]] = {}
+        for match in barrier_matches:
+            expiry = (match["market"].end_date or "unknown")[:10]
+            buckets.setdefault((match["kind"], expiry), []).append(match)
+
+        candidates: list[Signal] = []
+        for (kind, expiry), items in buckets.items():
+            if kind not in {"reach", "dip"}:
+                continue
+            ordered = sorted(items, key=lambda entry: entry["barrier_price"])
+            candidates.extend(
+                self._build_duplicate_barrier_signals(
+                    symbol=symbol,
+                    kind=kind,
+                    expiry=expiry,
+                    items=ordered,
+                    move_pct=move_pct,
+                    direction=direction,
+                )
+            )
+            candidates.extend(
+                self._build_adjacent_ladder_signals(
+                    symbol=symbol,
+                    kind=kind,
+                    expiry=expiry,
+                    items=ordered,
+                    move_pct=move_pct,
+                    direction=direction,
+                )
+            )
+
+        candidates.extend(
+            self._build_ath_implication_signals(
+                symbol=symbol,
+                buckets=buckets,
+                move_pct=move_pct,
+                direction=direction,
+            )
+        )
+
+        best_by_group: dict[str, Signal] = {}
+        for signal in candidates:
+            self._track_best_signal(best_by_group, signal)
+
+        return {
+            "signals": list(best_by_group.values()),
+            "candidates": len(candidates),
+            "buckets": len(buckets),
+        }
+
+    def _build_duplicate_barrier_signals(
+        self,
+        *,
+        symbol: str,
+        kind: str,
+        expiry: str,
+        items: list[dict],
+        move_pct: float,
+        direction: str,
+    ) -> list[Signal]:
+        grouped: dict[int, list[dict]] = {}
+        for item in items:
+            grouped.setdefault(int(round(item["barrier_price"])), []).append(item)
+
+        signals: list[Signal] = []
+        for barrier_price, dupes in grouped.items():
+            if len(dupes) < 2:
+                continue
+            dupes.sort(key=lambda entry: entry["market"].outcomes[entry["yes_index"]].price)
+            cheapest = dupes[0]
+            priciest = dupes[-1]
+            cheap_yes = cheapest["market"].outcomes[cheapest["yes_index"]].price
+            rich_yes = priciest["market"].outcomes[priciest["yes_index"]].price
+            edge = rich_yes - cheap_yes
+            if edge < self.cfg.structure_min_equivalence_edge:
+                continue
+            signal = self._structure_signal(
+                symbol=symbol,
+                match=cheapest,
+                edge=edge,
+                move_pct=move_pct,
+                direction=direction,
+                bullish=(kind != "dip"),
+                group_key=f"crypto:structure:eq:{symbol}:{kind}:{expiry}:{barrier_price}",
+                reasoning=(
+                    f"CRYPTO STRUCTURE: equivalent {symbol} {kind} ${barrier_price:,.0f} "
+                    f"markets by {expiry} trade {cheap_yes:.1%} vs {rich_yes:.1%}; "
+                    f"buy the cheaper YES contract"
+                ),
+            )
+            if signal:
+                signals.append(signal)
+        return signals
+
+    def _build_adjacent_ladder_signals(
+        self,
+        *,
+        symbol: str,
+        kind: str,
+        expiry: str,
+        items: list[dict],
+        move_pct: float,
+        direction: str,
+    ) -> list[Signal]:
+        signals: list[Signal] = []
+        if len(items) < 2:
+            return signals
+
+        for left, right in zip(items, items[1:]):
+            left_yes = left["market"].outcomes[left["yes_index"]].price
+            right_yes = right["market"].outcomes[right["yes_index"]].price
+
+            if kind == "reach":
+                easier, harder = left, right
+                easier_yes, harder_yes = left_yes, right_yes
+                violation = harder_yes - easier_yes
+            else:
+                harder, easier = left, right
+                harder_yes, easier_yes = left_yes, right_yes
+                violation = harder_yes - easier_yes
+
+            if violation < self.cfg.structure_min_adjacent_edge:
+                continue
+
+            signal = self._structure_signal(
+                symbol=symbol,
+                match=easier,
+                edge=violation,
+                move_pct=move_pct,
+                direction=direction,
+                bullish=(kind == "reach"),
+                group_key=(
+                    f"crypto:structure:ladder:{symbol}:{kind}:{expiry}:"
+                    f"{int(round(easier['barrier_price']))}:{int(round(harder['barrier_price']))}"
+                ),
+                reasoning=(
+                    f"CRYPTO STRUCTURE: {symbol} {kind} ladder breaks monotonic order by {expiry}; "
+                    f"{int(round(harder['barrier_price'])):,} YES is {harder_yes:.1%} while "
+                    f"easier {int(round(easier['barrier_price'])):,} YES is only {easier_yes:.1%}"
+                ),
+            )
+            if signal:
+                signals.append(signal)
+        return signals
+
+    def _build_ath_implication_signals(
+        self,
+        *,
+        symbol: str,
+        buckets: dict[tuple[str, str], list[dict]],
+        move_pct: float,
+        direction: str,
+    ) -> list[Signal]:
+        ath_barrier = ALL_TIME_HIGH_USD.get(symbol)
+        if not ath_barrier:
+            return []
+
+        signals: list[Signal] = []
+        for (kind, expiry), ath_items in buckets.items():
+            if kind != "ath" or not ath_items:
+                continue
+
+            ath_match = ath_items[0]
+            ath_yes = ath_match["market"].outcomes[ath_match["yes_index"]].price
+            for reach_match in buckets.get(("reach", expiry), []):
+                barrier_price = reach_match["barrier_price"]
+                if barrier_price < ath_barrier + ATH_IMPLICATION_BUFFER_USD:
+                    continue
+                reach_yes = reach_match["market"].outcomes[reach_match["yes_index"]].price
+                edge = reach_yes - ath_yes
+                if edge < self.cfg.structure_min_implication_edge:
+                    continue
+                signal = self._structure_signal(
+                    symbol=symbol,
+                    match=ath_match,
+                    edge=edge,
+                    move_pct=move_pct,
+                    direction=direction,
+                    bullish=True,
+                    group_key=f"crypto:structure:imp:{symbol}:{expiry}:ath:{int(round(barrier_price))}",
+                    reasoning=(
+                        f"CRYPTO STRUCTURE: {symbol} reaching ${barrier_price:,.0f} by {expiry} "
+                        f"implies a new all-time high first, but the reach market is {reach_yes:.1%} "
+                        f"vs ATH at {ath_yes:.1%}"
+                    ),
+                )
+                if signal:
+                    signals.append(signal)
+        return signals
+
+    def _structure_signal(
+        self,
+        *,
+        symbol: str,
+        match: dict,
+        edge: float,
+        move_pct: float,
+        direction: str,
+        bullish: bool,
+        group_key: str,
+        reasoning: str,
+    ) -> Signal | None:
+        market = match["market"]
+        yes_index = match["yes_index"]
+        yes_outcome = market.outcomes[yes_index]
+        yes_price = yes_outcome.price
+        if yes_price <= 0 or yes_price >= self.cfg.structure_max_entry_price:
+            return None
+
+        confidence = STRUCTURE_BASE_CONFIDENCE + min(edge * 2.5, 0.22)
+        if bullish and direction == "up":
+            confidence += min(abs(move_pct) * 8, STRUCTURE_ALIGNMENT_BONUS)
+        if not bullish and direction == "down":
+            confidence += min(abs(move_pct) * 8, STRUCTURE_ALIGNMENT_BONUS)
+        confidence = min(confidence, STRUCTURE_MAX_CONFIDENCE)
+
+        size_usd = min(
+            self.cfg.structure_max_size_usd,
+            max(self.cfg.structure_min_size_usd, self.cfg.structure_min_size_usd + (edge * 180.0)),
+        )
+
+        return Signal(
+            source=SignalSource.CRYPTO_STRUCTURE,
+            action=SignalAction.BUY_YES,
+            market_slug=market.slug,
+            condition_id=market.condition_id,
+            token_id=yes_outcome.token_id,
+            confidence=confidence,
+            expected_edge=edge * 100,
+            group_key=group_key,
+            reasoning=reasoning,
+            suggested_size_usd=size_usd,
+        )
 
     async def _fetch_spot_prices(self) -> dict[str, float]:
         """Fetch current spot prices from multiple public providers and aggregate."""
@@ -389,6 +674,8 @@ class CryptoTemporalArbStrategy(BaseStrategy):
 
     def _match_barrier_market(self, symbol: str, market: Market, text: str) -> dict | None:
         if len(market.outcomes) < 2 or " or " in text:
+            return None
+        if any(keyword in text for keyword in NON_SPOT_CRYPTO_KEYWORDS):
             return None
 
         yes_index, no_index = self._resolve_yes_no_indices(market)

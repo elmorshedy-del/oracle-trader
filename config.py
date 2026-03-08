@@ -84,6 +84,15 @@ class NewsConfig:
         "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+        "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "https://feeds.bbci.co.uk/news/business/rss.xml",
+        "https://feeds.bbci.co.uk/news/politics/rss.xml",
+        "https://feeds.npr.org/1004/rss.xml",
+        "https://feeds.npr.org/1006/rss.xml",
+        "https://feeds.npr.org/1014/rss.xml",
+        "https://www.theguardian.com/world/rss",
+        "https://www.theguardian.com/us/business/rss",
+        "https://www.theguardian.com/us-news/us-politics/rss",
     ])
     # Min confidence to generate a signal (0.0 - 1.0)
     min_confidence: float = 0.5  # lowered from 0.7 — let more signals through for paper testing
@@ -105,40 +114,58 @@ class CryptoArbConfig:
     max_entry_price: float = 0.75
     # Symbols to track
     symbols: list = field(default_factory=lambda: ["BTC", "ETH", "SOL"])
+    # Structure strategy: exploit ladder / implication violations on barrier markets
+    structure_enabled: bool = True
+    structure_min_adjacent_edge: float = 0.025
+    structure_min_equivalence_edge: float = 0.02
+    structure_min_implication_edge: float = 0.04
+    structure_max_entry_price: float = 0.80
+    structure_min_size_usd: float = 8.0
+    structure_max_size_usd: float = 35.0
 
 
 @dataclass
 class WeatherForecastConfig:
-    """Weather forecast arbitrage — NOAA vs Polymarket."""
+    """Weather forecast variants — Open-Meteo model consensus vs Polymarket."""
     enabled: bool = True
-    # Min edge to trade (forecast prob - market prob)
-    min_edge: float = 0.10  # 10% disagreement required
-    # Cities to track (must have NOAA coverage)
-    cities: list = field(default_factory=lambda: ["new-york", "chicago", "miami", "los-angeles"])
+    cities: list = field(default_factory=lambda: [
+        "new-york",
+        "chicago",
+        "miami",
+        "los-angeles",
+        "london",
+        "seoul",
+    ])
+    forecast_refresh_secs: int = 120
+    market_refresh_secs: int = 120
+    forecast_days: int = 4
+    model_agreement_max_spread_f: float = 3.6
+    min_edge: float = 0.08
 
+    sniper_budget_usd: float = float(os.getenv("WEATHER_SNIPER_BUDGET_USD", "150"))
+    latency_budget_usd: float = float(os.getenv("WEATHER_LATENCY_BUDGET_USD", "150"))
+    swing_budget_usd: float = float(os.getenv("WEATHER_SWING_BUDGET_USD", "150"))
+    combined_budget_usd: float = float(os.getenv("WEATHER_COMBINED_BUDGET_USD", "450"))
 
-@dataclass
-class CryptoArbConfig:
-    """Crypto temporal arbitrage — exploit exchange-to-Polymarket price lag."""
-    enabled: bool = True
-    # Min price move on exchange to trigger (0.3% = significant)
-    min_move_pct: float = 0.003
-    # Lookback window in seconds to measure the move
-    lookback_seconds: int = 120  # 2 minutes
-    # Max entry price (don't buy YES at 0.90, the edge is gone)
-    max_entry_price: float = 0.75
-    # Symbols to track
-    symbols: list = field(default_factory=lambda: ["BTC", "ETH", "SOL"])
+    sniper_max_yes_price: float = 0.05
+    sniper_min_prob: float = 0.94
+    sniper_min_size_usd: float = 1.0
+    sniper_max_size_usd: float = 3.0
 
+    latency_min_probability_shift: float = 0.08
+    latency_min_edge: float = 0.04
+    latency_max_entry_price: float = 0.58
+    latency_take_profit_price: float = 0.60
+    latency_min_size_usd: float = 8.0
+    latency_max_size_usd: float = 30.0
 
-@dataclass
-class WeatherForecastConfig:
-    """Weather forecast arbitrage — NOAA vs Polymarket."""
-    enabled: bool = True
-    # Min edge to trade (forecast prob - market prob)
-    min_edge: float = 0.10  # 10% disagreement required
-    # Cities to track (must have NOAA coverage)
-    cities: list = field(default_factory=lambda: ["new-york", "chicago", "miami", "los-angeles"])
+    swing_min_prob: float = 0.58
+    swing_max_prob: float = 0.42
+    swing_min_token_dip: float = 0.05
+    swing_lookback_minutes: int = 180
+    swing_min_edge: float = 0.04
+    swing_min_size_usd: float = 6.0
+    swing_max_size_usd: float = 24.0
 
 
 @dataclass
@@ -170,8 +197,6 @@ class PipelineConfig:
     whale: WhaleTrackingConfig = field(default_factory=WhaleTrackingConfig)
     news: NewsConfig = field(default_factory=NewsConfig)
     mean_reversion: MeanReversionConfig = field(default_factory=MeanReversionConfig)
-    crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
-    weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)

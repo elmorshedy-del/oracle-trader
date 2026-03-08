@@ -576,7 +576,12 @@ function stratBadge(source) {
     'news_latency': ['NEWS', 'strat-news'],
     'mean_reversion': ['MEAN', 'strat-mean'],
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
+    'crypto_structure': ['CSTR', 'strat-crypto'],
     'weather_forecast': ['WX', 'strat-weather'],
+    'weather_all': ['WX', 'strat-weather'],
+    'weather_sniper': ['SNIPER', 'strat-weather'],
+    'weather_latency_hunter': ['LAT', 'strat-weather'],
+    'weather_swing_trader': ['SWING', 'strat-weather'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;
@@ -591,6 +596,9 @@ function normalizeStrategyKey(key) {
     mean_reversion: 'mean_reversion',
     crypto_arb: 'crypto_temporal_arb',
     weather: 'weather_forecast',
+    weather_sniper: 'weather_sniper',
+    weather_latency: 'weather_latency_hunter',
+    weather_swing: 'weather_swing_trader',
   };
   return aliases[key] || key;
 }
@@ -644,7 +652,17 @@ function getActiveView(d) {
 
 function renderViewTabs(d) {
   const views = d.comparison_views || {};
-  const order = ['all', 'news', 'bitcoin', 'weather', 'arbitrage', 'momentum'];
+  const order = [
+    'all',
+    'weather_all',
+    'weather_sniper',
+    'weather_latency',
+    'weather_swing',
+    'news',
+    'bitcoin',
+    'arbitrage',
+    'momentum',
+  ];
   const tabs = order
     .filter(key => views[key])
     .map(key => {
@@ -688,7 +706,7 @@ function render(d) {
   badge.className = `mode-badge mode-${d.mode}`;
   document.getElementById('uptime').textContent = `Uptime: ${d.uptime_human || '--'}`;
   document.getElementById('scan-count').textContent = `Scans: ${d.scan_count || 0}`;
-  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} paper portfolio</span>`;
+  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} paper portfolio</span> <span style="margin-left:10px;color:var(--text-dim)">Budget $${((activeView.portfolio || {}).starting_capital || 0).toFixed(0)}</span>`;
 
   // Stats
   const p = activeView.portfolio || {};
@@ -750,7 +768,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'news', 'bitcoin', 'weather', 'arbitrage', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'bitcoin', 'arbitrage', 'momentum'];
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};
@@ -765,6 +783,7 @@ function render(d) {
       open: (portfolio.positions || []).length,
       signals: (view.signals || []).length,
       cash: portfolio.cash || 0,
+      budget: portfolio.starting_capital || 0,
     };
   }).sort((a, b) => {
     if (a.key === 'all') return -1;
@@ -782,6 +801,7 @@ function render(d) {
           <th>Trades</th>
           <th>Open</th>
           <th>Signals</th>
+          <th>Budget</th>
           <th>Cash</th>
         </tr>
       </thead>
@@ -794,6 +814,7 @@ function render(d) {
             <td>${row.trades}</td>
             <td>${row.open}</td>
             <td>${row.signals}</td>
+            <td>$${row.budget.toFixed(0)}</td>
             <td>$${row.cash.toFixed(2)}</td>
           </tr>
         `).join('')}
@@ -908,16 +929,28 @@ function renderSanity(d) {
   const activeView = getActiveView(d);
   if (activeView.key !== 'all') {
     const strategyKeyMap = {
+      weather_all: 'weather',
+      weather_sniper: 'weather',
+      weather_latency: 'weather',
+      weather_swing: 'weather',
       news: 'news',
       bitcoin: 'crypto_arb',
-      weather: 'weather',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',
     };
     const runtime = d.strategies?.[strategyKeyMap[activeView.key]] || {};
+    const weatherVariantKeyMap = {
+      weather_all: 'all',
+      weather_sniper: 'sniper',
+      weather_latency: 'latency',
+      weather_swing: 'swing',
+    };
+    const weatherVariants = runtime.variants || {};
+    const weatherVariant = weatherVariants[weatherVariantKeyMap[activeView.key]] || {};
     const p = activeView.portfolio || {};
     const signals = activeView.signals || [];
     const positions = p.positions || [];
+    const openCap = activeView.key === 'weather_sniper' ? 30 : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing' ? 12 : 10);
     const checks = [
       {
         label: 'Portfolio funded',
@@ -936,10 +969,24 @@ function renderSanity(d) {
       },
       {
         label: 'Capacity available',
-        ok: (p.cash || 0) > 100 || positions.length < 10,
-        note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open`,
+        ok: (p.cash || 0) > 25 || positions.length < openCap,
+        note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${openCap})`,
       },
     ];
+
+    if (activeView.key === 'weather_all') {
+      const variantSignals = Object.values(weatherVariants).reduce((sum, item) => sum + (item.last_signals || 0), 0);
+      checks.splice(2, 0, {
+        label: 'Forecast models ready',
+        ok: (runtime.models_ready || 0) >= 2 && (runtime.forecast_cities || 0) > 0,
+        note: `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`,
+      });
+      checks.splice(3, 0, {
+        label: 'Variant flow',
+        ok: variantSignals > 0 || (p.total_trades || 0) > 0,
+        note: `${variantSignals} live variant signals`,
+      });
+    }
 
     if (activeView.key === 'bitcoin') {
       checks.splice(2, 0, {
@@ -957,11 +1004,32 @@ function renderSanity(d) {
       });
     }
 
-    if (activeView.key === 'weather') {
+    if (activeView.key === 'weather_sniper' || activeView.key === 'weather_latency' || activeView.key === 'weather_swing') {
       checks.splice(2, 0, {
-        label: 'Forecast loop alive',
-        ok: (runtime.scans_completed || 0) > 0 && (runtime.errors || 0) === 0,
-        note: `${runtime.signals_generated || 0} signals generated`,
+        label: 'Forecast models ready',
+        ok: (runtime.models_ready || 0) >= 2 && (runtime.forecast_cities || 0) > 0,
+        note: `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`,
+      });
+      checks.splice(3, 0, {
+        label: 'Variant candidates',
+        ok: (weatherVariant.last_candidates || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${weatherVariant.last_candidates || 0} candidates / ${weatherVariant.last_signals || 0} live`,
+      });
+    }
+
+    if (activeView.key === 'weather_latency') {
+      checks.splice(4, 0, {
+        label: 'Forecast comparison ready',
+        ok: (weatherVariant.previous_ready_markets || 0) > 0 || (runtime.state_loaded || false),
+        note: `${weatherVariant.previous_ready_markets || 0} markets with old vs new forecast`,
+      });
+    }
+
+    if (activeView.key === 'weather_swing') {
+      checks.splice(4, 0, {
+        label: 'Price history ready',
+        ok: (weatherVariant.history_ready_markets || 0) > 0 || (runtime.state_loaded || false),
+        note: `${weatherVariant.history_ready_markets || 0} markets with dip history`,
       });
     }
 

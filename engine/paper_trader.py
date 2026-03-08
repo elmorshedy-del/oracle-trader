@@ -34,12 +34,22 @@ STALE_ROTATION_REENTRY_COOLDOWN_HOURS = 6.0
 STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.NEWS: 18.0,
     SignalSource.CRYPTO_ARB: 18.0,
+    SignalSource.CRYPTO_STRUCTURE: 8.0,
     SignalSource.WEATHER: 12.0,
+    SignalSource.WEATHER_SNIPER: 8.0,
+    SignalSource.WEATHER_LATENCY: 6.0,
+    SignalSource.WEATHER_SWING: 18.0,
     SignalSource.MEAN_REVERSION: 24.0,
 }
 STALE_DIRECTIONAL_FLAT_PNL_PCT = 0.08
 STALE_DIRECTIONAL_LOSS_CUT_HOURS = 8.0
 STALE_DIRECTIONAL_LOSS_CUT_PCT = -0.10
+WEATHER_SNIPER_TAKE_PROFIT_PRICE = 0.20
+WEATHER_LATENCY_TAKE_PROFIT_PRICE = 0.60
+WEATHER_SWING_TAKE_PROFIT_PCT = 0.18
+WEATHER_SWING_STOP_LOSS_PCT = -0.15
+CRYPTO_STRUCTURE_TAKE_PROFIT_PCT = 0.12
+CRYPTO_STRUCTURE_STOP_LOSS_PCT = -0.10
 WEATHER_SLUG_GROUP_RE = re.compile(
     r"highest-temperature-in-([a-z-]+)-on-([a-z]+)-(\d{1,2})-(\d{4})"
 )
@@ -67,8 +77,34 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.NEWS: 0.15,
     SignalSource.MEAN_REVERSION: 0.20,
     SignalSource.CRYPTO_ARB: 0.20,
+    SignalSource.CRYPTO_STRUCTURE: 0.30,
     SignalSource.WEATHER: 0.15,
+    SignalSource.WEATHER_SNIPER: 0.08,
+    SignalSource.WEATHER_LATENCY: 0.12,
+    SignalSource.WEATHER_SWING: 0.10,
     SignalSource.WHALE: 0.10,
+}
+SOURCE_POSITION_LIMITS = {
+    SignalSource.CRYPTO_STRUCTURE: 12,
+    SignalSource.WEATHER_SNIPER: 30,
+    SignalSource.WEATHER_LATENCY: 12,
+    SignalSource.WEATHER_SWING: 12,
+}
+SOURCE_SCAN_LIMITS = {
+    SignalSource.CRYPTO_STRUCTURE: 4,
+    SignalSource.WEATHER_SNIPER: 12,
+    SignalSource.WEATHER_LATENCY: 4,
+    SignalSource.WEATHER_SWING: 4,
+}
+CRYPTO_SOURCES = {
+    SignalSource.CRYPTO_ARB,
+    SignalSource.CRYPTO_STRUCTURE,
+}
+WEATHER_SOURCES = {
+    SignalSource.WEATHER,
+    SignalSource.WEATHER_SNIPER,
+    SignalSource.WEATHER_LATENCY,
+    SignalSource.WEATHER_SWING,
 }
 
 
@@ -171,7 +207,7 @@ class PaperTrader:
         if pos.source == SignalSource.ARBITRAGE:
             return f"arb:{slug}"
 
-        if pos.source == SignalSource.WEATHER:
+        if pos.source in WEATHER_SOURCES:
             match = WEATHER_SLUG_GROUP_RE.search(slug)
             if not match:
                 return None
@@ -186,7 +222,7 @@ class PaperTrader:
                 return None
             return f"weather:{city}:{target_date}"
 
-        if pos.source != SignalSource.CRYPTO_ARB:
+        if pos.source not in CRYPTO_SOURCES:
             return None
 
         symbol = None
@@ -229,6 +265,18 @@ class PaperTrader:
         if action == SignalAction.HEDGE_BOTH:
             return STRATEGY_EXPOSURE_CAPS[SignalSource.LIQUIDITY]
         return STRATEGY_EXPOSURE_CAPS.get(source, 0.20)
+
+    def _max_positions_for_signal(self, signal: Signal) -> int:
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return MAX_HEDGE_POSITIONS
+        return SOURCE_POSITION_LIMITS.get(signal.source, MAX_DIRECTIONAL_POSITIONS)
+
+    def _per_scan_limit_for_signal(self, signal: Signal) -> int:
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return MAX_NEW_HEDGE_POSITIONS_PER_SCAN
+        if signal.action == SignalAction.ARB_ALL:
+            return MAX_NEW_ARB_POSITIONS_PER_SCAN
+        return SOURCE_SCAN_LIMITS.get(signal.source, MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN)
 
     def _position_value(self, pos: Position) -> float:
         return pos.shares * pos.current_price
@@ -285,20 +333,12 @@ class PaperTrader:
                 filtered["cooldown"] += 1
                 continue
 
-            per_scan_cap = MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN
-            if signal.action == SignalAction.HEDGE_BOTH:
-                per_scan_cap = MAX_NEW_HEDGE_POSITIONS_PER_SCAN
-            elif signal.action == SignalAction.ARB_ALL:
-                per_scan_cap = MAX_NEW_ARB_POSITIONS_PER_SCAN
+            per_scan_cap = self._per_scan_limit_for_signal(signal)
             if selected_per_source.get(signal.source, 0) >= per_scan_cap:
                 filtered["source_scan_cap"] += 1
                 continue
 
-            max_positions = (
-                MAX_HEDGE_POSITIONS
-                if signal.action == SignalAction.HEDGE_BOTH
-                else MAX_DIRECTIONAL_POSITIONS
-            )
+            max_positions = self._max_positions_for_signal(signal)
             if source_counts.get(signal.source, 0) >= max_positions:
                 filtered["source_position_cap"] += 1
                 continue
@@ -583,8 +623,26 @@ class PaperTrader:
             age_hours = (now - pos.opened_at).total_seconds() / 3600
             reason = None
 
+            if pos.source == SignalSource.WEATHER_LATENCY and current >= WEATHER_LATENCY_TAKE_PROFIT_PRICE:
+                reason = f"LATENCY_CATCHUP: ${current:.3f}"
+
+            elif pos.source == SignalSource.WEATHER_SNIPER and current >= WEATHER_SNIPER_TAKE_PROFIT_PRICE:
+                reason = f"SNIPER_SPIKE: ${current:.3f}"
+
+            elif pos.source == SignalSource.WEATHER_SWING and pnl_pct >= WEATHER_SWING_TAKE_PROFIT_PCT:
+                reason = f"SWING_TAKE_PROFIT: +{pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.WEATHER_SWING and pnl_pct <= WEATHER_SWING_STOP_LOSS_PCT:
+                reason = f"SWING_STOP: {pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.CRYPTO_STRUCTURE and pnl_pct >= CRYPTO_STRUCTURE_TAKE_PROFIT_PCT:
+                reason = f"CRYPTO_STRUCTURE_TP: +{pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.CRYPTO_STRUCTURE and pnl_pct <= CRYPTO_STRUCTURE_STOP_LOSS_PCT:
+                reason = f"CRYPTO_STRUCTURE_STOP: {pnl_pct:.1%}"
+
             # Take profit: price moved +20% from entry
-            if pnl_pct >= DIRECTIONAL_TAKE_PROFIT_PCT:
+            elif pnl_pct >= DIRECTIONAL_TAKE_PROFIT_PCT:
                 reason = f"TAKE_PROFIT: +{pnl_pct:.1%}"
 
             # Stop loss: price moved -25% from entry
@@ -611,7 +669,7 @@ class PaperTrader:
         for pos in self.portfolio.positions:
             if id(pos) in queued_positions:
                 continue
-            if pos.source not in (SignalSource.CRYPTO_ARB, SignalSource.WEATHER):
+            if pos.source not in (CRYPTO_SOURCES | WEATHER_SOURCES):
                 continue
             if pos.side not in {"YES", "NO"} or not pos.group_key:
                 continue
@@ -884,11 +942,7 @@ class PaperTrader:
 
         # Max positions per strategy (higher limit for hedged positions)
         same_source = [p for p in self.portfolio.positions if p.source == signal.source]
-        max_positions = (
-            MAX_HEDGE_POSITIONS
-            if signal.action == SignalAction.HEDGE_BOTH
-            else MAX_DIRECTIONAL_POSITIONS
-        )
+        max_positions = self._max_positions_for_signal(signal)
         if len(same_source) >= max_positions:
             logger.debug(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False

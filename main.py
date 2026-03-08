@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 import io
@@ -19,6 +20,12 @@ from fastapi.staticfiles import StaticFiles
 
 from config import PipelineConfig
 from engine.pipeline import Pipeline
+from engine.multiagent import (
+    MultiagentRuntime,
+    OrchestratorConfig,
+    consult_multiagent_logs,
+    dataclass_to_dict,
+)
 from runtime_paths import LOG_DIR, STATE_PATH
 
 # Logging
@@ -38,25 +45,36 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 # Global pipeline instance
 pipeline: Pipeline | None = None
+multiagent_runtime: MultiagentRuntime | None = None
+
+
+class MultiagentConsultRequest(BaseModel):
+    question: str
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start pipeline on startup, stop on shutdown."""
-    global pipeline
+    global pipeline, multiagent_runtime
     config = PipelineConfig()
     pipeline = Pipeline(config)
+    multiagent_runtime = MultiagentRuntime(pipeline_config=config)
 
     # Start pipeline in background
     task = asyncio.create_task(pipeline.start())
+    multiagent_task = asyncio.create_task(multiagent_runtime.start())
     logger.info("Pipeline background task started")
+    logger.info("Multi-agent runtime background task started")
 
     yield
 
     # Shutdown
     if pipeline:
         await pipeline.stop()
+    if multiagent_runtime:
+        await multiagent_runtime.stop()
     task.cancel()
+    multiagent_task.cancel()
 
 
 app = FastAPI(
@@ -242,11 +260,84 @@ async def health():
     return {"status": "ok", "mode": pipeline.config.mode if pipeline else "unknown"}
 
 
+@app.get("/api/multiagent/defaults")
+async def multiagent_defaults():
+    """Expose the current recommended multi-agent defaults."""
+    config = OrchestratorConfig()
+    return JSONResponse(dataclass_to_dict(config))
+
+
+@app.get("/api/multiagent/status")
+async def multiagent_status():
+    """Expose the isolated Opus runtime status."""
+    if multiagent_runtime is None:
+        config = OrchestratorConfig()
+        return JSONResponse(
+            {
+                "bridge": {
+                    "mode": "isolated_runtime",
+                    "state": "booting",
+                    "next_step": "wait_for_multiagent_startup",
+                },
+                "summary": {
+                    "scan_count": 0,
+                    "active_markets": 0,
+                    "open_positions": 0,
+                    "top_blocker": "Multi-agent runtime is still starting",
+                },
+                "defaults": dataclass_to_dict(config),
+                "portfolio": {},
+                "health": {},
+                "diagnostics": {},
+                "market_mix": {},
+                "market_preview": [],
+                "module_cards": [],
+                "strategy_cards": [],
+                "comparison_views": [],
+                "blockers": [],
+            }
+        )
+    return JSONResponse(multiagent_runtime.get_status())
+
+
+@app.post("/api/multiagent/consult")
+async def multiagent_consult(payload: MultiagentConsultRequest):
+    """Consult an LLM against compact Opus runtime diagnostics."""
+    if multiagent_runtime is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "The isolated Opus runtime is not running yet.",
+                "model": None,
+            },
+            status_code=503,
+        )
+    if not payload.question.strip():
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Ask a non-empty diagnostic question.",
+                "model": None,
+            },
+            status_code=400,
+        )
+
+    result = await consult_multiagent_logs(
+        question=payload.question.strip(),
+        context=multiagent_runtime.llm_context(),
+    )
+    return JSONResponse(result)
+
+
 # ---------------------------------------------------------------------------
 # Dashboard — serves the React build or inline HTML
 # ---------------------------------------------------------------------------
 
 DASHBOARD_HTML = Path(__file__).parent / "dashboard" / "index.html"
+MULTIAGENT_DIR = Path(__file__).parent / "dashboard" / "multiagent"
+MULTIAGENT_HTML = MULTIAGENT_DIR / "index.html"
+
+app.mount("/multiagent-assets", StaticFiles(directory=MULTIAGENT_DIR), name="multiagent-assets")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -255,6 +346,14 @@ async def dashboard():
     if DASHBOARD_HTML.exists():
         return HTMLResponse(DASHBOARD_HTML.read_text())
     return HTMLResponse("<h1>Polymarket Algo Trader</h1><p>Dashboard loading...</p>")
+
+
+@app.get("/multiagent", response_class=HTMLResponse)
+async def multiagent_dashboard():
+    """Serve the separate multi-agent section."""
+    if MULTIAGENT_HTML.exists():
+        return HTMLResponse(MULTIAGENT_HTML.read_text())
+    return HTMLResponse("<h1>Oracle Multi-Agent Lab</h1><p>Multi-agent dashboard unavailable.</p>")
 
 
 # ---------------------------------------------------------------------------

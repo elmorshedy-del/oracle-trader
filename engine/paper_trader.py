@@ -29,6 +29,7 @@ DIRECTIONAL_STOP_LOSS_PCT = -0.25
 TOKEN_CONVERGENCE_PRICE = 0.95
 HEDGE_ROTATION_HOURS = 6.0
 ARB_ROTATION_HOURS = 4.0
+ARB_EARLY_RELEASE_MIN_HOURS = 1.0
 ARB_REENTRY_COOLDOWN_HOURS = 4.0
 STALE_ROTATION_REENTRY_COOLDOWN_HOURS = 6.0
 STALE_DIRECTIONAL_ROTATION_HOURS = {
@@ -735,9 +736,63 @@ class PaperTrader:
                 self._strategy_exposure_cap_pct(SignalSource.LIQUIDITY) * 100,
             )
 
-        # Execute exits
+        return self._apply_exits(exits)
+
+    def release_locked_arb_positions(self, pending_signals: list[Signal]) -> int:
+        """
+        Free cash from older locked arb positions when fresh arb entries are waiting.
+
+        This does not change arb detection or payout math. It only accelerates
+        capital release once an existing arb has been in the book long enough
+        and new arb signals are queued behind it.
+        """
+        pending_arb = [signal for signal in pending_signals if signal.action == SignalAction.ARB_ALL]
+        if not pending_arb:
+            return 0
+
+        target_cash = max(
+            MIN_TRADE_CASH_USD,
+            max(float(signal.suggested_size_usd or 0.0) for signal in pending_arb[:MAX_NEW_ARB_POSITIONS_PER_SCAN]),
+        )
+        if self.portfolio.cash >= target_cash:
+            return 0
+
+        now = datetime.now(timezone.utc)
+        releasable_positions = [
+            pos
+            for pos in self.portfolio.positions
+            if pos.side == "ARB"
+            and (now - pos.opened_at).total_seconds() / 3600 >= ARB_EARLY_RELEASE_MIN_HOURS
+        ]
+        if not releasable_positions:
+            return 0
+
+        releasable_positions.sort(key=lambda pos: pos.opened_at)
+        exits = []
+        projected_cash = self.portfolio.cash
+        for pos in releasable_positions:
+            if projected_cash >= target_cash:
+                break
+            exit_price = pos.current_price or 1.0
+            projected_cash += pos.shares * exit_price
+            age_hours = (now - pos.opened_at).total_seconds() / 3600
+            exits.append((pos, exit_price, f"ARB_RELEASE: pending arb @ {age_hours:.1f}h"))
+
+        if not exits:
+            return 0
+
+        logger.info(
+            "[ARB] Early release triggered: pending=%s target_cash=$%.2f current_cash=$%.2f releasing=%s",
+            len(pending_arb),
+            target_cash,
+            self.portfolio.cash,
+            len(exits),
+        )
+        return self._apply_exits(exits)
+
+    def _apply_exits(self, exits: list[tuple[Position, float, str]]) -> int:
+        """Apply queued exits and release cash back into the paper portfolio."""
         for pos, exit_price, reason in exits:
-            # Calculate realized P&L
             if pos.side == "HEDGE":
                 pnl = 0.0
                 proceeds = pos.shares
@@ -755,7 +810,6 @@ class PaperTrader:
                 proceeds = pos.shares * exit_price
                 fee = proceeds * EXIT_FEE_ESTIMATE_RATE
 
-            # Return capital + P&L to cash
             self.portfolio.cash += proceeds
             self.portfolio.total_realized_pnl += pnl
             self.portfolio.total_fees_paid += fee

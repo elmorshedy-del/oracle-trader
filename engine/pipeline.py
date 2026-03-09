@@ -254,6 +254,10 @@ class Pipeline:
                     + ", ".join(f"{reason}={count}" for reason, count in filtered.items())
                 )
 
+            early_arb_releases = self.trader.release_locked_arb_positions(all_signals)
+            if early_arb_releases:
+                exit_count += early_arb_releases
+
             executed = 0
             executed_by_strategy: dict[str, int] = {}
             for signal in all_signals:

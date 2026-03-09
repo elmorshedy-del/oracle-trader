@@ -11,8 +11,8 @@ import httpx
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
 OPENAI_API_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions")
-DEFAULT_ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 DEFAULT_FIREWORKS_MODEL = os.getenv("FIREWORKS_CONSULT_MODEL", "accounts/fireworks/models/glm-5")
+DEFAULT_ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_CONSULT_MODEL", "gpt-5")
 
 
@@ -69,10 +69,10 @@ async def consult_multiagent_logs(
 
 def _provider_chain() -> list[tuple[str, str]]:
     providers: list[tuple[str, str]] = []
-    if os.getenv("ANTHROPIC_API_KEY", ""):
-        providers.append(("anthropic", DEFAULT_ANTHROPIC_MODEL))
     if os.getenv("FIREWORKS_API_KEY", ""):
         providers.append(("fireworks", DEFAULT_FIREWORKS_MODEL))
+    if os.getenv("ANTHROPIC_API_KEY", ""):
+        providers.append(("anthropic", DEFAULT_ANTHROPIC_MODEL))
     if os.getenv("OPENAI_API_KEY", ""):
         providers.append(("openai", DEFAULT_OPENAI_MODEL))
     return providers
@@ -165,7 +165,7 @@ async def _call_fireworks(
                 "model": model,
                 "max_tokens": 1200,
                 "temperature": 0.2,
-                "reasoning_effort": "medium",
+                "reasoning_effort": "high",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": _safe_json(user_content)},

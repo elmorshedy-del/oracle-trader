@@ -10,9 +10,9 @@ from runtime_paths import LOG_DIR
 
 @dataclass(frozen=True)
 class StrategyCap:
-    max_capital_pct: float = 0.25
-    max_positions: int = 5
-    max_single_position_usd: float = 150.0
+    max_capital_pct: float = 1.0
+    max_positions: int = 999
+    max_single_position_usd: float = 1500.0
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class ValidationConfig:
     min_hours_to_resolution: float = 4.0
     min_market_age_hours: float = 2.0
     min_edge_absolute: float = 0.03
-    max_positions_per_category: int = 8
+    max_positions_per_category: int = 999
     max_enrichment_age_seconds: dict[str, float] = field(
         default_factory=lambda: {
             "weather": 7200.0,
@@ -60,62 +60,62 @@ class SlippageConfig:
 def recommended_strategy_caps() -> dict[str, StrategyCap]:
     return {
         "relationship_arbitrage": StrategyCap(
-            max_capital_pct=0.20,
-            max_positions=6,
-            max_single_position_usd=120.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "weather_sniper": StrategyCap(
-            max_capital_pct=0.15,
-            max_positions=4,
-            max_single_position_usd=100.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "weather_latency": StrategyCap(
-            max_capital_pct=0.10,
-            max_positions=3,
-            max_single_position_usd=75.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "weather_swing": StrategyCap(
-            max_capital_pct=0.10,
-            max_positions=3,
-            max_single_position_usd=75.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "crypto_structure": StrategyCap(
-            max_capital_pct=0.15,
-            max_positions=5,
-            max_single_position_usd=100.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "crypto_latency": StrategyCap(
-            max_capital_pct=0.10,
-            max_positions=3,
-            max_single_position_usd=75.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
         "news_signal": StrategyCap(
-            max_capital_pct=0.10,
-            max_positions=4,
-            max_single_position_usd=90.0,
+            max_capital_pct=1.0,
+            max_positions=999,
+            max_single_position_usd=1500.0,
         ),
     }
 
 
 @dataclass(frozen=True)
 class RiskLimits:
-    max_portfolio_utilization_pct: float = 0.80
-    min_reserve_pct: float = 0.10
+    max_portfolio_utilization_pct: float = 0.98
+    min_reserve_pct: float = 0.02
     max_drawdown_pct: float = 0.15
-    max_single_position_pct: float = 0.08
-    max_single_position_usd: float = 200.0
+    max_single_position_pct: float = 0.20
+    max_single_position_usd: float = 2500.0
     strategy_caps: dict[str, StrategyCap] = field(default_factory=recommended_strategy_caps)
     category_caps: dict[str, float] = field(
         default_factory=lambda: {
-            "weather": 0.35,
-            "crypto": 0.35,
-            "politics": 0.20,
-            "sports": 0.10,
-            "other": 0.10,
+            "weather": 1.0,
+            "crypto": 1.0,
+            "politics": 1.0,
+            "sports": 1.0,
+            "other": 1.0,
         }
     )
     reentry_cooldown_hours: float = 24.0
-    max_correlated_positions: int = 3
+    max_correlated_positions: int = 999
 
 
 @dataclass(frozen=True)

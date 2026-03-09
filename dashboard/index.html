@@ -663,8 +663,10 @@ function stratBadge(source) {
     'multi_outcome_arbitrage': ['ARB', 'strat-arbitrage'],
     'whale_tracking': ['WHALE', 'strat-whale'],
     'news_latency': ['NEWS', 'strat-news'],
+    'news_whale': ['N+W', 'strat-whale'],
     'mean_reversion': ['MEAN', 'strat-mean'],
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
+    'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
     'weather_forecast': ['WX', 'strat-weather'],
     'weather_all': ['WX', 'strat-weather'],
@@ -748,8 +750,11 @@ function renderViewTabs(d) {
     'weather_latency',
     'weather_swing',
     'news',
+    'news_whale',
     'bitcoin',
+    'bitcoin_whale',
     'arbitrage',
+    'whale_follow',
     'momentum',
   ];
   const tabs = order
@@ -858,7 +863,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'bitcoin', 'arbitrage', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'whale_follow', 'momentum'];
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};

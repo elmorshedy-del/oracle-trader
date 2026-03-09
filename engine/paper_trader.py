@@ -82,19 +82,21 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_SNIPER: 0.08,
     SignalSource.WEATHER_LATENCY: 0.12,
     SignalSource.WEATHER_SWING: 0.10,
-    SignalSource.WHALE: 0.10,
+    SignalSource.WHALE: 0.35,
 }
 SOURCE_POSITION_LIMITS = {
     SignalSource.CRYPTO_STRUCTURE: 12,
     SignalSource.WEATHER_SNIPER: 30,
     SignalSource.WEATHER_LATENCY: 12,
     SignalSource.WEATHER_SWING: 12,
+    SignalSource.WHALE: 16,
 }
 SOURCE_SCAN_LIMITS = {
     SignalSource.CRYPTO_STRUCTURE: 4,
     SignalSource.WEATHER_SNIPER: 12,
     SignalSource.WEATHER_LATENCY: 4,
     SignalSource.WEATHER_SWING: 4,
+    SignalSource.WHALE: 6,
 }
 CRYPTO_SOURCES = {
     SignalSource.CRYPTO_ARB,

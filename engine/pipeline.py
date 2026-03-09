@@ -63,8 +63,15 @@ COMPARISON_VIEW_CONFIG = {
         "signal_sources": (SignalSource.WEATHER_SWING.value,),
     },
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
+    "news_whale": {"label": "News + Whale", "strategy": "news", "source": "news_whale"},
     "bitcoin": {"label": "Bitcoin", "strategy": "crypto_arb", "source": "crypto_temporal_arb"},
+    "bitcoin_whale": {
+        "label": "Bitcoin + Whale",
+        "strategy": "crypto_arb",
+        "source": "bitcoin_whale",
+    },
     "arbitrage": {"label": "Arbitrage", "strategy": "arbitrage", "source": "multi_outcome_arbitrage"},
+    "whale_follow": {"label": "Whale Follow", "strategy": "whale", "source": SignalSource.WHALE.value},
     "momentum": {"label": "Momentum", "strategy": "mean_reversion", "source": "mean_reversion"},
 }
 
@@ -256,6 +263,7 @@ class Pipeline:
                     source = trade.source.value
                     executed_by_strategy[source] = executed_by_strategy.get(source, 0) + 1
 
+            whale: WhaleTrackingStrategy = self.strategies["whale"]
             for view_key, meta in COMPARISON_VIEW_CONFIG.items():
                 strategy_name = meta["strategy"]
                 if strategy_name is None:
@@ -263,9 +271,11 @@ class Pipeline:
                     continue
 
                 trader = self.comparison_traders[view_key]
-                view_signals = self._filter_comparison_signals(
+                view_signals = self._build_comparison_signals(
                     view_key=view_key,
-                    signals=strategy_signals.get(strategy_name, []),
+                    strategy_name=strategy_name,
+                    strategy_signals=strategy_signals,
+                    whale_strategy=whale,
                 )
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
@@ -357,6 +367,36 @@ class Pipeline:
                 or BITCOIN_SIGNAL_PATTERN.search(signal.reasoning)
             ]
         return filtered
+
+    def _build_comparison_signals(
+        self,
+        *,
+        view_key: str,
+        strategy_name: str,
+        strategy_signals: dict[str, list[Signal]],
+        whale_strategy: WhaleTrackingStrategy,
+    ) -> list[Signal]:
+        base_signals = strategy_signals.get(strategy_name, [])
+        if view_key == "news_whale":
+            return self._apply_whale_overlay(base_signals, whale_strategy)
+        if view_key == "bitcoin_whale":
+            bitcoin_signals = self._filter_comparison_signals(view_key="bitcoin", signals=base_signals)
+            return self._apply_whale_overlay(bitcoin_signals, whale_strategy)
+        if view_key == "whale_follow":
+            return whale_strategy.build_standalone_signals(self._markets)
+        return self._filter_comparison_signals(view_key=view_key, signals=base_signals)
+
+    @staticmethod
+    def _apply_whale_overlay(
+        signals: list[Signal],
+        whale_strategy: WhaleTrackingStrategy,
+    ) -> list[Signal]:
+        overlaid: list[Signal] = []
+        for signal in signals:
+            adjusted, applied = whale_strategy.apply_cached_confirmation(signal)
+            if applied:
+                overlaid.append(adjusted)
+        return overlaid
 
     def _comparison_starting_capital(self, view_key: str) -> float:
         if view_key == "weather_all":

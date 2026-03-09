@@ -52,6 +52,7 @@ multiagent_runtime: MultiagentRuntime | None = None
 
 class MultiagentConsultRequest(BaseModel):
     question: str
+    provider: str | None = "auto"
 
 
 @asynccontextmanager
@@ -391,6 +392,7 @@ async def multiagent_consult(payload: MultiagentConsultRequest):
     result = await consult_multiagent_logs(
         question=payload.question.strip(),
         context=multiagent_runtime.llm_context(),
+        preferred_provider=payload.provider,
     )
     return JSONResponse(result)
 

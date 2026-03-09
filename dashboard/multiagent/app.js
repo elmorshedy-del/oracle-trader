@@ -596,6 +596,7 @@ let LIVE_STATUS_LOADED_AT = null;
 let CONSULT_LOADING = false;
 let CONSULT_RESPONSE = null;
 let CONSULT_QUESTION = "";
+let CONSULT_PROVIDER = "auto";
 let selectedRuntimeView = "all";
 
 function renderMetrics() {
@@ -1584,9 +1585,20 @@ function renderConsultPanel() {
       <div class="panel-eyebrow">LLM consult</div>
       <h3 style="margin-top:10px">Ask the runtime</h3>
       <p>
-        This connector sends the compact Opus diagnostics, cycle reports, blockers, errors, and closed-position history to the model.
+        This connector sends compact Opus diagnostics, scan tape, trade tape, blocker history, policy knobs, and closed-position history to the selected model.
       </p>
       <form id="consult-form" class="consult-form">
+        <div class="consult-actions">
+          <label class="consult-provider-wrap">
+            <span class="inline-meta">Model route</span>
+            <select id="consult-provider" class="consult-select">
+              <option value="auto" ${CONSULT_PROVIDER === "auto" ? "selected" : ""}>Auto</option>
+              <option value="fireworks" ${CONSULT_PROVIDER === "fireworks" ? "selected" : ""}>GLM-5</option>
+              <option value="anthropic" ${CONSULT_PROVIDER === "anthropic" ? "selected" : ""}>Anthropic</option>
+              <option value="openai" ${CONSULT_PROVIDER === "openai" ? "selected" : ""}>OpenAI</option>
+            </select>
+          </label>
+        </div>
         <textarea
           id="consult-question"
           class="consult-input"
@@ -1603,7 +1615,7 @@ function renderConsultPanel() {
           ? `
             <div class="consult-response">
               <div class="row-split">
-                <strong>${escapeHtml(CONSULT_RESPONSE.model || "LLM response")}</strong>
+                <strong>${escapeHtml(CONSULT_RESPONSE.provider || "llm")} · ${escapeHtml(CONSULT_RESPONSE.model || "response")}</strong>
                 <span class="inline-meta">${escapeHtml(CONSULT_RESPONSE.generated_at || "")}</span>
               </div>
               <pre class="consult-answer">${escapeHtml(CONSULT_RESPONSE.answer || "")}</pre>
@@ -1611,7 +1623,7 @@ function renderConsultPanel() {
           `
           : `
             <div class="inline-meta" style="margin-top:14px">
-              The model only sees compact diagnostics, not a raw log flood.
+              The model sees compact runtime diagnostics, scan and trade tape, blocker rollups, and the active policy snapshot instead of a raw log flood.
             </div>
           `
       }
@@ -1772,9 +1784,10 @@ async function loadLiveStatus() {
   renderActiveSection();
 }
 
-async function submitConsult(question) {
+async function submitConsult(question, provider) {
   CONSULT_LOADING = true;
   CONSULT_QUESTION = question;
+  CONSULT_PROVIDER = provider || "auto";
   renderActiveSection();
   bindRuntimeActions();
 
@@ -1784,7 +1797,7 @@ async function submitConsult(question) {
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, provider: CONSULT_PROVIDER }),
     });
     const payload = await response.json();
     CONSULT_RESPONSE = payload;
@@ -1827,11 +1840,13 @@ function bindRuntimeActions() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const input = document.getElementById("consult-question");
+    const provider = document.getElementById("consult-provider");
     const question = input?.value?.trim() || "";
+    CONSULT_PROVIDER = provider?.value || "auto";
     if (!question) {
       return;
     }
-    submitConsult(question);
+    submitConsult(question, CONSULT_PROVIDER);
   });
 }
 

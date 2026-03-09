@@ -20,6 +20,7 @@ async def consult_multiagent_logs(
     *,
     question: str,
     context: dict[str, Any],
+    preferred_provider: str | None = None,
 ) -> dict[str, Any]:
     system_prompt = (
         "You are diagnosing an isolated Polymarket paper-trading runtime. "
@@ -37,7 +38,7 @@ async def consult_multiagent_logs(
     }
 
     last_error = "no_provider_configured"
-    for provider, model in _provider_chain():
+    for provider, model in _provider_chain(preferred_provider):
         try:
             answer = await _call_provider(
                 provider=provider,
@@ -67,15 +68,21 @@ async def consult_multiagent_logs(
     }
 
 
-def _provider_chain() -> list[tuple[str, str]]:
-    providers: list[tuple[str, str]] = []
+def _provider_chain(preferred_provider: str | None = None) -> list[tuple[str, str]]:
+    available: dict[str, tuple[str, str]] = {}
     if os.getenv("FIREWORKS_API_KEY", ""):
-        providers.append(("fireworks", DEFAULT_FIREWORKS_MODEL))
+        available["fireworks"] = ("fireworks", DEFAULT_FIREWORKS_MODEL)
     if os.getenv("ANTHROPIC_API_KEY", ""):
-        providers.append(("anthropic", DEFAULT_ANTHROPIC_MODEL))
+        available["anthropic"] = ("anthropic", DEFAULT_ANTHROPIC_MODEL)
     if os.getenv("OPENAI_API_KEY", ""):
-        providers.append(("openai", DEFAULT_OPENAI_MODEL))
-    return providers
+        available["openai"] = ("openai", DEFAULT_OPENAI_MODEL)
+
+    order = ["fireworks", "anthropic", "openai"]
+    preferred = (preferred_provider or "auto").strip().lower()
+    if preferred in available:
+        order = [preferred] + [name for name in order if name != preferred]
+
+    return [available[name] for name in order if name in available]
 
 
 async def _call_provider(

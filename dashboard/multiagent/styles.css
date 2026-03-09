@@ -571,6 +571,13 @@ tr:hover td {
   margin-top: 14px;
 }
 
+.consult-provider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
 .consult-input {
   width: 100%;
   min-height: 120px;
@@ -581,9 +588,19 @@ tr:hover td {
   resize: vertical;
 }
 
+.consult-select {
+  min-width: 180px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
 .consult-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
   margin-top: 10px;
 }
 

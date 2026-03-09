@@ -1275,11 +1275,34 @@ class MultiagentRuntime:
     def llm_context(self) -> dict[str, Any]:
         status = self.get_status()
         comparison_views = status.get("comparison_views", [])
+        metrics_summary = self.metrics_store.llm_summary(recent_scans=24, recent_closes=20)
         return {
+            "schema_version": 2,
+            "ingestion_notes": (
+                "This payload is organized for diagnostic LLM review. "
+                "Prefer latest_scan, blockers, portfolio, scan_tape, trade_tape, close_tape, "
+                "strategy_rollup, and rejection_rollup before looking at raw paths."
+            ),
             "summary": status["summary"],
+            "policy_snapshot": status.get("defaults", {}),
             "performance": self._build_performance(self._last_report),
             "health": self._build_health(self._last_report),
             "diagnostics": self._build_diagnostics(self._last_report),
+            "latest_scan": {
+                "scan_count": self._scan_count,
+                "markets_scanned": self._last_report.markets_scanned if self._last_report else 0,
+                "markets_after_filter": self._last_report.markets_after_filter if self._last_report else 0,
+                "candidates_generated": self._last_report.candidates_generated if self._last_report else 0,
+                "candidates_validated": self._last_report.candidates_validated if self._last_report else 0,
+                "candidates_rejected": self._last_report.candidates_rejected if self._last_report else 0,
+                "intents_created": self._last_report.intents_created if self._last_report else 0,
+                "allocation_rejections": self._last_report.allocation_rejections if self._last_report else 0,
+                "executions_succeeded": self._last_report.executions_succeeded if self._last_report else 0,
+                "executions_failed": self._last_report.executions_failed if self._last_report else 0,
+                "top_rejection_reason": self._last_report.top_rejection_reason if self._last_report else None,
+                "top_allocation_rejection_reason": self._last_report.top_allocation_rejection_reason if self._last_report else None,
+                "zero_trade_explanation": self._last_report.zero_trade_explanation if self._last_report else "",
+            },
             "provider_cards": [card.__dict__ for card in self.enricher.provider_cards()],
             "module_cards": status.get("module_cards", []),
             "strategy_cards": status.get("strategy_cards", []),
@@ -1308,7 +1331,12 @@ class MultiagentRuntime:
             ],
             "recent_trades": self._recent_trade_rows(limit=24),
             "news_terminal": status.get("news_terminal", [])[:20],
-            "compact_metrics_store": self.metrics_store.llm_summary(recent_scans=24, recent_closes=20),
+            "scan_tape": metrics_summary.get("recent_cycles", []),
+            "trade_tape": metrics_summary.get("recent_fills", []),
+            "close_tape": metrics_summary.get("recent_closes", []),
+            "strategy_rollup": metrics_summary.get("strategy_rollup", []),
+            "rejection_rollup": metrics_summary.get("rejection_rollup", []),
+            "compact_metrics_store": metrics_summary,
             "recent_closed_positions": self.state.closed_positions(20),
             "recent_errors": list(self._recent_errors[-12:]),
             "snapshot_reports": self._compact_snapshot_reports(8),

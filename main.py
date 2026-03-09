@@ -315,6 +315,7 @@ async def multiagent_logs_export():
         )
 
     bundle = io.BytesIO()
+    llm_context = multiagent_runtime.llm_context()
     with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
             "status.json",
@@ -322,7 +323,7 @@ async def multiagent_logs_export():
         )
         archive.writestr(
             "llm_context.json",
-            json.dumps(multiagent_runtime.llm_context(), indent=2, default=str),
+            json.dumps(llm_context, indent=2, default=str),
         )
         archive.writestr(
             "README.txt",
@@ -335,17 +336,20 @@ async def multiagent_logs_export():
                     "- llm_context.json: compact diagnostic context for on-request LLM review",
                     "- logs/multiagent_metrics.jsonl: compact per-cycle metrics log",
                     "- logs/multiagent_runtime.sqlite: persisted compact runtime database",
+                    "- logs/multiagent_runtime_state.json: persisted Opus portfolio state",
+                    "- logs/multiagent_runtime_meta.json: persisted Opus scan counters/totals",
                     "- snapshots/: recent scan-cycle snapshots",
                 ]
             ),
         )
 
-        log_path = Path(multiagent_runtime.llm_context()["metrics_log_path"])
-        db_path = Path(multiagent_runtime.llm_context()["metrics_db_path"])
-        if log_path.exists():
-            archive.write(log_path, arcname=f"logs/{log_path.name}")
-        if db_path.exists():
-            archive.write(db_path, arcname=f"logs/{db_path.name}")
+        for key in ("metrics_log_path", "metrics_db_path", "state_path", "runtime_meta_path"):
+            raw_path = llm_context.get(key)
+            if not raw_path:
+                continue
+            path = Path(raw_path)
+            if path.exists():
+                archive.write(path, arcname=f"logs/{path.name}")
 
         for snapshot in sorted(
             multiagent_runtime.snapshot_store.config.snapshot_dir.glob("cycle_*.json"),

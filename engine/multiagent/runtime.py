@@ -1273,17 +1273,74 @@ class MultiagentRuntime:
             self._recent_errors = self._recent_errors[-20:]
 
     def llm_context(self) -> dict[str, Any]:
+        status = self.get_status()
+        comparison_views = status.get("comparison_views", [])
         return {
-            "summary": self.get_status()["summary"],
+            "summary": status["summary"],
             "performance": self._build_performance(self._last_report),
             "health": self._build_health(self._last_report),
             "diagnostics": self._build_diagnostics(self._last_report),
             "provider_cards": [card.__dict__ for card in self.enricher.provider_cards()],
+            "module_cards": status.get("module_cards", []),
+            "strategy_cards": status.get("strategy_cards", []),
             "blockers": self._build_blockers(self._last_report),
+            "portfolio": {
+                "total_capital": status.get("portfolio", {}).get("total_capital"),
+                "available_capital": status.get("portfolio", {}).get("available_capital"),
+                "deployed_capital": status.get("portfolio", {}).get("deployed_capital"),
+                "position_count": status.get("portfolio", {}).get("position_count"),
+                "max_drawdown_pct": status.get("portfolio", {}).get("max_drawdown_pct"),
+                "exposure_by_strategy": status.get("portfolio", {}).get("exposure_by_strategy", {}),
+                "exposure_by_category": status.get("portfolio", {}).get("exposure_by_category", {}),
+            },
+            "comparison_overview": [
+                {
+                    "key": view.get("key"),
+                    "label": view.get("label"),
+                    "total_value": view.get("portfolio", {}).get("total_value"),
+                    "total_pnl": view.get("portfolio", {}).get("total_pnl"),
+                    "win_rate": view.get("portfolio", {}).get("win_rate"),
+                    "mark_win_rate": view.get("portfolio", {}).get("mark_win_rate"),
+                    "open_positions": view.get("portfolio", {}).get("open_positions"),
+                    "total_trades": view.get("portfolio", {}).get("total_trades"),
+                }
+                for view in comparison_views
+            ],
+            "recent_trades": self._recent_trade_rows(limit=24),
+            "news_terminal": status.get("news_terminal", [])[:20],
             "compact_metrics_store": self.metrics_store.llm_summary(recent_scans=24, recent_closes=20),
             "recent_closed_positions": self.state.closed_positions(20),
             "recent_errors": list(self._recent_errors[-12:]),
-            "snapshot_reports": self.snapshot_store.list_recent(8),
+            "snapshot_reports": self._compact_snapshot_reports(8),
             "metrics_log_path": str(METRICS_LOG_PATH),
             "metrics_db_path": str(METRICS_DB_PATH),
+            "state_path": str(STATE_FILE_PATH),
+            "runtime_meta_path": str(RUNTIME_META_PATH),
         }
+
+    def _compact_snapshot_reports(self, limit: int = 8) -> list[dict[str, Any]]:
+        compact: list[dict[str, Any]] = []
+        for report in self.snapshot_store.list_recent(limit):
+            compact.append(
+                {
+                    "cycle_id": report.get("cycle_id"),
+                    "started_at": report.get("started_at"),
+                    "completed_at": report.get("completed_at"),
+                    "duration_seconds": report.get("duration_seconds"),
+                    "markets_scanned": report.get("markets_scanned"),
+                    "markets_after_filter": report.get("markets_after_filter"),
+                    "candidates_generated": report.get("candidates_generated"),
+                    "candidates_validated": report.get("candidates_validated"),
+                    "candidates_rejected": report.get("candidates_rejected"),
+                    "intents_created": report.get("intents_created"),
+                    "allocation_rejections": report.get("allocation_rejections"),
+                    "executions_succeeded": report.get("executions_succeeded"),
+                    "executions_failed": report.get("executions_failed"),
+                    "top_rejection_reason": report.get("top_rejection_reason"),
+                    "top_allocation_rejection_reason": report.get("top_allocation_rejection_reason"),
+                    "zero_trade_explanation": report.get("zero_trade_explanation"),
+                    "errors": report.get("errors", [])[-3:],
+                    "warnings": report.get("warnings", [])[-3:],
+                }
+            )
+        return compact

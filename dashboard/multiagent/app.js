@@ -1268,7 +1268,11 @@ function renderNewsTerminal() {
                           <td title="${escapeHtml(row.market_slug || "")}">${escapeHtml(truncate(row.market_slug || "", 28))}</td>
                           <td>${escapeHtml(row.direction || "neutral")}</td>
                           <td>${Number(row.confidence || 0).toFixed(2)}</td>
-                          <td>${escapeHtml(row.llm_assisted ? `${row.llm_provider || "llm"}:${row.llm_model || "model"}` : "raw fallback")}</td>
+                          <td title="${escapeHtml(row.llm_error || row.status || "")}">${escapeHtml(
+                            row.llm_assisted
+                              ? `${row.llm_provider || "llm"}:${row.llm_model || "model"}`
+                              : row.status || "raw fallback"
+                          )}</td>
                         </tr>
                       `
                     )

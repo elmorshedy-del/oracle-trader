@@ -162,7 +162,8 @@ class LLMConfig:
                     os.getenv("ANTHROPIC_API_KEY", "")
                     or os.getenv("FIREWORKS_API_KEY", "")
                     or os.getenv("OPENAI_API_KEY", "")
-                )
+                ),
+                max_calls_per_cycle=15,
             ),
             "relationship_linking": LLMTaskConfig(enabled=False),
             "rule_extraction": LLMTaskConfig(enabled=False),

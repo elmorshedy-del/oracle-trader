@@ -701,6 +701,7 @@ class MultiagentRuntime:
             "diagnostics": self._build_diagnostics(report),
             "market_mix": self._build_market_mix(),
             "market_preview": self._build_market_preview(),
+            "provider_cards": [card.__dict__ for card in self.enricher.provider_cards()],
             "news_terminal": self._build_news_terminal(),
             "module_cards": self._build_module_cards(report),
             "strategy_cards": self._build_strategy_cards(report),
@@ -983,6 +984,18 @@ class MultiagentRuntime:
         for provider in getattr(self.enricher, "providers", []):
             if getattr(provider, "name", None) != "news":
                 continue
+            activity_rows = list(getattr(provider.state, "recent_activity", lambda limit=10: [])(20))
+            if activity_rows:
+                activity_rows.sort(
+                    key=lambda item: (
+                        1 if item.get("llm_assisted") else 0,
+                        float(item.get("confidence", 0.0) or 0.0),
+                        item.get("fetched_at", ""),
+                    ),
+                    reverse=True,
+                )
+                return activity_rows[:12]
+
             results = list(getattr(provider.state, "results", {}).values())
             results.sort(
                 key=lambda item: (
@@ -1009,6 +1022,9 @@ class MultiagentRuntime:
                         "llm_assisted": bool(result.llm_assisted),
                         "llm_error": data.get("llm_error") or result.error,
                         "fetched_at": result.fetched_at.isoformat(),
+                        "status": "enriched",
+                        "stage": "enriched",
+                        "llm_attempts": data.get("llm_attempts", []),
                     }
                 )
             return terminal_rows
@@ -1293,6 +1309,7 @@ class MultiagentRuntime:
 
     def _append_metrics_log(self, report: ScanCycleReport) -> None:
         METRICS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        provider_cards = [card.__dict__ for card in self.enricher.provider_cards()]
         entry = {
             "timestamp": utc_now().isoformat(),
             "scan": self._scan_count,
@@ -1308,6 +1325,14 @@ class MultiagentRuntime:
             "capital_total": self.state.snapshot().total_capital,
             "capital_available": self.state.snapshot().available_capital,
             "open_positions": self.state.snapshot().position_count,
+            "policy": {
+                "min_reserve_pct": self.config.risk_limits.min_reserve_pct,
+                "max_portfolio_utilization_pct": self.config.risk_limits.max_portfolio_utilization_pct,
+                "news_llm_max_calls_per_cycle": self.config.llm.tasks["news_relevance"].max_calls_per_cycle,
+                "news_signal_min_confidence": self.config.strategies["news_signal"]["min_confidence"],
+                "news_signal_min_edge": self.config.strategies["news_signal"]["min_edge"],
+            },
+            "provider_cards": provider_cards,
         }
         try:
             with METRICS_LOG_PATH.open("a") as handle:

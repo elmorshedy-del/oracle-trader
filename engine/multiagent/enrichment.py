@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -27,6 +27,7 @@ class ProviderCard:
     status: str
     detail: str
     updated_at: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 class ProviderState:
@@ -36,33 +37,88 @@ class ProviderState:
         self.last_error: str | None = None
         self.last_refresh: datetime | None = None
         self.last_count: int = 0
+        self.last_stats: dict[str, Any] = {}
+        self.recent_items: list[dict[str, Any]] = []
 
-    def set_results(self, results: dict[str, EnrichmentResult]) -> None:
+    def set_results(
+        self,
+        results: dict[str, EnrichmentResult],
+        *,
+        stats: dict[str, Any] | None = None,
+        recent_items: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.results = results
         self.last_count = len(results)
         self.last_refresh = utc_now()
         self.last_error = None
+        self.last_stats = dict(stats or {})
+        self.last_stats["enriched_markets"] = len(results)
+        self.recent_items = list((recent_items or [])[-40:])
 
-    def set_error(self, error: Exception | str) -> None:
+    def set_error(
+        self,
+        error: Exception | str,
+        *,
+        stats: dict[str, Any] | None = None,
+        recent_items: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.last_error = str(error)
         self.last_refresh = utc_now()
+        self.last_stats = dict(stats or {})
+        self.recent_items = list((recent_items or [])[-40:])
 
     def provider_card(self) -> ProviderCard:
         if self.last_error:
             status = "failed"
-            detail = self.last_error
+            detail = self._detail_text() or self.last_error
         elif self.last_count > 0:
             status = "healthy"
-            detail = f"{self.last_count} enriched markets available"
+            detail = self._detail_text() or f"{self.last_count} enriched markets available"
         else:
             status = "degraded"
-            detail = "No enrichments produced in the last refresh"
+            detail = self._detail_text() or "No enrichments produced in the last refresh"
         return ProviderCard(
             name=self.name,
             status=status,
             detail=detail,
             updated_at=self.last_refresh.isoformat() if self.last_refresh else None,
+            metrics=dict(self.last_stats),
         )
+
+    def recent_activity(self, limit: int = 20) -> list[dict[str, Any]]:
+        return list(self.recent_items[-limit:])
+
+    def _detail_text(self) -> str:
+        if self.name != "news":
+            if not self.last_stats:
+                return ""
+            parts: list[str] = []
+            if self.last_stats.get("enriched_markets") is not None:
+                parts.append(f"{int(self.last_stats.get('enriched_markets', 0) or 0)} enriched markets available")
+            return " | ".join(parts)
+
+        parts: list[str] = []
+        fetched = int(self.last_stats.get("fetched_headlines", 0) or 0)
+        matched = int(self.last_stats.get("matched_headlines", 0) or 0)
+        llm_attempted = int(self.last_stats.get("llm_attempted", 0) or 0)
+        llm_succeeded = int(self.last_stats.get("llm_succeeded", 0) or 0)
+        enriched = int(self.last_stats.get("enriched_markets", 0) or 0)
+        if fetched:
+            parts.append(f"{fetched} fetched")
+        if matched or fetched:
+            parts.append(f"{matched} matched")
+        if llm_attempted or matched:
+            parts.append(f"{llm_attempted} LLM attempts")
+        if llm_succeeded or llm_attempted:
+            parts.append(f"{llm_succeeded} LLM parsed")
+        parts.append(f"{enriched} enrichments")
+        llm_failed = int(self.last_stats.get("llm_failed", 0) or 0)
+        if llm_failed:
+            parts.append(f"{llm_failed} llm_failed")
+        no_match = int(self.last_stats.get("prefilter_no_match", 0) or 0)
+        if no_match:
+            parts.append(f"{no_match} no_match")
+        return " | ".join(parts)
 
 
 class WeatherEnrichmentProvider:
@@ -252,25 +308,69 @@ class NewsEnrichmentProvider:
         self.state = ProviderState(self.name)
 
     async def refresh(self, raw_markets: list[Market]) -> None:
+        refresh_stats: dict[str, Any] = {
+            "fetched_headlines": 0,
+            "ready_headlines": 0,
+            "matched_headlines": 0,
+            "prefilter_no_match": 0,
+            "llm_attempted": 0,
+            "llm_succeeded": 0,
+            "llm_failed": 0,
+            "llm_no_market": 0,
+            "llm_bad_market_slug": 0,
+            "enriched_markets": 0,
+        }
+        activity_rows: list[dict[str, Any]] = []
         try:
             self.helper._build_market_index(raw_markets)
             headlines = await self.helper._fetch_headlines()
+            refresh_stats["fetched_headlines"] = len(headlines)
             for headline in headlines:
                 self.helper._register_headline(headline)
 
             ready = self.helper._ready_headlines()[:15]
+            refresh_stats["ready_headlines"] = len(ready)
             if not ready:
-                self.state.set_results({})
+                self.state.set_results({}, stats=refresh_stats, recent_items=activity_rows)
                 return
 
             results: dict[str, EnrichmentResult] = {}
             for headline in ready:
                 headline_id = self.helper._headline_id(headline)
                 candidate_markets = self.helper._candidate_markets_for_headline(headline, limit=10)
+                activity_base = {
+                    "headline": headline.title,
+                    "source": headline.source,
+                    "fetched_at": utc_now().isoformat(),
+                    "matched_candidate_count": len(candidate_markets),
+                    "llm_assisted": False,
+                    "llm_provider": None,
+                    "llm_model": None,
+                    "llm_error": None,
+                    "confidence": 0.0,
+                    "expected_impact_cents": 0.0,
+                    "impact_cents": 0.0,
+                    "direction": "neutral",
+                    "market_slug": None,
+                    "reasoning": "",
+                    "status": "prefilter_pending",
+                    "stage": "prefilter",
+                    "llm_attempts": [],
+                }
                 if not candidate_markets:
+                    refresh_stats["prefilter_no_match"] += 1
+                    activity_rows.append(
+                        {
+                            **activity_base,
+                            "status": "no_candidate_matches",
+                            "stage": "prefilter",
+                        }
+                    )
                     self.helper._mark_headline_processed(headline_id)
                     continue
+                refresh_stats["matched_headlines"] += 1
 
+                refresh_stats["llm_attempted"] += 1
                 llm_result, attempts = await self.llm_router.complete_json(
                     task_name="news_relevance",
                     system_prompt=(
@@ -301,17 +401,87 @@ class NewsEnrichmentProvider:
                     required_keys=("market_slug", "direction", "confidence", "expected_impact_cents", "reasoning"),
                 )
 
+                attempt_rows = [
+                    {
+                        "provider": attempt.provider,
+                        "model": attempt.model,
+                        "role": attempt.role,
+                        "success": attempt.success,
+                        "parsed": attempt.parsed,
+                        "latency_ms": attempt.latency_ms,
+                        "error": attempt.error,
+                    }
+                    for attempt in attempts
+                ]
+                failure_attempt = llm_result if llm_result is not None and llm_result.parsed_json is None else None
+                if failure_attempt is not None:
+                    attempt_rows.insert(
+                        0,
+                        {
+                            "provider": failure_attempt.provider,
+                            "model": failure_attempt.model,
+                            "role": failure_attempt.role,
+                            "success": failure_attempt.success,
+                            "parsed": failure_attempt.parsed,
+                            "latency_ms": failure_attempt.latency_ms,
+                            "error": failure_attempt.error,
+                        },
+                    )
+
                 if llm_result is None or llm_result.parsed_json is None:
+                    refresh_stats["llm_failed"] += 1
+                    activity_rows.append(
+                        {
+                            **activity_base,
+                            "status": "llm_failed",
+                            "stage": "llm",
+                            "llm_assisted": False,
+                            "llm_provider": getattr(failure_attempt, "provider", None),
+                            "llm_model": getattr(failure_attempt, "model", None),
+                            "llm_error": _summarize_attempt_errors(attempt_rows),
+                            "llm_attempts": attempt_rows,
+                        }
+                    )
                     self.helper._mark_headline_processed(headline_id)
                     continue
 
                 parsed = llm_result.parsed_json
+                refresh_stats["llm_succeeded"] += 1
                 market_slug = str(parsed.get("market_slug", "") or "").strip()
                 if not market_slug:
+                    refresh_stats["llm_no_market"] += 1
+                    activity_rows.append(
+                        {
+                            **activity_base,
+                            "status": "llm_no_market",
+                            "stage": "llm",
+                            "llm_assisted": True,
+                            "llm_provider": llm_result.provider,
+                            "llm_model": llm_result.model,
+                            "llm_error": None,
+                            "llm_attempts": attempt_rows,
+                            "reasoning": str(parsed.get("reasoning", "") or ""),
+                        }
+                    )
                     self.helper._mark_headline_processed(headline_id)
                     continue
                 chosen_market = self.helper._market_lookup.get(market_slug) if market_slug else None
                 if chosen_market is None:
+                    refresh_stats["llm_bad_market_slug"] += 1
+                    activity_rows.append(
+                        {
+                            **activity_base,
+                            "status": "llm_bad_market_slug",
+                            "stage": "llm",
+                            "llm_assisted": True,
+                            "llm_provider": llm_result.provider,
+                            "llm_model": llm_result.model,
+                            "llm_error": f"unknown_market_slug:{market_slug}",
+                            "llm_attempts": attempt_rows,
+                            "reasoning": str(parsed.get("reasoning", "") or ""),
+                            "market_slug": market_slug,
+                        }
+                    )
                     self.helper._mark_headline_processed(headline_id)
                     continue
 
@@ -326,8 +496,9 @@ class NewsEnrichmentProvider:
                     "reasoning": parsed.get("reasoning", ""),
                     "llm_provider": llm_result.provider,
                     "llm_model": llm_result.model,
-                    "llm_attempts": [attempt.__dict__ for attempt in attempts],
+                    "llm_attempts": attempt_rows,
                     "llm_error": None,
+                    "candidate_market_slugs": [market.slug for market in candidate_markets[:6]],
                 }
                 if existing is None or payload["confidence"] > float(existing.data.get("confidence", 0.0) or 0.0):
                     results[chosen_market.condition_id] = EnrichmentResult(
@@ -339,10 +510,29 @@ class NewsEnrichmentProvider:
                         fetched_at=utc_now(),
                         staleness_seconds=0.0,
                     )
+                activity_rows.append(
+                    {
+                        **activity_base,
+                        "status": "enriched",
+                        "stage": "enriched",
+                        "llm_assisted": True,
+                        "llm_provider": llm_result.provider,
+                        "llm_model": llm_result.model,
+                        "llm_error": None,
+                        "llm_attempts": attempt_rows,
+                        "confidence": payload["confidence"],
+                        "expected_impact_cents": payload["expected_impact_cents"],
+                        "impact_cents": payload["expected_impact_cents"],
+                        "direction": payload["direction"],
+                        "market_slug": payload["market_slug"],
+                        "reasoning": payload["reasoning"],
+                    }
+                )
                 self.helper._mark_headline_processed(headline_id)
-            self.state.set_results(results)
+            refresh_stats["enriched_markets"] = len(results)
+            self.state.set_results(results, stats=refresh_stats, recent_items=activity_rows)
         except Exception as exc:
-            self.state.set_error(exc)
+            self.state.set_error(exc, stats=refresh_stats, recent_items=activity_rows)
 
     def result_for(self, market_id: str) -> EnrichmentResult | None:
         return self.state.results.get(market_id)
@@ -429,3 +619,14 @@ def _with_staleness(result: EnrichmentResult) -> EnrichmentResult:
         staleness_seconds=max(age, 0.0),
         error=result.error,
     )
+
+
+def _summarize_attempt_errors(attempt_rows: list[dict[str, Any]]) -> str:
+    errors = [
+        f"{row.get('provider')}:{row.get('error')}"
+        for row in attempt_rows
+        if row.get("error")
+    ]
+    if not errors:
+        return "llm_failed_without_error"
+    return " | ".join(errors[:3])

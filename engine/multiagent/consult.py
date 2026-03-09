@@ -24,9 +24,11 @@ async def consult_multiagent_logs(
 ) -> dict[str, Any]:
     system_prompt = (
         "You are diagnosing an isolated Polymarket paper-trading runtime. "
-        "Use only the provided metrics, cycle reports, blockers, health data, news terminal, "
+        "Use only the provided metrics, cycle reports, blockers, health data, policy snapshot, news terminal, "
         "recent trades, and closed-position history. "
         "Do not invent market behavior that is not in the payload. "
+        "Distinguish explicitly between current-state fields and recent-window historical rollups. "
+        "Do not present historical rollup counts as current blockers unless the latest_scan or blockers section confirms that. "
         "Answer concisely with: 1) what is happening, 2) main blockers or failure modes, "
         "3) what is working, 4) the next best engineering action. "
         "If evidence is insufficient, say so clearly."

@@ -123,6 +123,21 @@ class RuntimeMetricsStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
 
+            recent_scan_rows = conn.execute(
+                """
+                SELECT scan_id
+                FROM cycles
+                ORDER BY scan_id DESC
+                LIMIT ?
+                """,
+                (recent_scans,),
+            ).fetchall()
+            recent_scan_ids = [int(row["scan_id"]) for row in recent_scan_rows]
+            if recent_scan_ids:
+                placeholders = ",".join("?" for _ in recent_scan_ids)
+            else:
+                placeholders = "NULL"
+
             cycles = conn.execute(
                 """
                 SELECT scan_id, completed_at, markets_scanned, markets_after_filter,
@@ -137,47 +152,67 @@ class RuntimeMetricsStore:
                 (recent_scans,),
             ).fetchall()
 
-            strategy_rollup = conn.execute(
-                """
-                SELECT strategy_name, SUM(candidates) AS total_candidates
-                FROM strategy_counts
-                GROUP BY strategy_name
-                ORDER BY total_candidates DESC
-                LIMIT 12
-                """
-            ).fetchall()
+            strategy_rollup = []
+            rejection_rollup = []
+            closes = []
+            fills = []
+            window_summary = {
+                "scan_ids": recent_scan_ids,
+                "scan_count": len(recent_scan_ids),
+                "first_scan_id": min(recent_scan_ids) if recent_scan_ids else None,
+                "last_scan_id": max(recent_scan_ids) if recent_scan_ids else None,
+            }
 
-            rejection_rollup = conn.execute(
-                """
-                SELECT reason, SUM(count) AS total
-                FROM rejection_counts
-                GROUP BY reason
-                ORDER BY total DESC
-                LIMIT 12
-                """
-            ).fetchall()
+            if recent_scan_ids:
+                strategy_rollup = conn.execute(
+                    f"""
+                    SELECT strategy_name, SUM(candidates) AS total_candidates
+                    FROM strategy_counts
+                    WHERE scan_id IN ({placeholders})
+                    GROUP BY strategy_name
+                    ORDER BY total_candidates DESC
+                    LIMIT 12
+                    """,
+                    tuple(recent_scan_ids),
+                ).fetchall()
 
-            closes = conn.execute(
-                """
-                SELECT closed_at, market_question, strategy_name, realized_pnl, hold_hours, close_reason
-                FROM position_closes
-                ORDER BY id DESC
-                LIMIT ?
-                """,
-                (recent_closes,),
-            ).fetchall()
+                rejection_rollup = conn.execute(
+                    f"""
+                    SELECT reason, SUM(count) AS total
+                    FROM rejection_counts
+                    WHERE scan_id IN ({placeholders})
+                    GROUP BY reason
+                    ORDER BY total DESC
+                    LIMIT 12
+                    """,
+                    tuple(recent_scan_ids),
+                ).fetchall()
 
-            fills = conn.execute(
-                """
-                SELECT timestamp, market_id, market_question, strategy_name, direction, outcome,
-                       executed, fill_price, shares, edge_estimate, rationale
-                FROM fills
-                ORDER BY id DESC
-                LIMIT 60
-                """
-            ).fetchall()
+                closes = conn.execute(
+                    f"""
+                    SELECT closed_at, market_question, strategy_name, realized_pnl, hold_hours, close_reason
+                    FROM position_closes
+                    WHERE scan_id IN ({placeholders})
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (*recent_scan_ids, recent_closes),
+                ).fetchall()
+
+                fills = conn.execute(
+                    f"""
+                    SELECT timestamp, market_id, market_question, strategy_name, direction, outcome,
+                           executed, fill_price, shares, edge_estimate, rationale
+                    FROM fills
+                    WHERE scan_id IN ({placeholders})
+                    ORDER BY id DESC
+                    LIMIT 60
+                    """,
+                    tuple(recent_scan_ids),
+                ).fetchall()
 
         return {
+            "window": window_summary,
             "recent_cycles": [dict(row) for row in cycles],
             "strategy_rollup": [dict(row) for row in strategy_rollup],
             "rejection_rollup": [dict(row) for row in rejection_rollup],

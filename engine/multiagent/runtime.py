@@ -1280,9 +1280,14 @@ class MultiagentRuntime:
             "schema_version": 2,
             "ingestion_notes": (
                 "This payload is organized for diagnostic LLM review. "
-                "Prefer latest_scan, blockers, portfolio, scan_tape, trade_tape, close_tape, "
-                "strategy_rollup, and rejection_rollup before looking at raw paths."
+                "Treat summary, portfolio, performance, latest_scan, and blockers as current-state data. "
+                "Treat scan_tape, trade_tape, close_tape, strategy_rollup, and rejection_rollup as recent-window history only. "
+                "Do not infer that historical blocker totals are still active unless latest_scan or blockers confirms that."
             ),
+            "time_horizons": {
+                "current_state": "summary, portfolio, performance, health, diagnostics, latest_scan, blockers",
+                "recent_window": metrics_summary.get("window", {}),
+            },
             "summary": status["summary"],
             "policy_snapshot": status.get("defaults", {}),
             "performance": self._build_performance(self._last_report),

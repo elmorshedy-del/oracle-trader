@@ -34,7 +34,49 @@ async def consult_multiagent_logs(
         "3) what is working, 4) the next best engineering action. "
         "If evidence is insufficient, say so clearly."
     )
+    return await _consult_runtime(
+        question=question,
+        context=context,
+        preferred_provider=preferred_provider,
+        system_prompt=system_prompt,
+        unavailable_message="No configured LLM provider could answer the Opus consult request.",
+    )
 
+
+async def consult_legacy_logs(
+    *,
+    question: str,
+    context: dict[str, Any],
+    preferred_provider: str | None = None,
+) -> dict[str, Any]:
+    system_prompt = (
+        "You are diagnosing the legacy Oracle paper-trading engine. "
+        "Use only the provided current state, compact diagnostics, comparison-view summaries, strategy stats, "
+        "recent headlines, trade tape, and legacy blocker summary. "
+        "Do not mix Opus or multi-agent assumptions into this answer. "
+        "Distinguish clearly between current-state data and recent historical rollups. "
+        "Do not present aggregated rejection totals as live blockers unless the latest diagnostics or blockers section confirms them. "
+        "Answer concisely with: 1) what is happening, 2) main blockers or failure modes, "
+        "3) what is working, 4) the next best engineering action. "
+        "If evidence is insufficient, say so clearly."
+    )
+    return await _consult_runtime(
+        question=question,
+        context=context,
+        preferred_provider=preferred_provider,
+        system_prompt=system_prompt,
+        unavailable_message="No configured LLM provider could answer the legacy-engine consult request.",
+    )
+
+
+async def _consult_runtime(
+    *,
+    question: str,
+    context: dict[str, Any],
+    preferred_provider: str | None,
+    system_prompt: str,
+    unavailable_message: str,
+) -> dict[str, Any]:
     user_content = {
         "question": question,
         "runtime_context": context,
@@ -61,10 +103,7 @@ async def consult_multiagent_logs(
 
     return {
         "ok": False,
-        "answer": (
-            "No configured LLM provider could answer the Opus consult request. "
-            f"Last error: {last_error}"
-        ),
+        "answer": f"{unavailable_message} Last error: {last_error}",
         "provider": None,
         "model": None,
         "generated_at": _now_iso(),

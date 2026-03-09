@@ -11,7 +11,7 @@ from .config import (
     ValidationConfig,
     recommended_strategy_caps,
 )
-from .consult import consult_multiagent_logs
+from .consult import consult_legacy_logs, consult_multiagent_logs
 from .contracts import (
     AllocationRejection,
     EnrichmentResult,
@@ -51,6 +51,7 @@ __all__ = [
     "Allocator",
     "AuditConfig",
     "build_legacy_bridge_status",
+    "consult_legacy_logs",
     "consult_multiagent_logs",
     "EnrichmentResult",
     "ExecutionConfig",

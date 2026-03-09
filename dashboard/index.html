@@ -328,6 +328,54 @@
     font-size: 11px;
   }
 
+  .consult-select,
+  .consult-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+  }
+  .consult-textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  .consult-button {
+    border: 1px solid var(--blue);
+    background: var(--blue-dim);
+    color: var(--blue);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .consult-button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+  .consult-response {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    line-height: 1.55;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .consult-meta {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
   /* Responsive */
   @media (max-width: 1200px) {
     .grid { grid-template-columns: 1fr 1fr; }
@@ -353,7 +401,7 @@
     <span id="scan-count">Scans: 0</span>
     <span>|</span>
     <a href="/multiagent" class="header-link">OPUS LAB</a>
-    <a href="/api/logs/download" class="header-link">⬇ LOGS</a>
+    <a href="/api/legacy/logs/export" class="header-link">⬇ LOGS</a>
     <span id="last-update" class="dot-pulse">Connecting...</span>
   </div>
 </div>
@@ -477,6 +525,36 @@
     </div>
   </div>
 
+  <!-- Legacy LLM Consultant -->
+  <div class="card card-wide">
+    <div class="card-header">
+      <span class="card-title">LLM Consultant</span>
+      <span class="card-badge" id="legacy-consult-badge">LEGACY ONLY</span>
+    </div>
+    <div class="consult-meta" style="margin-bottom:10px">
+      This consultant reads compact legacy-engine diagnostics, trade tape, strategy rollups, headlines, and blocker summaries only. It does not read Opus.
+    </div>
+    <div style="display:grid;grid-template-columns:180px 1fr auto;gap:10px;align-items:center;margin-bottom:10px">
+      <select id="legacy-consult-provider" class="consult-select">
+        <option value="auto">Auto</option>
+        <option value="fireworks">GLM-5</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+      </select>
+      <div class="consult-meta" id="legacy-consult-meta">Ready to inspect the old engine.</div>
+      <a href="/api/legacy/logs/export" class="header-link" style="justify-self:end">⬇ LEGACY EXPORT</a>
+    </div>
+    <textarea
+      id="legacy-consult-question"
+      class="consult-textarea"
+      placeholder="Why is the old engine underperforming today? Which blocker matters most? What should I fix next?"
+    ></textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button id="legacy-consult-button" class="consult-button" onclick="runLegacyConsult()">CONSULT LLM</button>
+    </div>
+    <div id="legacy-consult-response" class="consult-response">Ask about legacy blockers, concentration, quiet cycles, strategy performance, or whether a recent loser was a model problem or an execution problem.</div>
+  </div>
+
   <!-- Whale Activity -->
   <div class="card">
     <div class="card-header">
@@ -576,6 +654,8 @@
 const API = window.location.origin + '/api/state';
 let lastState = null;
 let selectedView = 'all';
+let legacyConsultLoading = false;
+let legacyConsultResponse = null;
 
 function stratBadge(source) {
   const map = {
@@ -688,6 +768,7 @@ function selectView(key) {
 }
 
 window.selectView = selectView;
+window.runLegacyConsult = runLegacyConsult;
 
 async function fetchState() {
   try {
@@ -879,6 +960,7 @@ function render(d) {
   renderHealth(d);
   renderSlippage(d);
   renderAB(d);
+  renderLegacyConsultPanel(d);
 
   // Errors
   const errors = d.errors || [];
@@ -886,6 +968,69 @@ function render(d) {
     document.getElementById('error-log').innerHTML = errors.map(e =>
       `<div style="padding:3px 0;border-bottom:1px solid var(--border);color:var(--red)">${e}</div>`
     ).join('');
+  }
+}
+
+function renderLegacyConsultPanel(d) {
+  const button = document.getElementById('legacy-consult-button');
+  const meta = document.getElementById('legacy-consult-meta');
+  const response = document.getElementById('legacy-consult-response');
+  const badge = document.getElementById('legacy-consult-badge');
+  const blocker = (d.diagnostics?.filtered_signals && Object.keys(d.diagnostics.filtered_signals).length)
+    ? Object.entries(d.diagnostics.filtered_signals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+
+  button.disabled = legacyConsultLoading;
+  button.textContent = legacyConsultLoading ? 'CONSULTING…' : 'CONSULT LLM';
+  badge.textContent = `LEGACY ${d.scan_count || 0}`;
+  meta.textContent = blocker
+    ? `Latest legacy blocker signal: ${blocker[0]} (${blocker[1]})`
+    : 'Legacy consultant sees compact diagnostics only, not Opus.';
+
+  if (legacyConsultLoading) {
+    response.textContent = 'Consulting legacy diagnostics...';
+    return;
+  }
+
+  if (legacyConsultResponse) {
+    response.textContent = legacyConsultResponse.ok
+      ? legacyConsultResponse.answer || 'No answer returned.'
+      : legacyConsultResponse.answer || 'Legacy consult failed.';
+    return;
+  }
+
+  response.textContent = 'Ask about legacy blockers, concentration, quiet cycles, strategy performance, or whether a recent loser was a model problem or an execution problem.';
+}
+
+async function runLegacyConsult() {
+  const textarea = document.getElementById('legacy-consult-question');
+  const provider = document.getElementById('legacy-consult-provider').value || 'auto';
+  const question = (textarea.value || '').trim();
+  if (!question) {
+    legacyConsultResponse = { ok: false, answer: 'Ask a non-empty diagnostic question.' };
+    if (lastState) renderLegacyConsultPanel(lastState);
+    return;
+  }
+
+  legacyConsultLoading = true;
+  legacyConsultResponse = null;
+  if (lastState) renderLegacyConsultPanel(lastState);
+
+  try {
+    const resp = await fetch('/api/legacy/consult', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, provider }),
+    });
+    legacyConsultResponse = await resp.json();
+  } catch (err) {
+    legacyConsultResponse = {
+      ok: false,
+      answer: `Legacy consult failed: ${err.message || err}`,
+    };
+  } finally {
+    legacyConsultLoading = false;
+    if (lastState) renderLegacyConsultPanel(lastState);
   }
 }
 

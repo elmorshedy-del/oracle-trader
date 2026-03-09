@@ -25,6 +25,7 @@ from engine.pipeline import Pipeline
 from engine.multiagent import (
     MultiagentRuntime,
     OrchestratorConfig,
+    consult_legacy_logs,
     consult_multiagent_logs,
     dataclass_to_dict,
 )
@@ -53,6 +54,86 @@ multiagent_runtime: MultiagentRuntime | None = None
 class MultiagentConsultRequest(BaseModel):
     question: str
     provider: str | None = "auto"
+
+
+def _iter_legacy_export_files() -> list[tuple[Path, str]]:
+    files: list[tuple[Path, str]] = []
+    allowed_suffixes = {".jsonl", ".json", ".log", ".sqlite"}
+
+    for path in sorted(LOG_DIR.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.suffix not in allowed_suffixes:
+            continue
+        relative = path.relative_to(LOG_DIR)
+        if relative.name.startswith("multiagent_"):
+            continue
+        if any(part.startswith("multiagent_") for part in relative.parts):
+            continue
+        files.append((path, f"logs/{relative.as_posix()}"))
+
+    for path in sorted(STATE_PATH.parent.glob("state*.json")):
+        if path.is_file():
+            files.append((path, f"state/{path.name}"))
+
+    weather_state = STATE_PATH.with_name("weather_state.json")
+    if weather_state.exists():
+        files.append((weather_state, f"state/{weather_state.name}"))
+
+    return files
+
+
+def _build_legacy_export_response():
+    if pipeline is None:
+        return JSONResponse(
+            {"ok": False, "error": "legacy pipeline not initialized"},
+            status_code=503,
+        )
+
+    bundle = io.BytesIO()
+    state = pipeline.get_state()
+    llm_context = pipeline.llm_context()
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "status.json",
+            json.dumps(state, indent=2, default=str),
+        )
+        archive.writestr(
+            "llm_context.json",
+            json.dumps(llm_context, indent=2, default=str),
+        )
+        archive.writestr(
+            "README.txt",
+            "\n".join(
+                [
+                    "Oracle legacy-engine export",
+                    "",
+                    "Contents:",
+                    "- status.json: current legacy dashboard payload used by /",
+                    "- llm_context.json: compact legacy-engine diagnostic context for on-request LLM review",
+                    "- logs/*: legacy engine logs and compact diagnostics only",
+                    "- state/*: legacy engine state files and comparison-book state files",
+                    "",
+                    "This export intentionally excludes Opus / multiagent artifacts.",
+                ]
+            ),
+        )
+
+        for path, archive_name in _iter_legacy_export_files():
+            try:
+                archive.write(path, archive_name)
+            except OSError as exc:
+                archive.writestr(
+                    f"errors/{Path(archive_name).name}.txt",
+                    f"Failed to include {path}: {exc}",
+                )
+
+    bundle.seek(0)
+    return StreamingResponse(
+        bundle,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=oracle-legacy-engine-export.zip"},
+    )
 
 
 @asynccontextmanager
@@ -165,43 +246,14 @@ async def get_whales():
 
 @app.get("/api/logs/download")
 async def download_logs():
-    """Download all logs as a JSON bundle."""
-    import json as _json
-    bundle = {}
-    for log_file in sorted(LOG_DIR.iterdir()):
-        if log_file.suffix not in {".jsonl", ".json", ".log"}:
-            continue
-        try:
-            content = log_file.read_text(errors="replace").strip()
-            if log_file.suffix == ".jsonl":
-                lines = []
-                for line in content.split("\n"):
-                    if line:
-                        try:
-                            lines.append(_json.loads(line))
-                        except _json.JSONDecodeError:
-                            lines.append({"raw": line})
-                bundle[log_file.name] = lines
-            elif log_file.suffix == ".json":
-                bundle[log_file.name] = _json.loads(content) if content else {}
-            else:
-                bundle[log_file.name] = content
-        except Exception:
-            bundle[log_file.name] = {"error": "failed to read log file"}
-    # Add current state
-    if pipeline:
-        try:
-            bundle["current_state"] = pipeline.get_state()
-        except Exception:
-            pass
-    bundle["log_dir"] = str(LOG_DIR)
-    bundle["state_path"] = str(STATE_PATH)
-    content = _json.dumps(bundle, indent=2, default=str)
-    return StreamingResponse(
-        io.BytesIO(content.encode()),
-        media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=oracle-trader-logs.json"}
-    )
+    """Legacy-only log export kept for backward compatibility."""
+    return _build_legacy_export_response()
+
+
+@app.get("/api/legacy/logs/export")
+async def legacy_logs_export():
+    """Export compact legacy-engine logs, diagnostics, and state without mixing Opus data."""
+    return _build_legacy_export_response()
 
 
 @app.get("/api/reset")
@@ -392,6 +444,40 @@ async def multiagent_consult(payload: MultiagentConsultRequest):
     result = await consult_multiagent_logs(
         question=payload.question.strip(),
         context=multiagent_runtime.llm_context(),
+        preferred_provider=payload.provider,
+    )
+    return JSONResponse(result)
+
+
+@app.post("/api/legacy/consult")
+async def legacy_consult(payload: MultiagentConsultRequest):
+    """Consult an LLM against compact legacy-engine diagnostics only."""
+    if pipeline is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Legacy engine is still starting.",
+                "provider": None,
+                "model": None,
+            },
+            status_code=503,
+        )
+
+    question = (payload.question or "").strip()
+    if not question:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Ask a non-empty diagnostic question.",
+                "provider": None,
+                "model": None,
+            },
+            status_code=400,
+        )
+
+    result = await consult_legacy_logs(
+        question=question,
+        context=pipeline.llm_context(),
         preferred_provider=payload.provider,
     )
     return JSONResponse(result)

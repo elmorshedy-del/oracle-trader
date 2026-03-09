@@ -29,6 +29,8 @@ from runtime_paths import LOG_DIR, STATE_PATH
 
 logger = logging.getLogger(__name__)
 BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
+LEGACY_DIAGNOSTICS_LOG_PATH = LOG_DIR / "diagnostics.jsonl"
+LEGACY_APP_LOG_PATH = LOG_DIR / "app.log"
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
@@ -536,6 +538,79 @@ class Pipeline:
             ],
         }
 
+    def llm_context(self) -> dict:
+        """Build a compact, legacy-only diagnostic payload for the old engine consultant."""
+        state = self.get_state()
+        diagnostics = state.get("diagnostics") or {}
+        scan_tape = self._read_recent_diagnostics(limit=24)
+        strategy_rollup = self._aggregate_rollup(scan_tape, key="signals_by_strategy")
+        rejection_rollup = self._aggregate_rollup(scan_tape, key="filtered_signals")
+        trade_tape = [self._serialize_trade_row(trade) for trade in self.trader.trade_log[-60:]]
+        close_tape = [trade for trade in trade_tape if trade.get("realized_pnl") is not None][-30:]
+        blockers = self._legacy_blockers(state)
+
+        comparison_summary = []
+        for key, view in (state.get("comparison_views") or {}).items():
+            portfolio = view.get("portfolio") or {}
+            performance = view.get("performance") or {}
+            comparison_summary.append(
+                {
+                    "key": key,
+                    "label": view.get("label"),
+                    "source": view.get("source"),
+                    "total_value": portfolio.get("total_value", 0.0),
+                    "cash": portfolio.get("cash", 0.0),
+                    "positions_value": portfolio.get("positions_value", 0.0),
+                    "total_pnl": performance.get("total_pnl", portfolio.get("total_pnl", 0.0)),
+                    "win_rate": performance.get("win_rate", portfolio.get("win_rate", 0.0)),
+                    "total_trades": performance.get("total_trades", portfolio.get("total_trades", 0)),
+                    "open_positions": len(portfolio.get("positions") or []),
+                    "signals": len(view.get("signals") or []),
+                }
+            )
+
+        return {
+            "scope": "legacy_engine_only",
+            "notes": {
+                "current_state": "summary, portfolio, performance, health, diagnostics, comparison_summary, blockers",
+                "recent_window": "scan_tape, trade_tape, close_tape, strategy_rollup, rejection_rollup",
+                "separation": "This payload is legacy-engine only. Do not infer anything from Opus or multi-agent runtime data.",
+            },
+            "summary": {
+                "mode": state.get("mode"),
+                "uptime_human": state.get("uptime_human"),
+                "scan_count": state.get("scan_count", 0),
+                "active_markets": state.get("active_markets", 0),
+                "error_count": len(state.get("errors") or []),
+            },
+            "portfolio": state.get("portfolio"),
+            "performance": state.get("performance"),
+            "health": state.get("health"),
+            "latest_scan": diagnostics,
+            "blockers": blockers,
+            "strategies": state.get("strategies"),
+            "recent_news": state.get("recent_news", [])[:20],
+            "comparison_summary": comparison_summary,
+            "scan_tape": scan_tape,
+            "trade_tape": trade_tape,
+            "close_tape": close_tape,
+            "strategy_rollup": strategy_rollup,
+            "rejection_rollup": rejection_rollup,
+            "policy_snapshot": {
+                "scan_interval_secs": self.config.scan_interval_secs,
+                "starting_capital": self.config.risk.max_total_exposure_usd,
+                "weather_budgets": {
+                    "combined": self.config.weather.combined_budget_usd,
+                    "sniper": self.config.weather.sniper_budget_usd,
+                    "latency": self.config.weather.latency_budget_usd,
+                    "swing": self.config.weather.swing_budget_usd,
+                },
+            },
+            "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),
+            "app_log_path": str(LEGACY_APP_LOG_PATH),
+            "state_path": str(STATE_PATH),
+        }
+
     def _serialize_view(
         self,
         *,
@@ -608,6 +683,107 @@ class Pipeline:
             ],
             "performance": trader.get_performance_report(),
         }
+
+    def _read_recent_diagnostics(self, *, limit: int = 24) -> list[dict]:
+        if not LEGACY_DIAGNOSTICS_LOG_PATH.exists():
+            return []
+        try:
+            lines = LEGACY_DIAGNOSTICS_LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            logger.warning("[PIPELINE] Failed to read diagnostics log for consult: %s", exc)
+            return []
+
+        entries: list[dict] = []
+        for line in lines[-limit:]:
+            if not line.strip():
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        return entries
+
+    @staticmethod
+    def _aggregate_rollup(scan_tape: list[dict], *, key: str) -> list[dict]:
+        totals: dict[str, int] = {}
+        for scan in scan_tape:
+            for name, count in (scan.get(key) or {}).items():
+                totals[str(name)] = totals.get(str(name), 0) + int(count or 0)
+        return [
+            {"name": name, "count": count}
+            for name, count in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:20]
+        ]
+
+    @staticmethod
+    def _serialize_trade_row(trade) -> dict:
+        return {
+            "id": trade.id,
+            "timestamp": trade.timestamp.isoformat(),
+            "source": trade.source.value,
+            "market_slug": trade.market_slug,
+            "side": trade.side.value,
+            "price": round(trade.price, 4),
+            "shares": round(trade.size_shares, 4),
+            "size_usd": round(trade.size_usd, 2),
+            "fees": round(getattr(trade, "fees_paid", 0.0) or 0.0, 4),
+            "exit_price": round(trade.exit_price, 4) if getattr(trade, "exit_price", None) is not None else None,
+            "realized_pnl": round(trade.realized_pnl, 4) if trade.realized_pnl is not None else None,
+        }
+
+    @staticmethod
+    def _legacy_blockers(state: dict) -> list[dict[str, str]]:
+        diagnostics = state.get("diagnostics") or {}
+        health = state.get("health") or {}
+        portfolio = state.get("portfolio") or {}
+        blockers: list[dict[str, str]] = []
+
+        if (health.get("overall_status") or "").lower() not in {"", "healthy"}:
+            blockers.append(
+                {
+                    "title": "System health degraded",
+                    "detail": f"Legacy engine health is {health.get('overall_status', 'unknown')}.",
+                }
+            )
+
+        filtered = diagnostics.get("filtered_signals") or {}
+        if diagnostics.get("executed", 0) == 0:
+            if filtered:
+                top_reason, count = max(filtered.items(), key=lambda item: item[1])
+                blockers.append(
+                    {
+                        "title": "Signals are being filtered",
+                        "detail": f"Latest scan rejected {count} signals because of {top_reason}.",
+                    }
+                )
+            elif sum((diagnostics.get("signals_by_strategy") or {}).values()) == 0:
+                blockers.append(
+                    {
+                        "title": "No strategies emitted candidates",
+                        "detail": f"{diagnostics.get('markets_tradeable', 0)} tradeable markets were scanned but no strategy produced a live signal.",
+                    }
+                )
+
+        exposure = ((diagnostics.get("portfolio") or {}).get("exposure_by_source")) or {}
+        total_exposure = sum(float(value or 0.0) for value in exposure.values())
+        if total_exposure > 0:
+            source, value = max(exposure.items(), key=lambda item: item[1])
+            share = (float(value or 0.0) / total_exposure) if total_exposure else 0.0
+            if share >= 0.8:
+                blockers.append(
+                    {
+                        "title": "One strategy dominates exposure",
+                        "detail": f"{source} currently represents {share * 100:.0f}% of deployed legacy capital.",
+                    }
+                )
+
+        if not blockers:
+            blockers.append(
+                {
+                    "title": "No dominant blocker detected",
+                    "detail": "The latest legacy scan did not surface a single obvious failure mode.",
+                }
+            )
+        return blockers[:6]
 
     @staticmethod
     def _format_uptime(seconds: float) -> str:

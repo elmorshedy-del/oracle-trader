@@ -54,6 +54,7 @@ multiagent_runtime: MultiagentRuntime | None = None
 class MultiagentConsultRequest(BaseModel):
     question: str
     provider: str | None = "auto"
+    history: list[dict[str, str]] | None = None
 
 
 def _iter_legacy_export_files() -> list[tuple[Path, str]]:
@@ -445,6 +446,7 @@ async def multiagent_consult(payload: MultiagentConsultRequest):
         question=payload.question.strip(),
         context=multiagent_runtime.llm_context(),
         preferred_provider=payload.provider,
+        history=payload.history or [],
     )
     return JSONResponse(result)
 
@@ -479,6 +481,7 @@ async def legacy_consult(payload: MultiagentConsultRequest):
         question=question,
         context=pipeline.llm_context(),
         preferred_provider=payload.provider,
+        history=payload.history or [],
     )
     return JSONResponse(result)
 

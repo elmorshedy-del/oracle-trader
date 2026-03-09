@@ -22,6 +22,7 @@ async def consult_multiagent_logs(
     question: str,
     context: dict[str, Any],
     preferred_provider: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     system_prompt = (
         "You are diagnosing an isolated Polymarket paper-trading runtime. "
@@ -38,6 +39,7 @@ async def consult_multiagent_logs(
         question=question,
         context=context,
         preferred_provider=preferred_provider,
+        history=history,
         system_prompt=system_prompt,
         unavailable_message="No configured LLM provider could answer the Opus consult request.",
     )
@@ -48,6 +50,7 @@ async def consult_legacy_logs(
     question: str,
     context: dict[str, Any],
     preferred_provider: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     system_prompt = (
         "You are diagnosing the legacy Oracle paper-trading engine. "
@@ -68,6 +71,7 @@ async def consult_legacy_logs(
         question=question,
         context=context,
         preferred_provider=preferred_provider,
+        history=history,
         system_prompt=system_prompt,
         unavailable_message="No configured LLM provider could answer the legacy-engine consult request.",
     )
@@ -78,11 +82,13 @@ async def _consult_runtime(
     question: str,
     context: dict[str, Any],
     preferred_provider: str | None,
+    history: list[dict[str, str]] | None,
     system_prompt: str,
     unavailable_message: str,
 ) -> dict[str, Any]:
     user_content = {
         "question": question,
+        "conversation_history": _sanitize_history(history or []),
         "runtime_context": context,
     }
 
@@ -129,6 +135,22 @@ def _provider_chain(preferred_provider: str | None = None) -> list[tuple[str, st
         order = [preferred] + [name for name in order if name != preferred]
 
     return [available[name] for name in order if name in available]
+
+
+def _sanitize_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
+    sanitized: list[dict[str, str]] = []
+    for item in history[-12:]:
+        role = str(item.get("role", "") or "").strip().lower()
+        content = str(item.get("content", "") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        sanitized.append(
+            {
+                "role": role,
+                "content": content[:4000],
+            }
+        )
+    return sanitized
 
 
 async def _call_provider(

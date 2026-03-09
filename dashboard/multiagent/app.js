@@ -598,6 +598,7 @@ let CONSULT_RESPONSE = null;
 let CONSULT_QUESTION = "";
 let CONSULT_PROVIDER = "auto";
 let CONSULT_EXPANDED = false;
+let CONSULT_HISTORY = [];
 let selectedRuntimeView = "all";
 
 function renderMetrics() {
@@ -1585,18 +1586,34 @@ function renderRuntimeSection() {
 }
 
 function renderConsultPanel() {
+  const transcript = CONSULT_HISTORY.length
+    ? `
+      <div class="consult-transcript">
+        ${CONSULT_HISTORY.map(renderConsultMessage).join("")}
+        ${CONSULT_LOADING ? `<div class="consult-message assistant pending"><div class="consult-message-body">Thinking…</div></div>` : ""}
+      </div>
+    `
+    : `
+      <div class="inline-meta" style="margin-top:14px">
+        The model sees compact runtime diagnostics, scan and trade tape, blocker rollups, and the active policy snapshot instead of a raw log flood.
+      </div>
+    `;
   return `
     <article class="content-card consult-card ${CONSULT_EXPANDED ? "consult-card-expanded" : ""}">
       <div class="panel-eyebrow">LLM consult</div>
       <div class="row-split" style="margin-top:10px">
         <h3>Ask the runtime</h3>
-        <button type="button" id="consult-expand-toggle" class="button">
-          ${CONSULT_EXPANDED ? "Collapse" : "Expand"}
-        </button>
+        <div class="consult-actions" style="margin-top:0">
+          <button type="button" id="consult-reset-toggle" class="button">Reset Chat</button>
+          <button type="button" id="consult-expand-toggle" class="button">
+            ${CONSULT_EXPANDED ? "Collapse" : "Expand"}
+          </button>
+        </div>
       </div>
       <p>
         This connector sends compact Opus diagnostics, scan tape, trade tape, blocker history, policy knobs, and closed-position history to the selected model.
       </p>
+      ${transcript}
       <form id="consult-form" class="consult-form">
         <div class="consult-actions">
           <label class="consult-provider-wrap">
@@ -1612,7 +1629,7 @@ function renderConsultPanel() {
         <textarea
           id="consult-question"
           class="consult-input"
-          placeholder="Why is the isolated runtime not trading enough? Which blockers matter most? What should I fix next?"
+          placeholder="Ask a follow-up about blockers, strategy behavior, exits, capital lock, or whether the last fix improved anything."
         >${escapeHtml(CONSULT_QUESTION)}</textarea>
         <div class="consult-actions">
           <button type="submit" class="button button-primary" ${CONSULT_LOADING ? "disabled" : ""}>
@@ -1620,24 +1637,20 @@ function renderConsultPanel() {
           </button>
         </div>
       </form>
-      ${
-        CONSULT_RESPONSE
-          ? `
-            <div class="consult-response">
-              <div class="row-split">
-                <strong>${escapeHtml(CONSULT_RESPONSE.provider || "llm")} · ${escapeHtml(CONSULT_RESPONSE.model || "response")}</strong>
-                <span class="inline-meta">${escapeHtml(CONSULT_RESPONSE.generated_at || "")}</span>
-              </div>
-              <pre class="consult-answer">${escapeHtml(CONSULT_RESPONSE.answer || "")}</pre>
-            </div>
-          `
-          : `
-            <div class="inline-meta" style="margin-top:14px">
-              The model sees compact runtime diagnostics, scan and trade tape, blocker rollups, and the active policy snapshot instead of a raw log flood.
-            </div>
-          `
-      }
     </article>
+  `;
+}
+
+function renderConsultMessage(message) {
+  const role = message.role === "assistant" ? "assistant" : "user";
+  const meta = role === "assistant"
+    ? `${message.provider || "llm"}${message.model ? ` · ${message.model}` : ""}${message.generated_at ? ` · ${message.generated_at}` : ""}`
+    : "you";
+  return `
+    <div class="consult-message ${escapeHtml(role)}">
+      <div class="consult-message-meta">${escapeHtml(meta)}</div>
+      <div class="consult-message-body">${escapeHtml(message.content || "")}</div>
+    </div>
   `;
 }
 
@@ -1776,6 +1789,11 @@ function escapeHtml(value) {
 }
 
 async function loadLiveStatus() {
+  const typingInConsult = document.activeElement?.id === "consult-question";
+  const draftInput = document.getElementById("consult-question");
+  if (draftInput) {
+    CONSULT_QUESTION = draftInput.value;
+  }
   try {
     const response = await fetch("/api/multiagent/status", { cache: "no-store" });
     if (!response.ok) {
@@ -1791,13 +1809,23 @@ async function loadLiveStatus() {
   renderSectionControls();
   renderMetrics();
   renderRuntimeHeaderMeta();
-  renderActiveSection();
+  if (!typingInConsult) {
+    renderActiveSection();
+  }
 }
 
 async function submitConsult(question, provider) {
   CONSULT_LOADING = true;
-  CONSULT_QUESTION = question;
+  CONSULT_QUESTION = "";
   CONSULT_PROVIDER = provider || "auto";
+  CONSULT_HISTORY = [
+    ...CONSULT_HISTORY,
+    {
+      role: "user",
+      content: question,
+      generated_at: new Date().toISOString(),
+    },
+  ];
   renderActiveSection();
   bindRuntimeActions();
 
@@ -1807,16 +1835,40 @@ async function submitConsult(question, provider) {
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify({ question, provider: CONSULT_PROVIDER }),
+      body: JSON.stringify({
+        question,
+        provider: CONSULT_PROVIDER,
+        history: CONSULT_HISTORY,
+      }),
     });
     const payload = await response.json();
     CONSULT_RESPONSE = payload;
+    CONSULT_HISTORY = [
+      ...CONSULT_HISTORY,
+      {
+        role: "assistant",
+        content: payload.answer || "No answer returned.",
+        provider: payload.provider || "llm",
+        model: payload.model || "response",
+        generated_at: payload.generated_at || new Date().toISOString(),
+      },
+    ];
   } catch (error) {
     CONSULT_RESPONSE = {
       answer: error instanceof Error ? error.message : String(error),
       model: "connector_error",
       generated_at: new Date().toISOString(),
     };
+    CONSULT_HISTORY = [
+      ...CONSULT_HISTORY,
+      {
+        role: "assistant",
+        content: CONSULT_RESPONSE.answer,
+        provider: "connector_error",
+        model: "connector_error",
+        generated_at: CONSULT_RESPONSE.generated_at,
+      },
+    ];
   } finally {
     CONSULT_LOADING = false;
     renderActiveSection();
@@ -1847,9 +1899,16 @@ function bindRuntimeActions() {
     return;
   }
 
+  const consultInput = document.getElementById("consult-question");
+  if (consultInput) {
+    consultInput.addEventListener("input", () => {
+      CONSULT_QUESTION = consultInput.value;
+    });
+  }
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const input = document.getElementById("consult-question");
+    const input = consultInput || document.getElementById("consult-question");
     const provider = document.getElementById("consult-provider");
     const question = input?.value?.trim() || "";
     CONSULT_PROVIDER = provider?.value || "auto";
@@ -1863,6 +1922,16 @@ function bindRuntimeActions() {
   if (expandButton) {
     expandButton.addEventListener("click", () => {
       CONSULT_EXPANDED = !CONSULT_EXPANDED;
+      renderActiveSection();
+    });
+  }
+
+  const resetButton = document.getElementById("consult-reset-toggle");
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      CONSULT_HISTORY = [];
+      CONSULT_RESPONSE = null;
+      CONSULT_QUESTION = "";
       renderActiveSection();
     });
   }

@@ -625,6 +625,48 @@ tr:hover td {
   max-height: none;
 }
 
+.consult-transcript {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.consult-message {
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  padding: 12px;
+}
+
+.consult-message.user {
+  border-color: var(--blue-dim);
+}
+
+.consult-message.assistant {
+  border-color: var(--border);
+}
+
+.consult-message.assistant.pending {
+  opacity: 0.8;
+}
+
+.consult-message-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.consult-message-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
 .button {
   background: var(--blue-dim);
   color: var(--blue);

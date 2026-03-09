@@ -571,6 +571,18 @@ tr:hover td {
   margin-top: 14px;
 }
 
+.consult-card {
+  position: relative;
+}
+
+.consult-card-expanded {
+  position: fixed;
+  inset: 20px;
+  z-index: 1200;
+  overflow: auto;
+  box-shadow: 0 20px 80px #00000080;
+}
+
 .consult-provider-wrap {
   display: flex;
   flex-direction: column;
@@ -588,6 +600,10 @@ tr:hover td {
   resize: vertical;
 }
 
+.consult-card-expanded .consult-input {
+  min-height: 220px;
+}
+
 .consult-select {
   min-width: 180px;
   padding: 10px 12px;
@@ -602,6 +618,11 @@ tr:hover td {
   align-items: flex-end;
   gap: 12px;
   margin-top: 10px;
+}
+
+.consult-card-expanded .consult-answer {
+  min-height: 320px;
+  max-height: none;
 }
 
 .button {

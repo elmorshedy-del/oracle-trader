@@ -597,6 +597,7 @@ let CONSULT_LOADING = false;
 let CONSULT_RESPONSE = null;
 let CONSULT_QUESTION = "";
 let CONSULT_PROVIDER = "auto";
+let CONSULT_EXPANDED = false;
 let selectedRuntimeView = "all";
 
 function renderMetrics() {
@@ -1581,9 +1582,14 @@ function renderRuntimeSection() {
 
 function renderConsultPanel() {
   return `
-    <article class="content-card">
+    <article class="content-card consult-card ${CONSULT_EXPANDED ? "consult-card-expanded" : ""}">
       <div class="panel-eyebrow">LLM consult</div>
-      <h3 style="margin-top:10px">Ask the runtime</h3>
+      <div class="row-split" style="margin-top:10px">
+        <h3>Ask the runtime</h3>
+        <button type="button" id="consult-expand-toggle" class="button">
+          ${CONSULT_EXPANDED ? "Collapse" : "Expand"}
+        </button>
+      </div>
       <p>
         This connector sends compact Opus diagnostics, scan tape, trade tape, blocker history, policy knobs, and closed-position history to the selected model.
       </p>
@@ -1848,6 +1854,14 @@ function bindRuntimeActions() {
     }
     submitConsult(question, CONSULT_PROVIDER);
   });
+
+  const expandButton = document.getElementById("consult-expand-toggle");
+  if (expandButton) {
+    expandButton.addEventListener("click", () => {
+      CONSULT_EXPANDED = !CONSULT_EXPANDED;
+      renderActiveSection();
+    });
+  }
 }
 
 function renderActiveSection() {

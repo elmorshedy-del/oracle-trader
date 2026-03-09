@@ -14,6 +14,7 @@ OPENAI_API_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/co
 DEFAULT_FIREWORKS_MODEL = os.getenv("FIREWORKS_CONSULT_MODEL", "accounts/fireworks/models/glm-5")
 DEFAULT_ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_CONSULT_MODEL", "gpt-5")
+CONSULT_MAX_TOKENS = int(os.getenv("MULTIAGENT_CONSULT_MAX_TOKENS", "2200"))
 
 
 async def consult_multiagent_logs(
@@ -123,7 +124,7 @@ async def _call_anthropic(
             },
             json={
                 "model": model,
-                "max_tokens": 900,
+                "max_tokens": CONSULT_MAX_TOKENS,
                 "temperature": 0.2,
                 "system": system_prompt,
                 "messages": [
@@ -172,7 +173,7 @@ async def _call_fireworks(
             },
             json={
                 "model": model,
-                "max_tokens": 1200,
+                "max_tokens": CONSULT_MAX_TOKENS,
                 "temperature": 0.2,
                 "reasoning_effort": "high",
                 "messages": [
@@ -210,7 +211,7 @@ async def _call_openai(
             },
             json={
                 "model": model,
-                "max_completion_tokens": 900,
+                "max_completion_tokens": CONSULT_MAX_TOKENS,
                 "temperature": 0.2,
                 "messages": [
                     {"role": "system", "content": system_prompt},

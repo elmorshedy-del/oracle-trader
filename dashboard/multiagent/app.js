@@ -1,5 +1,4 @@
-const SECTION_ORDER = [
-  "runtime",
+const ARCHITECTURE_SECTION_ORDER = [
   "overview",
   "flow",
   "modules",
@@ -590,7 +589,7 @@ const DATA = {
   ],
 };
 
-let activeSection = "runtime";
+let activeSection = "overview";
 let LIVE_STATUS = null;
 let LIVE_STATUS_ERROR = null;
 let LIVE_STATUS_LOADED_AT = null;
@@ -608,6 +607,7 @@ function renderMetrics() {
         <article class="metric-card ${metric.tone || ""}">
           <div class="metric-label">${metric.label}</div>
           <div class="metric-value">${metric.value}</div>
+          <div class="metric-sub ${metric.subTone || ""}">${metric.sub || ""}</div>
         </article>
       `
     )
@@ -623,37 +623,32 @@ function renderNonNegotiables() {
 }
 
 function renderSectionControls() {
-  const nav = document.getElementById("section-nav");
   const tabs = document.getElementById("section-tabs");
-
-  if (nav) {
-    nav.innerHTML = "";
-  }
 
   if (!tabs) {
     return;
   }
 
-  const tabHtml = SECTION_ORDER.map((key) => {
-    const section = DATA.sections[key];
-    const active = key === activeSection ? "active" : "";
+  const views = getRuntimeViews();
+  const runtimeViews = views.length
+    ? views
+    : [
+        {
+          key: "all",
+          label: "All Opus",
+        },
+      ];
+
+  const tabHtml = runtimeViews.map((view) => {
+    const active = view.key === selectedRuntimeView ? "active" : "";
     return `
-      <button class="view-tab ${active}" data-section="${key}">
-        ${section.label}
+      <button class="view-tab ${active}" data-runtime-view="${view.key}">
+        ${view.label}
       </button>
     `;
   }).join("");
 
   tabs.innerHTML = tabHtml;
-
-  document.querySelectorAll("[data-section]").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeSection = button.getAttribute("data-section");
-      renderMetrics();
-      renderActiveSection();
-      renderSectionControls();
-    });
-  });
 }
 
 function renderStrategyCards(strategies, subtitle) {
@@ -763,86 +758,142 @@ function getActiveRuntimeView() {
   );
 }
 
+function getViewValueSummary(view) {
+  const portfolio = view.portfolio || {};
+  const performance = view.performance || {};
+  const totalValue =
+    portfolio.total_value ??
+    ((performance.exposure || portfolio.positions_value || 0) + (performance.realized_pnl || 0));
+  const totalPnl = portfolio.total_pnl ?? performance.total_pnl ?? 0;
+  const totalPnlPct = portfolio.total_pnl_pct ?? 0;
+  return {
+    totalValue,
+    totalPnl,
+    totalPnlPct,
+  };
+}
+
+function getViewWinSummary(view) {
+  const portfolio = view.portfolio || {};
+  const performance = view.performance || {};
+  const displayWinRate =
+    performance.display_win_rate ??
+    portfolio.display_win_rate ??
+    performance.win_rate ??
+    portfolio.win_rate ??
+    0;
+  const winRateBasis =
+    performance.win_rate_basis ??
+    portfolio.win_rate_basis ??
+    (performance.closed_positions > 0 ? "closed positions" : "no trades");
+  const totalTrades = performance.total_trades ?? portfolio.total_trades ?? 0;
+  return {
+    displayWinRate,
+    winRateBasis,
+    totalTrades,
+  };
+}
+
+function getViewDrawdownSummary(view) {
+  const portfolio = view.portfolio || {};
+  const performance = view.performance || {};
+  const aggregate = portfolio.scope === "aggregate";
+  const drawdown = aggregate
+    ? (portfolio.max_drawdown_pct ?? performance.max_drawdown_pct ?? 0)
+    : (performance.current_drawdown_pct ?? portfolio.current_drawdown_pct ?? 0);
+  return {
+    label: aggregate ? "Max Drawdown" : "Current Drawdown",
+    value: drawdown,
+    sub: aggregate
+      ? `Fees: ${formatUsd(portfolio.total_fees_paid ?? performance.total_fees_paid ?? 0)}`
+      : `Exposure: ${formatUsd(performance.exposure || portfolio.positions_value || 0)}`,
+  };
+}
+
 function buildMetrics() {
   if (!LIVE_STATUS) {
-    return DATA.metrics;
-  }
-
-  if (activeSection === "runtime") {
-    const view = getActiveRuntimeView();
-    const portfolio = view.portfolio || {};
-    const performance = view.performance || {};
-    const scope = portfolio.scope || "aggregate";
-    if (scope === "aggregate") {
-      return [
-        {
-          label: "Total Value",
-          value: formatUsd(portfolio.total_value || 0),
-          tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
-        },
-        {
-          label: "Total PnL",
-          value: `${Number(portfolio.total_pnl || 0) >= 0 ? "+" : ""}${formatUsd(portfolio.total_pnl || 0)}`,
-          tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
-        },
-        {
-          label: "Trades",
-          value: String(portfolio.total_trades || 0),
-          tone: "good",
-        },
-        {
-          label: "Open Positions",
-          value: String(portfolio.open_positions || 0),
-          tone: "good",
-        },
-      ];
-    }
     return [
       {
-        label: "Strategy PnL",
-        value: `${Number(portfolio.total_pnl || 0) >= 0 ? "+" : ""}${formatUsd(portfolio.total_pnl || 0)}`,
-        tone: pnlColor(portfolio.total_pnl || 0) === "negative" ? "bad" : "good",
+        label: "Portfolio Value",
+        value: "$0.00",
+        sub: "--",
       },
       {
-        label: "Exposure",
-        value: formatUsd(performance.exposure || portfolio.positions_value || 0),
-        tone: "good",
+        label: "Win Rate",
+        value: "0.0%",
+        sub: "0 trades",
       },
       {
-        label: "Trades",
-        value: String(portfolio.total_trades || 0),
-        tone: "good",
+        label: "Max Drawdown",
+        value: "0.0%",
+        sub: "Fees: $0.00",
       },
       {
-        label: "Signals",
-        value: String(performance.signals || (view.signals || []).length || 0),
-        tone: "good",
+        label: "Active Markets",
+        value: "0",
+        sub: "0 signals",
       },
     ];
   }
 
+  const view = getActiveRuntimeView();
+  const portfolio = view.portfolio || {};
+  const performance = view.performance || {};
+  const valueSummary = getViewValueSummary(view);
+  const winSummary = getViewWinSummary(view);
+  const drawdownSummary = getViewDrawdownSummary(view);
+
   return [
     {
-      label: "Runtime",
-      value: LIVE_STATUS.bridge?.mode || "isolated_runtime",
+      label: portfolio.scope === "aggregate" ? "Portfolio Value" : "Strategy Value",
+      value: formatUsd(valueSummary.totalValue || 0),
+      sub: `${Number(valueSummary.totalPnl || 0) >= 0 ? "+" : ""}${formatUsd(valueSummary.totalPnl || 0)} (${Number(valueSummary.totalPnlPct || 0).toFixed(1)}%)`,
+      subTone: pnlColor(valueSummary.totalPnl),
+      tone: pnlColor(valueSummary.totalPnl) === "negative" ? "bad" : "good",
+    },
+    {
+      label: "Win Rate",
+      value: formatPct(winSummary.displayWinRate || 0),
+      sub: `${winSummary.totalTrades || 0} trades · ${winSummary.winRateBasis}`,
       tone: "good",
     },
     {
-      label: "Scan Count",
-      value: String(LIVE_STATUS.summary?.scan_count ?? 0),
-      tone: "good",
+      label: drawdownSummary.label,
+      value: formatPct(drawdownSummary.value || 0),
+      sub: drawdownSummary.sub,
+      tone: Number(drawdownSummary.value || 0) > 10 ? "warn" : "good",
     },
     {
       label: "Active Markets",
       value: String(LIVE_STATUS.summary?.active_markets ?? 0),
+      sub: `${performance.signals || (view.signals || []).length || 0} signals`,
       tone: "good",
     },
-    {
-      label: "Top Blocker",
-      value: LIVE_STATUS.summary?.top_blocker || "No dominant blocker detected",
-      tone: LIVE_STATUS.blockers?.length ? "warn" : "good",
-    },
   ];
+}
+
+function renderArchitecturePanel() {
+  const section = DATA.sections[activeSection];
+  const tabs = ARCHITECTURE_SECTION_ORDER.map((key) => {
+    const item = DATA.sections[key];
+    const active = key === activeSection ? "active" : "";
+    return `<button class="view-tab ${active}" data-arch-section="${key}">${item.label}</button>`;
+  }).join("");
+
+  return `
+    <section class="architecture-panel">
+      <article class="content-card">
+        <div class="panel-eyebrow">Opus architecture</div>
+        <h3 style="margin-top:10px">${section.label}</h3>
+        <p>
+          The runtime and performance surfaces stay above. This lower block is only for the Opus design,
+          contracts, workflow, and strategy architecture.
+        </p>
+        <div class="architecture-tabs">${tabs}</div>
+      </article>
+      ${section.render()}
+    </section>
+  `;
 }
 
 function renderWorkflowIllustration() {
@@ -1167,7 +1218,7 @@ function renderRuntimeComparisonTable() {
                   <tr>
                     <td><span class="strat-badge ${stratClass(view.source)}">${escapeHtml(view.label)}</span></td>
                     <td class="${pnlColor(view.performance?.total_pnl)}">${formatUsd(view.performance?.total_pnl || 0)}</td>
-                    <td>${formatPct(view.performance?.win_rate || 0)}</td>
+                    <td>${formatPct(view.performance?.display_win_rate || view.performance?.win_rate || 0)}</td>
                     <td>${escapeHtml(String(view.performance?.total_trades || 0))}</td>
                     <td>${escapeHtml(String(view.performance?.open_positions || 0))}</td>
                     <td>${escapeHtml(String(view.performance?.signals || 0))}</td>
@@ -1183,6 +1234,52 @@ function renderRuntimeComparisonTable() {
   `;
 }
 
+function renderNewsTerminal() {
+  const rows = LIVE_STATUS?.news_terminal || [];
+  return `
+    <article class="content-card">
+      <div class="card-header">
+        <div class="card-title">News Terminal</div>
+        <div class="card-badge">${rows.length}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Headline</th>
+              <th>Mapped Market</th>
+              <th>Bias</th>
+              <th>Conf</th>
+              <th>LLM</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              rows.length
+                ? rows
+                    .map(
+                      (row) => `
+                        <tr>
+                          <td>${escapeHtml(row.source || "unknown")}</td>
+                          <td title="${escapeHtml(row.reasoning || row.headline || "")}">${escapeHtml(truncate(row.headline || "", 48))}</td>
+                          <td title="${escapeHtml(row.market_slug || "")}">${escapeHtml(truncate(row.market_slug || "", 28))}</td>
+                          <td>${escapeHtml(row.direction || "neutral")}</td>
+                          <td>${Number(row.confidence || 0).toFixed(2)}</td>
+                          <td>${escapeHtml(row.llm_assisted ? `${row.llm_provider || "llm"}:${row.llm_model || "model"}` : "raw fallback")}</td>
+                        </tr>
+                      `
+                    )
+                    .join("")
+                : `<tr><td colspan="6" class="table-empty">No news enrichments are queued in the isolated runtime right now.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
 function renderRuntimeHeaderMeta() {
   const stateMeta = document.getElementById("runtime-state-meta");
   const scanMeta = document.getElementById("runtime-scan-meta");
@@ -1191,7 +1288,7 @@ function renderRuntimeHeaderMeta() {
     return;
   }
 
-  if (!LIVE_STATUS || activeSection !== "runtime") {
+  if (!LIVE_STATUS) {
     stateMeta.textContent = "State: connecting";
     scanMeta.textContent = "Scans: 0";
     viewMeta.textContent = "";
@@ -1200,10 +1297,10 @@ function renderRuntimeHeaderMeta() {
 
   const activeView = getActiveRuntimeView();
   const label = escapeHtml(activeView.label);
-  const scope = activeView.portfolio?.scope === "aggregate" ? "full opus portfolio" : "strategy-filtered view";
+  const scope = activeView.portfolio?.scope === "aggregate" ? "opus portfolio" : "strategy-filtered opus view";
   stateMeta.textContent = `State: ${LIVE_STATUS.bridge?.state || "unknown"}`;
   scanMeta.textContent = `Scans: ${LIVE_STATUS.summary?.scan_count ?? 0}`;
-  viewMeta.innerHTML = `Viewing <span class="strat-badge ${stratClass(activeView.source)}">${label}</span> ${escapeHtml(scope)}`;
+  viewMeta.innerHTML = `Viewing <span class="strat-badge ${stratClass(activeView.source)}">${label}</span> <span style="margin-left:6px">${escapeHtml(scope)}</span>`;
 }
 
 function renderRuntimeSection() {
@@ -1239,6 +1336,9 @@ function renderRuntimeSection() {
   const activeView = getActiveRuntimeView();
   const activePortfolio = activeView.portfolio || {};
   const activePerformance = activeView.performance || {};
+  const valueSummary = getViewValueSummary(activeView);
+  const winSummary = getViewWinSummary(activeView);
+  const drawdownSummary = getViewDrawdownSummary(activeView);
   const loadedAt = LIVE_STATUS_LOADED_AT
     ? new Date(LIVE_STATUS_LOADED_AT).toLocaleTimeString()
     : "unknown";
@@ -1248,10 +1348,9 @@ function renderRuntimeSection() {
       <div class="panel-eyebrow">Live runtime</div>
       <h3 style="margin-top:10px">Opus runtime operator view</h3>
       <p>
-        Same reading pattern as the old Oracle dashboard: switch the active sleeve, read the top PnL and trade counts first,
-        inspect signals, trades, and open positions, then use the Opus-only sanity, blockers, workflow, and consult layers below.
+        Same reading pattern as the old Oracle dashboard: the top strip follows the active strategy view,
+        then signals, trades, positions, comparison, sanity, blockers, and the architecture surface below.
       </p>
-      ${renderRuntimeViewTabs()}
       <div class="contract-meta">
         <div class="meta-box">
           <div class="meta-label">Active view</div>
@@ -1275,10 +1374,10 @@ function renderRuntimeSection() {
     <div class="content-grid three">
       <article class="content-card">
         <div class="panel-eyebrow">Selected view</div>
-        <h3 style="margin-top:10px">${formatUsd(activePortfolio.total_pnl || 0)}</h3>
+        <h3 style="margin-top:10px">${formatUsd(valueSummary.totalValue || 0)}</h3>
         <div class="soft-stack">
+          <div class="soft-row">PnL: ${Number(valueSummary.totalPnl || 0) >= 0 ? "+" : ""}${formatUsd(valueSummary.totalPnl || 0)} (${Number(valueSummary.totalPnlPct || 0).toFixed(1)}%)</div>
           <div class="soft-row">Realized PnL: ${formatUsd(activePerformance.realized_pnl || 0)}</div>
-          <div class="soft-row">Unrealized PnL: ${formatUsd(activePerformance.unrealized_pnl || 0)}</div>
           <div class="soft-row">Exposure: ${formatUsd(activePerformance.exposure || activePortfolio.positions_value || 0)}</div>
         </div>
       </article>
@@ -1293,9 +1392,10 @@ function renderRuntimeSection() {
       </article>
       <article class="content-card">
         <div class="panel-eyebrow">Performance</div>
-        <h3 style="margin-top:10px">${escapeHtml(String(activePerformance.total_trades || activePortfolio.total_trades || 0))} trades</h3>
+        <h3 style="margin-top:10px">${formatPct(winSummary.displayWinRate || 0)}</h3>
         <div class="soft-stack">
-          <div class="soft-row">Win rate: ${formatPct(activePerformance.win_rate || activePortfolio.win_rate || 0)}</div>
+          <div class="soft-row">Win rate basis: ${escapeHtml(winSummary.winRateBasis)}</div>
+          <div class="soft-row">${drawdownSummary.label}: ${formatPct(drawdownSummary.value || 0)}</div>
           <div class="soft-row">Signals: ${escapeHtml(String(activePerformance.signals || (activeView.signals || []).length || 0))}</div>
           <div class="soft-row">Open positions: ${escapeHtml(String(activePerformance.open_positions || activePortfolio.open_positions || 0))}</div>
         </div>
@@ -1336,6 +1436,8 @@ function renderRuntimeSection() {
       }
     </article>
 
+    ${renderArchitecturePanel()}
+
     <div class="content-grid two">
       <article class="content-card">
         <div class="panel-eyebrow">Runtime totals</div>
@@ -1347,7 +1449,7 @@ function renderRuntimeSection() {
           <div class="soft-row">Execution rate: ${formatPct(performance.execution_rate || 0)}</div>
           <div class="soft-row">Quiet-cycle rate: ${formatPct(performance.quiet_cycle_rate || 0)}</div>
           <div class="soft-row">Realized PnL: ${formatUsd(performance.realized_pnl || 0)} | Unrealized PnL: ${formatUsd(performance.unrealized_pnl || 0)}</div>
-          <div class="soft-row">Closed positions: ${escapeHtml(String(performance.closed_positions || 0))} | Win rate: ${formatPct(performance.win_rate || 0)}</div>
+          <div class="soft-row">Closed positions: ${escapeHtml(String(performance.closed_positions || 0))} | Win rate: ${formatPct(performance.display_win_rate || performance.win_rate || 0)}</div>
           <div class="soft-row">Average hold: ${Number(performance.avg_hold_hours || 0).toFixed(2)}h</div>
         </div>
         ${
@@ -1367,6 +1469,20 @@ function renderRuntimeSection() {
         }
       </article>
       ${renderConsultPanel()}
+    </div>
+
+    <div class="content-grid two">
+      ${renderNewsTerminal()}
+      <article class="content-card">
+        <div class="panel-eyebrow">Runtime mode</div>
+        <h3 style="margin-top:10px">${escapeHtml(LIVE_STATUS.bridge?.mode || "unknown")}</h3>
+        <div class="soft-stack">
+          <div class="soft-row">State: ${escapeHtml(LIVE_STATUS.bridge?.state || "unknown")}</div>
+          <div class="soft-row">Next step: ${escapeHtml(LIVE_STATUS.bridge?.next_step || "n/a")}</div>
+          <div class="soft-row">Reserve target: ${formatUsd(portfolio.reserved_capital || 0)}</div>
+          <div class="soft-row">Last runtime refresh: ${escapeHtml(loadedAt)}</div>
+        </div>
+      </article>
     </div>
 
     <div class="content-grid two">
@@ -1390,13 +1506,13 @@ function renderRuntimeSection() {
         </div>
       </article>
       <article class="content-card">
-        <div class="panel-eyebrow">Runtime mode</div>
-        <h3 style="margin-top:10px">${escapeHtml(LIVE_STATUS.bridge?.mode || "unknown")}</h3>
+        <div class="panel-eyebrow">Export</div>
+        <h3 style="margin-top:10px">Logs + data bundle</h3>
         <div class="soft-stack">
-          <div class="soft-row">State: ${escapeHtml(LIVE_STATUS.bridge?.state || "unknown")}</div>
-          <div class="soft-row">Next step: ${escapeHtml(LIVE_STATUS.bridge?.next_step || "n/a")}</div>
-          <div class="soft-row">Reserve target: ${formatUsd(portfolio.reserved_capital || 0)}</div>
-          <div class="soft-row">Logs export: <a href="/api/multiagent/logs/export" class="inline-link">download zip</a></div>
+          <div class="soft-row">Use the export bundle instead of raw Railway logs.</div>
+          <div class="soft-row">Metrics DB: ${escapeHtml(LIVE_STATUS.export?.metrics_db_path || "n/a")}</div>
+          <div class="soft-row">Snapshot dir: ${escapeHtml(LIVE_STATUS.export?.snapshot_dir || "n/a")}</div>
+          <div class="soft-row">Download: <a href="/api/multiagent/logs/export" class="inline-link">multiagent export zip</a></div>
         </div>
       </article>
     </div>
@@ -1650,6 +1766,7 @@ async function loadLiveStatus() {
     LIVE_STATUS_ERROR = error instanceof Error ? error.message : String(error);
   }
 
+  renderSectionControls();
   renderMetrics();
   renderRuntimeHeaderMeta();
   renderActiveSection();
@@ -1689,7 +1806,15 @@ function bindRuntimeActions() {
     button.addEventListener("click", () => {
       selectedRuntimeView = button.getAttribute("data-runtime-view") || "all";
       renderMetrics();
+      renderSectionControls();
       renderRuntimeHeaderMeta();
+      renderActiveSection();
+    });
+  });
+
+  document.querySelectorAll("[data-arch-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeSection = button.getAttribute("data-arch-section") || "overview";
       renderActiveSection();
     });
   });
@@ -1711,10 +1836,10 @@ function bindRuntimeActions() {
 }
 
 function renderActiveSection() {
-  const section = DATA.sections[activeSection];
-  document.getElementById("active-title").textContent = section.label;
-  document.getElementById("active-description").textContent = section.description;
-  document.getElementById("section-content").innerHTML = section.render();
+  document.getElementById("active-title").textContent = "Opus Runtime";
+  document.getElementById("active-description").textContent =
+    "Old-engine layout on top, isolated Opus runtime in the middle, and the Opus architecture lower on the page.";
+  document.getElementById("section-content").innerHTML = renderRuntimeSection();
   renderRuntimeHeaderMeta();
   bindRuntimeActions();
 }

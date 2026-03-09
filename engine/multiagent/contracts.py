@@ -263,6 +263,9 @@ class PortfolioSnapshot:
     reserved_capital: float = 0.0
     total_unrealized_pnl: float = 0.0
     total_realized_pnl: float = 0.0
+    total_fees_paid: float = 0.0
+    max_drawdown_pct: float = 0.0
+    mark_win_rate: float = 0.0
     positions: tuple[PositionState, ...] = ()
     position_count: int = 0
     capital_utilization_pct: float = 0.0

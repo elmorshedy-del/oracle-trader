@@ -235,6 +235,13 @@ textarea {
   letter-spacing: -0.03em;
 }
 
+.metric-sub {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 .metric-card.good {
   box-shadow: inset 0 1px 0 var(--green-dim);
 }
@@ -303,6 +310,19 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.architecture-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.architecture-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .content-grid {

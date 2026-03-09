@@ -159,6 +159,9 @@ class InMemoryStateManager:
         self._recently_closed: dict[str, datetime] = {}
         self._cash_balance = starting_capital
         self._realized_pnl = 0.0
+        self._fees_paid = 0.0
+        self._peak_total_capital = starting_capital
+        self._max_drawdown_pct = 0.0
         self._snapshot = self._recompute_snapshot()
 
     def snapshot(self) -> PortfolioSnapshot:
@@ -185,6 +188,7 @@ class InMemoryStateManager:
                 continue
 
             cost_basis = result.fill_price * result.shares_filled
+            fees_paid = float(result.fees or 0.0)
             position = PositionState(
                 position_id=result.result_id,
                 market_id=signal.market_id,
@@ -208,7 +212,8 @@ class InMemoryStateManager:
                 },
             )
             positions.append(position)
-            cash_balance -= cost_basis
+            cash_balance -= cost_basis + fees_paid
+            self._fees_paid += fees_paid
             open_market_ids.add(signal.market_id)
             exposure_by_strategy[signal.strategy_name] = (
                 exposure_by_strategy.get(signal.strategy_name, 0.0) + cost_basis
@@ -283,6 +288,14 @@ class InMemoryStateManager:
         deployed_capital = sum(pos.current_price * pos.shares for pos in self._positions)
         total_unrealized = sum(pos.unrealized_pnl for pos in self._positions)
         total_capital = self._cash_balance + deployed_capital
+        if total_capital > self._peak_total_capital:
+            self._peak_total_capital = total_capital
+        current_drawdown_pct = (
+            ((self._peak_total_capital - total_capital) / self._peak_total_capital) * 100
+            if self._peak_total_capital > 0
+            else 0.0
+        )
+        self._max_drawdown_pct = max(self._max_drawdown_pct, current_drawdown_pct)
         exposure_by_strategy: dict[str, float] = {}
         exposure_by_category: dict[str, float] = {}
         positions_by_strategy: dict[str, int] = {}
@@ -294,6 +307,8 @@ class InMemoryStateManager:
             exposure_by_category[pos.category.value] = exposure_by_category.get(pos.category.value, 0.0) + market_value
             positions_by_strategy[pos.strategy_name] = positions_by_strategy.get(pos.strategy_name, 0) + 1
             open_market_ids.add(pos.market_id)
+        open_mark_wins = sum(1 for pos in self._positions if pos.unrealized_pnl > 0)
+        mark_win_rate = (open_mark_wins / len(self._positions) * 100) if self._positions else 0.0
 
         return PortfolioSnapshot(
             total_capital=total_capital,
@@ -302,6 +317,9 @@ class InMemoryStateManager:
             reserved_capital=total_capital * self._reserve_pct,
             total_unrealized_pnl=total_unrealized,
             total_realized_pnl=self._realized_pnl,
+            total_fees_paid=self._fees_paid,
+            max_drawdown_pct=self._max_drawdown_pct,
+            mark_win_rate=mark_win_rate,
             positions=tuple(self._positions),
             position_count=len(self._positions),
             capital_utilization_pct=(deployed_capital / total_capital) if total_capital else 0.0,
@@ -350,18 +368,37 @@ class InMemoryStateManager:
         wins = sum(1 for item in closed if item["realized_pnl"] > 0)
         losses = sum(1 for item in closed if item["realized_pnl"] < 0)
         hold_hours = [item["hold_hours"] for item in closed]
+        open_positions = self._positions
+        mark_wins = sum(1 for position in open_positions if position.unrealized_pnl > 0)
+        mark_total = len(open_positions)
         close_reasons: dict[str, int] = {}
         for item in closed:
             reason = item["close_reason"]
             close_reasons[reason] = close_reasons.get(reason, 0) + 1
         total_closed = len(closed)
+        realized_win_rate = (wins / total_closed * 100) if total_closed else 0.0
+        mark_win_rate = (mark_wins / mark_total * 100) if mark_total else 0.0
+        if total_closed:
+            display_win_rate = realized_win_rate
+            win_rate_basis = "closed positions"
+        elif mark_total:
+            display_win_rate = mark_win_rate
+            win_rate_basis = "open marks"
+        else:
+            display_win_rate = 0.0
+            win_rate_basis = "no trades"
         return {
             "closed_positions": total_closed,
             "wins": wins,
             "losses": losses,
-            "win_rate": (wins / total_closed * 100) if total_closed else 0.0,
+            "win_rate": realized_win_rate,
+            "mark_win_rate": mark_win_rate,
+            "display_win_rate": display_win_rate,
+            "win_rate_basis": win_rate_basis,
             "avg_hold_hours": (sum(hold_hours) / len(hold_hours)) if hold_hours else 0.0,
             "close_reasons": close_reasons,
+            "max_drawdown_pct": self._max_drawdown_pct,
+            "total_fees_paid": self._fees_paid,
             "recent_closed": self.closed_positions(12),
         }
 
@@ -479,6 +516,7 @@ class MultiagentRuntime:
             "diagnostics": self._build_diagnostics(report),
             "market_mix": self._build_market_mix(),
             "market_preview": self._build_market_preview(),
+            "news_terminal": self._build_news_terminal(),
             "module_cards": self._build_module_cards(report),
             "strategy_cards": self._build_strategy_cards(report),
             "comparison_views": comparison_views,
@@ -723,6 +761,33 @@ class MultiagentRuntime:
             )
         return preview
 
+    def _build_news_terminal(self) -> list[dict[str, Any]]:
+        for provider in getattr(self.enricher, "providers", []):
+            if getattr(provider, "name", None) != "news":
+                continue
+            results = list(getattr(provider.state, "results", {}).values())
+            results.sort(key=lambda item: item.fetched_at, reverse=True)
+            terminal_rows = []
+            for result in results[:10]:
+                data = result.data or {}
+                terminal_rows.append(
+                    {
+                        "headline": data.get("headline"),
+                        "source": data.get("source"),
+                        "market_slug": data.get("market_slug"),
+                        "direction": data.get("direction"),
+                        "confidence": float(data.get("confidence", 0.0) or 0.0),
+                        "impact_cents": float(data.get("expected_impact_cents", 0.0) or 0.0),
+                        "reasoning": data.get("reasoning"),
+                        "llm_provider": data.get("llm_provider"),
+                        "llm_model": data.get("llm_model"),
+                        "llm_assisted": bool(result.llm_assisted),
+                        "fetched_at": result.fetched_at.isoformat(),
+                    }
+                )
+            return terminal_rows
+        return []
+
     def _build_comparison_views(
         self,
         report: ScanCycleReport | None,
@@ -744,7 +809,9 @@ class MultiagentRuntime:
                 realized_pnl = portfolio.total_realized_pnl
                 unrealized_pnl = portfolio.total_unrealized_pnl
                 exposure = portfolio.deployed_capital
-                win_rate = state_perf.get("win_rate", 0.0)
+                win_rate = state_perf.get("display_win_rate", state_perf.get("win_rate", 0.0))
+                mark_win_rate = state_perf.get("mark_win_rate", portfolio.mark_win_rate)
+                win_rate_basis = state_perf.get("win_rate_basis", "no trades")
                 view_portfolio = {
                     "scope": "aggregate",
                     "starting_capital": self.starting_capital,
@@ -756,6 +823,10 @@ class MultiagentRuntime:
                     if self.starting_capital
                     else 0.0,
                     "win_rate": win_rate,
+                    "mark_win_rate": mark_win_rate,
+                    "win_rate_basis": win_rate_basis,
+                    "max_drawdown_pct": state_perf.get("max_drawdown_pct", portfolio.max_drawdown_pct),
+                    "total_fees_paid": state_perf.get("total_fees_paid", portfolio.total_fees_paid),
                     "total_trades": portfolio.position_count + state_perf.get("closed_positions", 0),
                     "open_positions": portfolio.position_count,
                     "positions": [self._serialize_position(position) for position in view_positions],
@@ -769,7 +840,27 @@ class MultiagentRuntime:
                 unrealized_pnl = sum(position.unrealized_pnl for position in view_positions)
                 exposure = sum(position.current_price * position.shares for position in view_positions)
                 wins = sum(1 for event in view_closed if float(event.get("realized_pnl", 0.0) or 0.0) > 0)
-                win_rate = (wins / len(view_closed) * 100) if view_closed else 0.0
+                realized_win_rate = (wins / len(view_closed) * 100) if view_closed else 0.0
+                mark_wins = sum(1 for position in view_positions if position.unrealized_pnl > 0)
+                mark_win_rate = (mark_wins / len(view_positions) * 100) if view_positions else 0.0
+                if view_closed:
+                    win_rate = realized_win_rate
+                    win_rate_basis = "closed positions"
+                elif view_positions:
+                    win_rate = mark_win_rate
+                    win_rate_basis = "open marks"
+                else:
+                    win_rate = 0.0
+                    win_rate_basis = "no trades"
+                invested_basis = sum(position.entry_price * position.shares for position in view_positions) + sum(
+                    float(event.get("entry_price", 0.0) or 0.0) * float(event.get("shares", 0.0) or 0.0)
+                    for event in view_closed
+                )
+                current_drawdown_pct = (
+                    max(0.0, -(realized_pnl + unrealized_pnl)) / invested_basis * 100
+                    if invested_basis > 0
+                    else 0.0
+                )
                 view_portfolio = {
                     "scope": "strategy_filter",
                     "starting_capital": None,
@@ -777,8 +868,13 @@ class MultiagentRuntime:
                     "cash": None,
                     "positions_value": exposure,
                     "total_pnl": realized_pnl + unrealized_pnl,
-                    "total_pnl_pct": 0.0,
+                    "total_pnl_pct": ((realized_pnl + unrealized_pnl) / invested_basis * 100)
+                    if invested_basis > 0
+                    else 0.0,
                     "win_rate": win_rate,
+                    "mark_win_rate": mark_win_rate,
+                    "win_rate_basis": win_rate_basis,
+                    "current_drawdown_pct": current_drawdown_pct,
                     "total_trades": len(view_positions) + len(view_closed),
                     "open_positions": len(view_positions),
                     "positions": [self._serialize_position(position) for position in view_positions],
@@ -797,11 +893,17 @@ class MultiagentRuntime:
                         "unrealized_pnl": unrealized_pnl,
                         "total_pnl": realized_pnl + unrealized_pnl,
                         "win_rate": win_rate,
+                        "mark_win_rate": mark_win_rate,
+                        "display_win_rate": win_rate,
+                        "win_rate_basis": win_rate_basis,
                         "total_trades": len(view_positions) + len(view_closed),
                         "signals": len(view_signals),
                         "open_positions": len(view_positions),
                         "exposure": exposure,
                         "closed_positions": len(view_closed),
+                        "current_drawdown_pct": current_drawdown_pct if key != "all" else state_perf.get("max_drawdown_pct", portfolio.max_drawdown_pct),
+                        "max_drawdown_pct": state_perf.get("max_drawdown_pct", portfolio.max_drawdown_pct) if key == "all" else current_drawdown_pct,
+                        "total_fees_paid": state_perf.get("total_fees_paid", portfolio.total_fees_paid) if key == "all" else 0.0,
                     },
                 }
             )

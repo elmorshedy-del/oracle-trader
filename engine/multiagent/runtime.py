@@ -30,7 +30,7 @@ from .enrichment import (
     NewsEnrichmentProvider,
     WeatherEnrichmentProvider,
 )
-from .enums import ModuleStatus, PositionStatus
+from .enums import MarketCategory, ModuleStatus, PositionStatus, SignalDirection
 from .llm import MultiagentLLMRouter
 from .orchestrator import Orchestrator
 from .strategies import (
@@ -59,6 +59,8 @@ DEFAULT_EXIT_MAX_HOLD_HOURS = 8.0
 DEFAULT_EXIT_STOP_LOSS_PCT = -0.18
 METRICS_LOG_PATH = LOG_DIR / "multiagent_metrics.jsonl"
 METRICS_DB_PATH = LOG_DIR / "multiagent_runtime.sqlite"
+STATE_FILE_PATH = LOG_DIR / "multiagent_runtime_state.json"
+RUNTIME_META_PATH = LOG_DIR / "multiagent_runtime_meta.json"
 COMPARISON_VIEW_ORDER = [
     ("all", "All Opus", "all"),
     ("relationship_arbitrage", "Arbitrage", "relationship_arbitrage"),
@@ -74,6 +76,24 @@ COMPARISON_VIEW_ORDER = [
 class PrefilterDrop:
     market_id: str
     reason: str
+
+
+def _write_json_atomically(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(f"{path.suffix}.tmp")
+    tmp_path.write_text(json.dumps(payload, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
 
 
 class CollectorScanner:
@@ -228,6 +248,7 @@ class InMemoryStateManager:
         self._positions = positions
         self._cash_balance = max(0.0, cash_balance)
         self._snapshot = self._recompute_snapshot()
+        self.save()
 
     def save(self) -> None:
         return
@@ -283,6 +304,7 @@ class InMemoryStateManager:
         self._positions = open_positions
         self._cleanup_recently_closed(now)
         self._snapshot = self._recompute_snapshot()
+        self.save()
 
     def _recompute_snapshot(self) -> PortfolioSnapshot:
         deployed_capital = sum(pos.current_price * pos.shares for pos in self._positions)
@@ -403,6 +425,128 @@ class InMemoryStateManager:
         }
 
 
+class PersistentStateManager(InMemoryStateManager):
+    def __init__(
+        self,
+        *,
+        starting_capital: float,
+        reserve_pct: float,
+        state_path: Path,
+    ) -> None:
+        self._state_path = state_path
+        super().__init__(starting_capital=starting_capital, reserve_pct=reserve_pct)
+        self._load()
+
+    def save(self) -> None:
+        payload = {
+            "version": 1,
+            "starting_capital": self._starting_capital,
+            "reserve_pct": self._reserve_pct,
+            "cash_balance": self._cash_balance,
+            "realized_pnl": self._realized_pnl,
+            "fees_paid": self._fees_paid,
+            "peak_total_capital": self._peak_total_capital,
+            "max_drawdown_pct": self._max_drawdown_pct,
+            "positions": [self._serialize_position(position) for position in self._positions],
+            "closed_positions": list(self._closed_positions),
+            "closed_event_queue": list(self._closed_event_queue),
+            "recently_closed": {
+                market_id: closed_at.isoformat()
+                for market_id, closed_at in self._recently_closed.items()
+            },
+        }
+        _write_json_atomically(self._state_path, payload)
+
+    def _load(self) -> None:
+        if not self._state_path.exists():
+            self.save()
+            return
+
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.exception("[MULTIAGENT] Failed to load persisted Opus state: %s", exc)
+            return
+
+        self._cash_balance = float(payload.get("cash_balance", self._starting_capital) or self._starting_capital)
+        self._realized_pnl = float(payload.get("realized_pnl", 0.0) or 0.0)
+        self._fees_paid = float(payload.get("fees_paid", 0.0) or 0.0)
+        self._peak_total_capital = float(payload.get("peak_total_capital", self._starting_capital) or self._starting_capital)
+        self._max_drawdown_pct = float(payload.get("max_drawdown_pct", 0.0) or 0.0)
+        self._positions = [
+            self._deserialize_position(item)
+            for item in payload.get("positions", [])
+            if isinstance(item, dict)
+        ]
+        self._closed_positions = [
+            item
+            for item in payload.get("closed_positions", [])
+            if isinstance(item, dict)
+        ][-200:]
+        self._closed_event_queue = [
+            item
+            for item in payload.get("closed_event_queue", [])
+            if isinstance(item, dict)
+        ][-50:]
+        self._recently_closed = {}
+        for market_id, closed_at in payload.get("recently_closed", {}).items():
+            parsed = _parse_datetime(closed_at)
+            if parsed is not None:
+                self._recently_closed[str(market_id)] = parsed
+        self._cleanup_recently_closed(utc_now())
+        self._snapshot = self._recompute_snapshot()
+
+    @staticmethod
+    def _serialize_position(position: PositionState) -> dict[str, Any]:
+        return {
+            "position_id": position.position_id,
+            "market_id": position.market_id,
+            "market_question": position.market_question,
+            "strategy_name": position.strategy_name,
+            "category": position.category.value,
+            "direction": position.direction.value,
+            "outcome": position.outcome,
+            "entry_price": position.entry_price,
+            "current_price": position.current_price,
+            "shares": position.shares,
+            "cost_basis": position.cost_basis,
+            "unrealized_pnl": position.unrealized_pnl,
+            "realized_pnl": position.realized_pnl,
+            "status": position.status.value,
+            "opened_at": position.opened_at.isoformat(),
+            "signal_id": position.signal_id,
+            "closed_at": position.closed_at.isoformat() if position.closed_at else None,
+            "close_reason": position.close_reason,
+            "metadata": dict(position.metadata),
+            "last_updated": position.last_updated.isoformat(),
+        }
+
+    @staticmethod
+    def _deserialize_position(data: dict[str, Any]) -> PositionState:
+        return PositionState(
+            position_id=str(data.get("position_id", "")),
+            market_id=str(data.get("market_id", "")),
+            market_question=str(data.get("market_question", "")),
+            strategy_name=str(data.get("strategy_name", "")),
+            category=MarketCategory(str(data.get("category", "other"))),
+            direction=SignalDirection(str(data.get("direction", SignalDirection.BUY_YES.value))),
+            outcome=str(data.get("outcome", "")),
+            entry_price=float(data.get("entry_price", 0.0) or 0.0),
+            current_price=float(data.get("current_price", 0.0) or 0.0),
+            shares=float(data.get("shares", 0.0) or 0.0),
+            cost_basis=float(data.get("cost_basis", 0.0) or 0.0),
+            unrealized_pnl=float(data.get("unrealized_pnl", 0.0) or 0.0),
+            realized_pnl=float(data.get("realized_pnl", 0.0) or 0.0),
+            status=PositionStatus(str(data.get("status", PositionStatus.OPEN.value))),
+            opened_at=_parse_datetime(data.get("opened_at")) or utc_now(),
+            signal_id=str(data.get("signal_id", "")),
+            closed_at=_parse_datetime(data.get("closed_at")),
+            close_reason=data.get("close_reason"),
+            metadata=dict(data.get("metadata", {})),
+            last_updated=_parse_datetime(data.get("last_updated")) or utc_now(),
+        )
+
+
 class MultiagentRuntime:
     def __init__(
         self,
@@ -441,9 +585,10 @@ class MultiagentRuntime:
                 NewsSignalStrategy(),
             ]
         )
-        self.state = InMemoryStateManager(
+        self.state = PersistentStateManager(
             starting_capital=self.starting_capital,
             reserve_pct=self.config.risk_limits.min_reserve_pct,
+            state_path=STATE_FILE_PATH,
         )
         self.tracer = ScanCycleTracer()
         self.snapshot_store = SnapshotStore(self.config.audit)
@@ -471,6 +616,7 @@ class MultiagentRuntime:
         self._total_validated = 0
         self._total_executed = 0
         self._quiet_cycles = 0
+        self._load_runtime_meta()
 
     async def start(self) -> None:
         if self._running:
@@ -484,10 +630,13 @@ class MultiagentRuntime:
                 logger.exception("[MULTIAGENT] Cycle failed: %s", exc)
                 self._recent_errors.append(str(exc))
                 self._recent_errors = self._recent_errors[-20:]
+                self._save_runtime_meta()
             await asyncio.sleep(self.scan_interval_secs)
 
     async def stop(self) -> None:
         self._running = False
+        self.state.save()
+        self._save_runtime_meta()
         await self.enricher.close()
         await self.collector.close()
 
@@ -526,6 +675,8 @@ class MultiagentRuntime:
                 "logs_url": "/api/multiagent/logs/export",
                 "metrics_log_path": str(METRICS_LOG_PATH),
                 "metrics_db_path": str(METRICS_DB_PATH),
+                "state_path": str(STATE_FILE_PATH),
+                "runtime_meta_path": str(RUNTIME_META_PATH),
                 "snapshot_dir": str(self.snapshot_store.config.snapshot_dir),
             },
             "blockers": blockers,
@@ -547,6 +698,7 @@ class MultiagentRuntime:
         self._total_executed += self._last_report.executions_succeeded
         if self._last_report.executions_succeeded == 0:
             self._quiet_cycles += 1
+        self._save_runtime_meta()
         self.metrics_store.record_cycle(
             scan_id=self._scan_count,
             report=self._last_report,
@@ -561,6 +713,36 @@ class MultiagentRuntime:
             self._last_report.candidates_generated,
             self._last_report.executions_succeeded,
         )
+
+    def _save_runtime_meta(self) -> None:
+        payload = {
+            "version": 1,
+            "scan_count": self._scan_count,
+            "total_candidates": self._total_candidates,
+            "total_validated": self._total_validated,
+            "total_executed": self._total_executed,
+            "quiet_cycles": self._quiet_cycles,
+            "recent_errors": list(self._recent_errors[-20:]),
+        }
+        _write_json_atomically(RUNTIME_META_PATH, payload)
+
+    def _load_runtime_meta(self) -> None:
+        if not RUNTIME_META_PATH.exists():
+            self._save_runtime_meta()
+            return
+
+        try:
+            payload = json.loads(RUNTIME_META_PATH.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.exception("[MULTIAGENT] Failed to load runtime meta: %s", exc)
+            return
+
+        self._scan_count = int(payload.get("scan_count", 0) or 0)
+        self._total_candidates = int(payload.get("total_candidates", 0) or 0)
+        self._total_validated = int(payload.get("total_validated", 0) or 0)
+        self._total_executed = int(payload.get("total_executed", 0) or 0)
+        self._quiet_cycles = int(payload.get("quiet_cycles", 0) or 0)
+        self._recent_errors = [str(item) for item in payload.get("recent_errors", [])][-20:]
 
     @staticmethod
     def _merge_supplemental_markets(raw_markets: list[Any], supplemental_markets: list[Any]) -> list[Any]:

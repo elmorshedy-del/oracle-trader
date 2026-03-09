@@ -103,7 +103,7 @@ class ArbitrageStrategy(BaseStrategy):
             arb_total_cost=total,
             arb_guaranteed_payout=1.0,
             suggested_size_usd=min(
-                self.config.risk.max_position_usd,
+                self.cfg.max_position_usd,
                 market.liquidity * 0.01  # don't take more than 1% of liquidity
             ),
         )
@@ -171,7 +171,7 @@ class ArbitrageStrategy(BaseStrategy):
             arb_total_cost=total_cost,
             arb_guaranteed_payout=1.0,
             suggested_size_usd=min(
-                self.config.risk.max_position_usd,
+                self.cfg.max_position_usd,
                 min(m.liquidity for m in event.markets) * 0.01
             ),
         )

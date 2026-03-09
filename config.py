@@ -48,6 +48,8 @@ class ArbitrageConfig:
     enabled: bool = True
     # Min profit after fees to trigger
     min_profit_cents: float = 2.0
+    # Per-trade arb sizing cap (kept separate from global directional max position sizing)
+    max_position_usd: float = float(os.getenv("ARB_MAX_POSITION_USD", "150"))
     # Max number of outcomes in a multi-outcome market to consider
     max_outcomes: int = 20
     # Min liquidity per outcome

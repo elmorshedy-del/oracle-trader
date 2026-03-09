@@ -277,9 +277,10 @@ class NewsEnrichmentProvider:
                     task_name="news_relevance",
                     system_prompt=(
                         "You are labeling prediction-market news relevance. "
-                        "Choose the single most relevant market candidate, classify direction as bullish, bearish, or neutral, "
-                        "estimate only a small expected market move in cents, and explain briefly. "
-                        "Return JSON only."
+                        "Choose the single most relevant market candidate using its exact market_slug. "
+                        "Classify direction as bullish, bearish, or neutral. "
+                        "Estimate only a small expected market move in cents, set confidence from 0.0 to 1.0, and explain briefly. "
+                        "Return exactly one JSON object with keys: market_slug, direction, confidence, expected_impact_cents, reasoning."
                     ),
                     user_payload={
                         "headline": headline.title,
@@ -311,6 +312,7 @@ class NewsEnrichmentProvider:
                             "llm_provider": None,
                             "llm_model": None,
                             "llm_attempts": [attempt.__dict__ for attempt in attempts],
+                            "llm_error": llm_result.error if llm_result else "news_llm_unavailable",
                         },
                         llm_assisted=False,
                         fetched_at=utc_now(),
@@ -339,6 +341,7 @@ class NewsEnrichmentProvider:
                     "llm_provider": llm_result.provider,
                     "llm_model": llm_result.model,
                     "llm_attempts": [attempt.__dict__ for attempt in attempts],
+                    "llm_error": None,
                 }
                 if existing is None or payload["confidence"] > float(existing.data.get("confidence", 0.0) or 0.0):
                     results[chosen_market.condition_id] = EnrichmentResult(

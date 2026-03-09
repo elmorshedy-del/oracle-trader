@@ -424,6 +424,41 @@ class InMemoryStateManager:
             "recent_closed": self.closed_positions(12),
         }
 
+    def reconcile_closed_history(self, historical_events: list[dict[str, Any]]) -> None:
+        if not historical_events:
+            return
+
+        merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for event in self._closed_positions:
+            key = (
+                str(event.get("market_id", "")),
+                str(event.get("strategy_name", "")),
+                str(event.get("closed_at", "")),
+            )
+            merged[key] = dict(event)
+
+        for event in historical_events:
+            if not isinstance(event, dict):
+                continue
+            key = (
+                str(event.get("market_id", "")),
+                str(event.get("strategy_name", "")),
+                str(event.get("closed_at", "")),
+            )
+            existing = merged.get(key)
+            if existing is None:
+                merged[key] = dict(event)
+                continue
+            if float(event.get("realized_pnl", 0.0) or 0.0) != 0.0 and float(existing.get("realized_pnl", 0.0) or 0.0) == 0.0:
+                merged[key] = dict(event)
+
+        events = list(merged.values())
+        events.sort(key=lambda item: item.get("closed_at", ""))
+        self._closed_positions = events[-200:]
+        self._realized_pnl = sum(float(item.get("realized_pnl", 0.0) or 0.0) for item in self._closed_positions)
+        self._snapshot = self._recompute_snapshot()
+        self.save()
+
 
 class PersistentStateManager(InMemoryStateManager):
     def __init__(
@@ -593,6 +628,7 @@ class MultiagentRuntime:
         self.tracer = ScanCycleTracer()
         self.snapshot_store = SnapshotStore(self.config.audit)
         self.metrics_store = RuntimeMetricsStore(METRICS_DB_PATH)
+        self.state.reconcile_closed_history(self.metrics_store.load_closed_history(limit=200))
         self.orchestrator = Orchestrator(
             scanner=self.scanner,
             enricher=self.enricher,

@@ -22,9 +22,12 @@ class CryptoLatencyStrategy:
         temporal_max_entry = float(cfg.get("temporal_max_entry_price", 0.75))
         barrier_min_edge = float(cfg.get("barrier_min_edge", 0.04))
         max_entry = float(cfg.get("max_entry_price", 0.80))
+        max_days_to_resolution = float(cfg.get("max_days_to_resolution", 90.0))
 
         candidates: list[SignalCandidate] = []
         for market in markets:
+            if market.hours_to_resolution is not None and market.hours_to_resolution > (max_days_to_resolution * 24.0):
+                continue
             enrichment = market.get_enrichment("crypto")
             if enrichment is None or enrichment.error:
                 continue

@@ -123,7 +123,7 @@ async def _call_provider(
         else:
             raise RuntimeError(f"unsupported_provider:{provider}")
 
-        parsed_json = _parse_json(raw_text)
+        parsed_json = _normalize_task_payload(task_name, _parse_json(raw_text))
         missing = [key for key in required_keys if key not in parsed_json]
         if missing:
             return LLMTaskResult(
@@ -300,10 +300,77 @@ def _parse_json(raw_text: str) -> dict[str, Any]:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines).strip()
-    parsed = json.loads(text)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise
+        parsed = json.loads(text[start : end + 1])
     if not isinstance(parsed, dict):
         raise ValueError("llm_output_not_object")
     return parsed
+
+
+def _normalize_task_payload(task_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if task_name != "news_relevance":
+        return payload
+
+    normalized = dict(payload)
+    if "market_slug" not in normalized:
+        for alias in ("slug", "candidate_slug", "selected_market_slug", "best_market_slug"):
+            if alias in normalized:
+                normalized["market_slug"] = normalized[alias]
+                break
+    if "direction" not in normalized:
+        for alias in ("bias", "sentiment", "market_direction"):
+            if alias in normalized:
+                normalized["direction"] = normalized[alias]
+                break
+    if "confidence" not in normalized:
+        for alias in ("confidence_score", "score", "probability"):
+            if alias in normalized:
+                normalized["confidence"] = normalized[alias]
+                break
+    if "expected_impact_cents" not in normalized:
+        for alias in ("impact_cents", "expected_move_cents", "impact", "price_impact_cents"):
+            if alias in normalized:
+                normalized["expected_impact_cents"] = normalized[alias]
+                break
+
+    direction = str(normalized.get("direction", "neutral")).strip().lower()
+    direction_map = {
+        "positive": "bullish",
+        "up": "bullish",
+        "yes": "bullish",
+        "negative": "bearish",
+        "down": "bearish",
+        "no": "bearish",
+    }
+    normalized["direction"] = direction_map.get(direction, direction if direction in {"bullish", "bearish", "neutral"} else "neutral")
+
+    confidence = normalized.get("confidence", 0.0)
+    try:
+        confidence = float(confidence)
+        if confidence > 1.0 and confidence <= 100.0:
+            confidence = confidence / 100.0
+    except (TypeError, ValueError):
+        confidence = 0.0
+    normalized["confidence"] = max(0.0, min(confidence, 1.0))
+
+    impact = normalized.get("expected_impact_cents", 0.0)
+    try:
+        impact = float(str(impact).replace("c", "").replace("¢", "").strip())
+    except (TypeError, ValueError):
+        impact = 0.0
+    normalized["expected_impact_cents"] = max(0.0, impact)
+
+    reasoning = normalized.get("reasoning")
+    if reasoning is None:
+        reasoning = normalized.get("explanation", "")
+    normalized["reasoning"] = str(reasoning or "")
+    return normalized
 
 
 def _prompt_hash(system_prompt: str, user_payload: dict[str, Any]) -> str:

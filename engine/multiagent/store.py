@@ -220,6 +220,21 @@ class RuntimeMetricsStore:
             "recent_fills": [dict(row) for row in fills],
         }
 
+    def load_closed_history(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT closed_at, market_id, market_question, strategy_name,
+                       entry_price, exit_price, shares, realized_pnl, hold_hours, close_reason
+                FROM position_closes
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.executescript(

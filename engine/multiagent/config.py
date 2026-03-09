@@ -115,7 +115,7 @@ class RiskLimits:
             "other": 1.0,
         }
     )
-    reentry_cooldown_hours: float = 24.0
+    reentry_cooldown_hours: float = 0.0
     max_correlated_positions: int = 999
 
 
@@ -206,6 +206,7 @@ class OrchestratorConfig:
                 "temporal_max_entry_price": 0.75,
                 "barrier_min_edge": 0.04,
                 "max_entry_price": 0.80,
+                "max_days_to_resolution": 90.0,
                 "max_candidates_per_cycle": 8,
             },
             "news_signal": {

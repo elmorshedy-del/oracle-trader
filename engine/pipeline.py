@@ -548,6 +548,8 @@ class Pipeline:
         trade_tape = [self._serialize_trade_row(trade) for trade in self.trader.trade_log[-60:]]
         close_tape = [trade for trade in trade_tape if trade.get("realized_pnl") is not None][-30:]
         blockers = self._legacy_blockers(state)
+        current_blocker_summary = self._current_blocker_summary(state)
+        recent_pattern_summary = self._recent_pattern_summary(scan_tape)
 
         comparison_summary = []
         for key, view in (state.get("comparison_views") or {}).items():
@@ -572,8 +574,8 @@ class Pipeline:
         return {
             "scope": "legacy_engine_only",
             "notes": {
-                "current_state": "summary, portfolio, performance, health, diagnostics, comparison_summary, blockers",
-                "recent_window": "scan_tape, trade_tape, close_tape, strategy_rollup, rejection_rollup",
+                "current_state": "summary, portfolio, performance, health, diagnostics, comparison_summary, blockers, current_blocker_summary",
+                "recent_window": "scan_tape, trade_tape, close_tape, strategy_rollup, rejection_rollup, recent_pattern_summary",
                 "separation": "This payload is legacy-engine only. Do not infer anything from Opus or multi-agent runtime data.",
             },
             "summary": {
@@ -583,11 +585,16 @@ class Pipeline:
                 "active_markets": state.get("active_markets", 0),
                 "error_count": len(state.get("errors") or []),
             },
+            "warm_start": {
+                "active": int(state.get("scan_count", 0) or 0) < 3,
+                "reason": "Treat current blockers as provisional during the first few scans after restart.",
+            },
             "portfolio": state.get("portfolio"),
             "performance": state.get("performance"),
             "health": state.get("health"),
             "latest_scan": diagnostics,
             "blockers": blockers,
+            "current_blocker_summary": current_blocker_summary,
             "strategies": state.get("strategies"),
             "recent_news": state.get("recent_news", [])[:20],
             "comparison_summary": comparison_summary,
@@ -596,6 +603,7 @@ class Pipeline:
             "close_tape": close_tape,
             "strategy_rollup": strategy_rollup,
             "rejection_rollup": rejection_rollup,
+            "recent_pattern_summary": recent_pattern_summary,
             "policy_snapshot": {
                 "scan_interval_secs": self.config.scan_interval_secs,
                 "starting_capital": self.config.risk.max_total_exposure_usd,
@@ -734,8 +742,16 @@ class Pipeline:
     def _legacy_blockers(state: dict) -> list[dict[str, str]]:
         diagnostics = state.get("diagnostics") or {}
         health = state.get("health") or {}
-        portfolio = state.get("portfolio") or {}
         blockers: list[dict[str, str]] = []
+
+        if not diagnostics or diagnostics.get("scan") is None:
+            blockers.append(
+                {
+                    "title": "Legacy runtime warming up",
+                    "detail": "No completed legacy diagnostic scan is available yet after startup.",
+                }
+            )
+            return blockers
 
         if (health.get("overall_status") or "").lower() not in {"", "healthy"}:
             blockers.append(
@@ -784,6 +800,68 @@ class Pipeline:
                 }
             )
         return blockers[:6]
+
+    @staticmethod
+    def _current_blocker_summary(state: dict) -> dict:
+        diagnostics = state.get("diagnostics") or {}
+        if not diagnostics or diagnostics.get("scan") is None:
+            return {
+                "authoritative": True,
+                "scan": None,
+                "executed": 0,
+                "markets_tradeable": 0,
+                "total_signals": 0,
+                "top_filtered_reason": None,
+                "top_filtered_count": 0,
+                "blockers": Pipeline._legacy_blockers(state),
+                "instruction": "No current scan is available yet. Treat this as warm-start state, not a settled blocker diagnosis.",
+            }
+        filtered = diagnostics.get("filtered_signals") or {}
+        signals_by_strategy = diagnostics.get("signals_by_strategy") or {}
+        total_signals = sum(int(value or 0) for value in signals_by_strategy.values())
+        top_filtered = None
+        if filtered:
+            top_filtered = max(filtered.items(), key=lambda item: item[1])
+        return {
+            "authoritative": True,
+            "scan": diagnostics.get("scan"),
+            "executed": diagnostics.get("executed", 0),
+            "markets_tradeable": diagnostics.get("markets_tradeable", 0),
+            "total_signals": total_signals,
+            "top_filtered_reason": top_filtered[0] if top_filtered else None,
+            "top_filtered_count": int(top_filtered[1]) if top_filtered else 0,
+            "blockers": Pipeline._legacy_blockers(state),
+            "instruction": "Use this section first for the current blocker. Treat recent rollups only as background pattern.",
+        }
+
+    @staticmethod
+    def _recent_pattern_summary(scan_tape: list[dict]) -> dict:
+        if not scan_tape:
+            return {
+                "window_scans": 0,
+                "avg_executed": 0.0,
+                "top_recent_filter": None,
+                "top_recent_filter_count": 0,
+            }
+
+        total_executed = sum(int(scan.get("executed", 0) or 0) for scan in scan_tape)
+        total_signals = sum(
+            sum(int(value or 0) for value in (scan.get("signals_by_strategy") or {}).values())
+            for scan in scan_tape
+        )
+        filter_totals: dict[str, int] = {}
+        for scan in scan_tape:
+            for reason, count in (scan.get("filtered_signals") or {}).items():
+                filter_totals[str(reason)] = filter_totals.get(str(reason), 0) + int(count or 0)
+        top_recent = max(filter_totals.items(), key=lambda item: item[1]) if filter_totals else None
+        return {
+            "window_scans": len(scan_tape),
+            "avg_executed": round(total_executed / len(scan_tape), 2),
+            "avg_signals": round(total_signals / len(scan_tape), 2),
+            "top_recent_filter": top_recent[0] if top_recent else None,
+            "top_recent_filter_count": int(top_recent[1]) if top_recent else 0,
+            "instruction": "Use this only for recent trend context, not as proof of the current blocker.",
+        }
 
     @staticmethod
     def _format_uptime(seconds: float) -> str:

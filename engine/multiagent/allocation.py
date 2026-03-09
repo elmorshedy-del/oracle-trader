@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 
-from .config import ExecutionConfig, RiskLimits, SizingConfig
+from .config import ExecutionConfig, RiskLimits, SizingConfig, SlippageConfig
 from .contracts import (
     AllocationRejection,
     ExecutionIntent,
@@ -147,6 +147,7 @@ class Executor:
 class Allocator:
     limits: RiskLimits
     sizing_config: SizingConfig
+    slippage_config: SlippageConfig = SlippageConfig()
 
     def allocate(
         self,
@@ -240,6 +241,12 @@ class Allocator:
                 max_strategy_usd,
             )
 
+            execution_cap = self._execution_feasible_size(
+                max_slippage_pct=self.sizing_config.max_slippage_pct,
+                liquidity=snapshot.liquidity,
+            )
+            capped_size = min(capped_size, execution_cap)
+
             if capped_size <= 0:
                 rejections.append(
                     AllocationRejection(
@@ -248,6 +255,19 @@ class Allocator:
                         constraint_name="position_size_zero_after_caps",
                         constraint_limit=0.0,
                         current_utilization=raw_size,
+                    )
+                )
+                continue
+
+            if capped_size < self.sizing_config.min_position_usd:
+                rejections.append(
+                    AllocationRejection(
+                        signal=signal,
+                        reason=AllocationRejectionReason.EXECUTION_SLIPPAGE_LIMIT,
+                        constraint_name="execution_feasible_size",
+                        constraint_limit=self.sizing_config.min_position_usd,
+                        current_utilization=capped_size,
+                        shortfall=self.sizing_config.min_position_usd - capped_size,
                     )
                 )
                 continue
@@ -382,6 +402,24 @@ class Allocator:
             edge=edge,
             edge_normalization=self.sizing_config.edge_normalization,
         )
+
+    def _execution_feasible_size(
+        self,
+        *,
+        max_slippage_pct: float,
+        liquidity: float,
+    ) -> float:
+        if liquidity <= 0:
+            return 0.0
+        if max_slippage_pct <= self.slippage_config.min_slippage_pct:
+            return 0.0
+        max_size = (
+            liquidity
+            * max_slippage_pct
+            / max(self.slippage_config.impact_factor, 1e-9)
+            * self.sizing_config.execution_size_safety_factor
+        )
+        return max(0.0, max_size)
 
     def _is_drawdown_breached(self, portfolio: PortfolioSnapshot) -> bool:
         if portfolio.total_capital <= 0:

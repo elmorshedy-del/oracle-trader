@@ -49,6 +49,7 @@ class SizingConfig:
     edge_normalization: float = 0.10
     min_position_usd: float = 10.0
     max_slippage_pct: float = 0.02
+    execution_size_safety_factor: float = 0.85
 
 
 @dataclass(frozen=True)

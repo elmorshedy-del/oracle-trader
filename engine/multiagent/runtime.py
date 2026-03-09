@@ -598,7 +598,7 @@ class MultiagentRuntime:
             enricher=self.enricher,
             strategy_registry=self.strategy_registry,
             validator=Validator(self.config.validation),
-            allocator=Allocator(self.config.risk_limits, self.config.sizing),
+            allocator=Allocator(self.config.risk_limits, self.config.sizing, self.config.execution.paper),
             executor=Executor.from_config(self.config.execution),
             state=self.state,
             tracer=self.tracer,

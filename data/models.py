@@ -24,6 +24,7 @@ class Side(str, Enum):
 class SignalSource(str, Enum):
     LIQUIDITY = "liquidity_provision"
     ARBITRAGE = "multi_outcome_arbitrage"
+    BUNDLE_ARB = "bundle_arb_strict"
     WHALE = "whale_tracking"
     NEWS = "news_latency"
     MEAN_REVERSION = "mean_reversion"

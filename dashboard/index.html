@@ -661,6 +661,7 @@ function stratBadge(source) {
   const map = {
     'liquidity_provision': ['LIQ', 'strat-liquidity'],
     'multi_outcome_arbitrage': ['ARB', 'strat-arbitrage'],
+    'bundle_arb_strict': ['BUNDLE', 'strat-arbitrage'],
     'whale_tracking': ['WHALE', 'strat-whale'],
     'news_latency': ['NEWS', 'strat-news'],
     'news_whale': ['N+W', 'strat-whale'],
@@ -754,6 +755,7 @@ function renderViewTabs(d) {
     'bitcoin',
     'bitcoin_whale',
     'arbitrage',
+    'bundle_arb',
     'whale_follow',
     'momentum',
   ];
@@ -863,7 +865,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};

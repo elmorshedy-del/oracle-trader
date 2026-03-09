@@ -21,6 +21,7 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.weather import WeatherForecastStrategy
+from strategies.bundle_arb import BundleArbitrageStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester
@@ -71,6 +72,7 @@ COMPARISON_VIEW_CONFIG = {
         "source": "bitcoin_whale",
     },
     "arbitrage": {"label": "Arbitrage", "strategy": "arbitrage", "source": "multi_outcome_arbitrage"},
+    "bundle_arb": {"label": "Bundle Arb", "strategy": "bundle_arb", "source": SignalSource.BUNDLE_ARB.value},
     "whale_follow": {"label": "Whale Follow", "strategy": "whale", "source": SignalSource.WHALE.value},
     "momentum": {"label": "Momentum", "strategy": "mean_reversion", "source": "mean_reversion"},
 }
@@ -106,6 +108,7 @@ class Pipeline:
                 state_path=str(STATE_PATH.with_name("weather_state.json")),
             ),
         }
+        self.bundle_arb_strategy = BundleArbitrageStrategy(self.config)
 
         # Engine
         self.trader = PaperTrader(
@@ -240,6 +243,18 @@ class Pipeline:
                     strategy_signal_counts[name] = 0
                     strategy_signals[name] = []
                     self.health.record_strategy_error(name, str(e))
+
+            try:
+                _bundle_start = _time.time()
+                bundle_signals = await self.bundle_arb_strategy.scan(self._markets, self._events)
+                _bundle_dur = (_time.time() - _bundle_start) * 1000
+                strategy_signals["bundle_arb"] = bundle_signals
+                self.health.record_strategy_run("bundle_arb", len(bundle_signals), _bundle_dur)
+            except Exception as e:
+                logger.error(f"Strategy bundle_arb error: {e}")
+                self.bundle_arb_strategy._stats["errors"] += 1
+                strategy_signals["bundle_arb"] = []
+                self.health.record_strategy_error("bundle_arb", str(e))
 
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
             # Whale data is still loaded and available for the dashboard
@@ -543,6 +558,8 @@ class Pipeline:
             "trades": comparison_views["all"]["trades"],
             "strategies": {
                 name: strat.stats for name, strat in self.strategies.items()
+            } | {
+                "bundle_arb": self.bundle_arb_strategy.stats
             },
             "whale_wallets": [
                 {

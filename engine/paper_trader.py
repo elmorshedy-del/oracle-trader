@@ -75,6 +75,7 @@ WEATHER_CITY_GROUP_ALIASES = {
 STRATEGY_EXPOSURE_CAPS = {
     SignalSource.LIQUIDITY: 0.25,
     SignalSource.ARBITRAGE: 0.20,
+    SignalSource.BUNDLE_ARB: 1.00,
     SignalSource.NEWS: 0.15,
     SignalSource.MEAN_REVERSION: 0.20,
     SignalSource.CRYPTO_ARB: 0.20,
@@ -86,6 +87,7 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WHALE: 0.35,
 }
 SOURCE_POSITION_LIMITS = {
+    SignalSource.BUNDLE_ARB: 20,
     SignalSource.CRYPTO_STRUCTURE: 12,
     SignalSource.WEATHER_SNIPER: 30,
     SignalSource.WEATHER_LATENCY: 12,
@@ -93,6 +95,7 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WHALE: 16,
 }
 SOURCE_SCAN_LIMITS = {
+    SignalSource.BUNDLE_ARB: 6,
     SignalSource.CRYPTO_STRUCTURE: 4,
     SignalSource.WEATHER_SNIPER: 12,
     SignalSource.WEATHER_LATENCY: 4,

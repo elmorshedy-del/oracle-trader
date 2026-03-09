@@ -59,6 +59,18 @@ class ArbitrageConfig:
 
 
 @dataclass
+class BundleArbitrageConfig:
+    """Strict bundle arbitrage experiment (comparison-book only)."""
+    enabled: bool = True
+    min_profit_cents: float = 3.0
+    max_position_usd: float = float(os.getenv("BUNDLE_ARB_MAX_POSITION_USD", "200"))
+    max_outcomes: int = 12
+    min_liquidity_usd: float = 1500.0
+    min_event_volume_usd: float = 10000.0
+    require_neg_risk: bool = False
+
+
+@dataclass
 class WhaleTrackingConfig:
     """Whale wallet tracking (Layer 3 — the advisor)."""
     enabled: bool = True
@@ -215,6 +227,7 @@ class PipelineConfig:
     wallet: WalletConfig = field(default_factory=WalletConfig)
     liquidity: LiquidityProvisionConfig = field(default_factory=LiquidityProvisionConfig)
     arbitrage: ArbitrageConfig = field(default_factory=ArbitrageConfig)
+    bundle_arb: BundleArbitrageConfig = field(default_factory=BundleArbitrageConfig)
     whale: WhaleTrackingConfig = field(default_factory=WhaleTrackingConfig)
     news: NewsConfig = field(default_factory=NewsConfig)
     mean_reversion: MeanReversionConfig = field(default_factory=MeanReversionConfig)

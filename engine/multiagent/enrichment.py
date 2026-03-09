@@ -258,7 +258,7 @@ class NewsEnrichmentProvider:
             for headline in headlines:
                 self.helper._register_headline(headline)
 
-            ready = self.helper._ready_headlines()[:10]
+            ready = self.helper._ready_headlines()[:15]
             if not ready:
                 self.state.set_results({})
                 return
@@ -268,8 +268,6 @@ class NewsEnrichmentProvider:
                 headline_id = self.helper._headline_id(headline)
                 candidate_markets = self.helper._candidate_markets_for_headline(headline, limit=10)
                 if not candidate_markets:
-                    candidate_markets = self.helper._fallback_market_context(raw_markets, limit=10)
-                if not candidate_markets:
                     self.helper._mark_headline_processed(headline_id)
                     continue
 
@@ -277,9 +275,12 @@ class NewsEnrichmentProvider:
                     task_name="news_relevance",
                     system_prompt=(
                         "You are labeling prediction-market news relevance. "
-                        "Choose the single most relevant market candidate using its exact market_slug. "
+                        "You must choose exactly one market_slug from the provided candidate list or return an empty string if none are relevant. "
                         "Classify direction as bullish, bearish, or neutral. "
-                        "Estimate only a small expected market move in cents, set confidence from 0.0 to 1.0, and explain briefly. "
+                        "Set confidence from 0.0 to 1.0. "
+                        "Estimate a plausible expected market move in cents from 0 to 25. "
+                        "Only assign confidence above 0.35 when the headline is directly relevant to the chosen market. "
+                        "Keep reasoning short and concrete. "
                         "Return exactly one JSON object with keys: market_slug, direction, confidence, expected_impact_cents, reasoning."
                     ),
                     user_payload={
@@ -289,41 +290,26 @@ class NewsEnrichmentProvider:
                             {
                                 "market_slug": market.slug,
                                 "question": market.question,
+                                "description": getattr(market, "description", "")[:180],
+                                "tags": list(getattr(market, "tags", [])[:6]),
                                 "yes_price": market.outcomes[0].price if market.outcomes else None,
+                                "no_price": market.outcomes[1].price if len(market.outcomes) > 1 else None,
                             }
-                            for market in candidate_markets[:8]
+                            for market in candidate_markets[:6]
                         ],
                     },
                     required_keys=("market_slug", "direction", "confidence", "expected_impact_cents", "reasoning"),
                 )
 
                 if llm_result is None or llm_result.parsed_json is None:
-                    top_market = candidate_markets[0]
-                    results[top_market.condition_id] = EnrichmentResult(
-                        provider_name=self.name,
-                        data={
-                            "headline": headline.title,
-                            "source": headline.source,
-                            "market_slug": top_market.slug,
-                            "direction": "neutral",
-                            "confidence": 0.0,
-                            "expected_impact_cents": 0.0,
-                            "reasoning": "No engine-side LLM classification was available; raw headline only.",
-                            "llm_provider": None,
-                            "llm_model": None,
-                            "llm_attempts": [attempt.__dict__ for attempt in attempts],
-                            "llm_error": llm_result.error if llm_result else "news_llm_unavailable",
-                        },
-                        llm_assisted=False,
-                        fetched_at=utc_now(),
-                        staleness_seconds=0.0,
-                        error=llm_result.error if llm_result else "news_llm_unavailable",
-                    )
                     self.helper._mark_headline_processed(headline_id)
                     continue
 
                 parsed = llm_result.parsed_json
-                market_slug = parsed.get("market_slug")
+                market_slug = str(parsed.get("market_slug", "") or "").strip()
+                if not market_slug:
+                    self.helper._mark_headline_processed(headline_id)
+                    continue
                 chosen_market = self.helper._market_lookup.get(market_slug) if market_slug else None
                 if chosen_market is None:
                     self.helper._mark_headline_processed(headline_id)

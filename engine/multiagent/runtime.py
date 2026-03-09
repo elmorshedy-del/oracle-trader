@@ -984,7 +984,14 @@ class MultiagentRuntime:
             if getattr(provider, "name", None) != "news":
                 continue
             results = list(getattr(provider.state, "results", {}).values())
-            results.sort(key=lambda item: item.fetched_at, reverse=True)
+            results.sort(
+                key=lambda item: (
+                    1 if item.llm_assisted else 0,
+                    float((item.data or {}).get("confidence", 0.0) or 0.0),
+                    item.fetched_at.timestamp(),
+                ),
+                reverse=True,
+            )
             terminal_rows = []
             for result in results[:10]:
                 data = result.data or {}
@@ -1000,6 +1007,7 @@ class MultiagentRuntime:
                         "llm_provider": data.get("llm_provider"),
                         "llm_model": data.get("llm_model"),
                         "llm_assisted": bool(result.llm_assisted),
+                        "llm_error": data.get("llm_error") or result.error,
                         "fetched_at": result.fetched_at.isoformat(),
                     }
                 )

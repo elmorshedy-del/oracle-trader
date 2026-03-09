@@ -17,6 +17,7 @@ class StrategyCap:
 
 @dataclass(frozen=True)
 class ValidationConfig:
+    allow_duplicate_positions: bool = True
     min_volume_24h: float = 5000.0
     strategy_min_volume_24h: dict[str, float] = field(
         default_factory=lambda: {
@@ -210,10 +211,10 @@ class OrchestratorConfig:
                 "max_candidates_per_cycle": 8,
             },
             "news_signal": {
-                "min_confidence": 0.58,
-                "min_edge": 0.03,
-                "max_entry_price": 0.75,
-                "max_candidates_per_cycle": 4,
+                "min_confidence": 0.35,
+                "min_edge": 0.015,
+                "max_entry_price": 0.85,
+                "max_candidates_per_cycle": 6,
             },
         }
     )

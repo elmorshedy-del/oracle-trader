@@ -215,6 +215,23 @@ class DuplicatePositionRule:
     blocking: bool = True
 
     def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+        if self.config.allow_duplicate_positions:
+            existing_count = sum(
+                1
+                for position in portfolio.positions
+                if position.status == PositionStatus.OPEN and position.market_id == candidate.market_id
+            )
+            return ValidationCheck(
+                rule_name=self.name,
+                passed=True,
+                blocking=self.blocking,
+                actual_value=float(existing_count),
+                reason=(
+                    "same-market pyramiding allowed"
+                    if existing_count
+                    else "no existing position"
+                ),
+            )
         duplicate = portfolio.has_position_in(candidate.market_id)
         return ValidationCheck(
             rule_name=self.name,

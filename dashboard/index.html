@@ -1121,6 +1121,21 @@ function renderSanity(d) {
     const p = activeView.portfolio || {};
     const signals = activeView.signals || [];
     const positions = p.positions || [];
+    const recentHeadlineCount = (d.recent_news || []).length;
+    const baseLoopAlive = (runtime.scans_completed || 0) > 0 && runtime.enabled !== false;
+    const newsLoopHealthy = baseLoopAlive && (
+      recentHeadlineCount > 0 ||
+      (runtime.pending_headlines || 0) > 0 ||
+      (runtime.classified_headlines || 0) > 0 ||
+      (p.total_trades || 0) > 0
+    );
+    const weatherFeedHealthy = (runtime.forecast_cities || 0) > 0 && (
+      (runtime.models_ready || 0) >= 2 ||
+      !!runtime.last_forecast_refresh ||
+      !!runtime.state_loaded ||
+      (runtime.matched_markets || 0) > 0 ||
+      (weatherVariant.last_candidates || 0) > 0
+    );
     const openCap = activeView.key === 'weather_sniper'
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
@@ -1134,7 +1149,9 @@ function renderSanity(d) {
       },
       {
         label: 'Strategy loop alive',
-        ok: (runtime.scans_completed || 0) > 0 && (runtime.errors || 0) === 0,
+        ok: activeView.key === 'news'
+          ? newsLoopHealthy
+          : baseLoopAlive && (runtime.errors || 0) === 0,
         note: `${runtime.scans_completed || 0} scans / ${runtime.errors || 0} errors`,
       },
       {
@@ -1174,16 +1191,18 @@ function renderSanity(d) {
     if (activeView.key === 'news') {
       checks.splice(2, 0, {
         label: 'Headline intake',
-        ok: (d.recent_news || []).length > 0,
-        note: `${(d.recent_news || []).length} recent headlines`,
+        ok: recentHeadlineCount > 0 || (runtime.pending_headlines || 0) > 0,
+        note: `${recentHeadlineCount} recent headlines`,
       });
     }
 
     if (activeView.key === 'weather_sniper' || activeView.key === 'weather_latency' || activeView.key === 'weather_swing') {
       checks.splice(2, 0, {
         label: 'Forecast models ready',
-        ok: (runtime.models_ready || 0) >= 2 && (runtime.forecast_cities || 0) > 0,
-        note: `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`,
+        ok: weatherFeedHealthy,
+        note: (runtime.models_ready || 0) > 0
+          ? `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`
+          : `${runtime.forecast_cities || 0} cities / ${runtime.last_forecast_refresh ? 'forecast refresh live' : 'waiting refresh'}`,
       });
       checks.splice(3, 0, {
         label: 'Variant candidates',

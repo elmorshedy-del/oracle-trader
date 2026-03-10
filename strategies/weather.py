@@ -265,6 +265,44 @@ class WeatherForecastStrategy(BaseStrategy):
 
         return signals
 
+    def get_model_candidates(self) -> list[dict]:
+        """Expose enriched weather matches for external-only ML sleeves."""
+        candidates: list[dict] = []
+        for match in self._matched_markets:
+            market = match["market"]
+            if len(market.outcomes) < 2:
+                continue
+
+            target_date = match.get("target_date")
+            horizon_days = self._forecast_horizon_days(target_date)
+            if horizon_days is None or horizon_days > WEATHER_MAX_SIGNAL_HORIZON_DAYS:
+                continue
+
+            context = self._build_forecast_context(
+                city=match["city"],
+                target_date=target_date,
+                temp_range=match["temp_range"],
+                range_kind=match["range_kind"],
+                horizon_days=horizon_days,
+            )
+            if not context:
+                continue
+
+            candidates.append(
+                {
+                    "market": market,
+                    "city": match["city"],
+                    "temp_range": match["temp_range"],
+                    "range_kind": match["range_kind"],
+                    "target_date": target_date,
+                    "temp_unit": match.get("temp_unit", "F"),
+                    "context": context,
+                    "yes_price": market.outcomes[0].price,
+                    "no_price": market.outcomes[1].price,
+                }
+            )
+        return candidates
+
     def _weather_group_key(self, city: str, target_date: str | None) -> str:
         canonical_city = WEATHER_CITY_ALIASES.get(city, city)
         return f"weather:{canonical_city}:{target_date or 'unknown'}"
@@ -865,6 +903,7 @@ class WeatherForecastStrategy(BaseStrategy):
             temp_range = self._extract_temp_range(market.question)
             range_kind = self._temp_range_kind(market.question)
             target_date = self._extract_date(market.question)
+            temp_unit = self._extract_temp_unit(market.question)
 
             if temp_range is None or target_date is None or range_kind is None:
                 continue
@@ -875,6 +914,7 @@ class WeatherForecastStrategy(BaseStrategy):
                 "temp_range": temp_range,
                 "range_kind": range_kind,
                 "target_date": target_date,
+                "temp_unit": temp_unit,
             })
 
         self._stats["matched_markets"] = len(self._matched_markets)
@@ -911,6 +951,18 @@ class WeatherForecastStrategy(BaseStrategy):
             return (exact - 0.5, exact + 0.5)
 
         return None
+
+    def _extract_temp_unit(self, question: str) -> str:
+        question_lower = question.lower()
+        if "celsius" in question_lower:
+            return "C"
+        if "fahrenheit" in question_lower:
+            return "F"
+        if re.search(r"\b\d+\s*°?\s*c\b", question_lower):
+            return "C"
+        if re.search(r"\b\d+\s*°?\s*f\b", question_lower):
+            return "F"
+        return "F"
 
     def _temp_range_kind(self, question: str) -> str | None:
         question_lower = question.lower()

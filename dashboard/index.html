@@ -674,6 +674,8 @@ function stratBadge(source) {
     'weather_sniper': ['SNIPER', 'strat-weather'],
     'weather_latency_hunter': ['LAT', 'strat-weather'],
     'weather_swing_trader': ['SWING', 'strat-weather'],
+    'weather_model_trader': ['ML TR', 'strat-weather'],
+    'weather_model_signal': ['ML SIG', 'strat-weather'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;
@@ -691,6 +693,8 @@ function normalizeStrategyKey(key) {
     weather_sniper: 'weather_sniper',
     weather_latency: 'weather_latency_hunter',
     weather_swing: 'weather_swing_trader',
+    weather_model_trader: 'weather_model_trader',
+    weather_model_signal: 'weather_model_signal',
   };
   return aliases[key] || key;
 }
@@ -750,6 +754,8 @@ function renderViewTabs(d) {
     'weather_sniper',
     'weather_latency',
     'weather_swing',
+    'weather_model_trader',
+    'weather_model_signal',
     'news',
     'news_whale',
     'bitcoin',
@@ -865,7 +871,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};
@@ -1094,6 +1100,8 @@ function renderSanity(d) {
       weather_sniper: 'weather',
       weather_latency: 'weather',
       weather_swing: 'weather',
+      weather_model_trader: 'weather_model',
+      weather_model_signal: 'weather_model',
       news: 'news',
       bitcoin: 'crypto_arb',
       arbitrage: 'arbitrage',
@@ -1105,13 +1113,19 @@ function renderSanity(d) {
       weather_sniper: 'sniper',
       weather_latency: 'latency',
       weather_swing: 'swing',
+      weather_model_trader: 'trader',
+      weather_model_signal: 'signal',
     };
     const weatherVariants = runtime.variants || {};
     const weatherVariant = weatherVariants[weatherVariantKeyMap[activeView.key]] || {};
     const p = activeView.portfolio || {};
     const signals = activeView.signals || [];
     const positions = p.positions || [];
-    const openCap = activeView.key === 'weather_sniper' ? 30 : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing' ? 12 : 10);
+    const openCap = activeView.key === 'weather_sniper'
+      ? 30
+      : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
+        ? 12
+        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : 10)));
     const checks = [
       {
         label: 'Portfolio funded',
@@ -1175,6 +1189,31 @@ function renderSanity(d) {
         label: 'Variant candidates',
         ok: (weatherVariant.last_candidates || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${weatherVariant.last_candidates || 0} candidates / ${weatherVariant.last_signals || 0} live`,
+      });
+    }
+
+    if (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_signal') {
+      checks.splice(2, 0, {
+        label: 'Model bundle loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.models_loaded || []).length > 0,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error} / ${runtime.bundle_version || 'unknown'}`
+          : `${(runtime.models_loaded || []).length} models / ${runtime.bundle_version || 'unknown'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Scored weather markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.candidate_markets || 0} candidates`,
+      });
+      checks.splice(4, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'ML sleeve flow',
+        ok: (weatherVariant.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${weatherVariant.last_signals || 0} live / ${p.total_trades || 0} trades`,
       });
     }
 

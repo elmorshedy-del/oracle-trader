@@ -40,6 +40,8 @@ STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.WEATHER_SNIPER: 8.0,
     SignalSource.WEATHER_LATENCY: 6.0,
     SignalSource.WEATHER_SWING: 18.0,
+    SignalSource.WEATHER_MODEL_TRADER: 12.0,
+    SignalSource.WEATHER_MODEL_SIGNAL: 10.0,
     SignalSource.MEAN_REVERSION: 24.0,
 }
 STALE_DIRECTIONAL_FLAT_PNL_PCT = 0.08
@@ -84,6 +86,8 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_SNIPER: 0.08,
     SignalSource.WEATHER_LATENCY: 0.12,
     SignalSource.WEATHER_SWING: 0.10,
+    SignalSource.WEATHER_MODEL_TRADER: 1.00,
+    SignalSource.WEATHER_MODEL_SIGNAL: 1.00,
     SignalSource.WHALE: 0.35,
 }
 SOURCE_POSITION_LIMITS = {
@@ -92,6 +96,8 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WEATHER_SNIPER: 30,
     SignalSource.WEATHER_LATENCY: 12,
     SignalSource.WEATHER_SWING: 12,
+    SignalSource.WEATHER_MODEL_TRADER: 20,
+    SignalSource.WEATHER_MODEL_SIGNAL: 14,
     SignalSource.WHALE: 16,
 }
 SOURCE_SCAN_LIMITS = {
@@ -100,6 +106,8 @@ SOURCE_SCAN_LIMITS = {
     SignalSource.WEATHER_SNIPER: 12,
     SignalSource.WEATHER_LATENCY: 4,
     SignalSource.WEATHER_SWING: 4,
+    SignalSource.WEATHER_MODEL_TRADER: 8,
+    SignalSource.WEATHER_MODEL_SIGNAL: 5,
     SignalSource.WHALE: 6,
 }
 CRYPTO_SOURCES = {
@@ -111,6 +119,8 @@ WEATHER_SOURCES = {
     SignalSource.WEATHER_SNIPER,
     SignalSource.WEATHER_LATENCY,
     SignalSource.WEATHER_SWING,
+    SignalSource.WEATHER_MODEL_TRADER,
+    SignalSource.WEATHER_MODEL_SIGNAL,
 }
 
 

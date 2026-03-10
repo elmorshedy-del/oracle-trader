@@ -21,6 +21,7 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.weather import WeatherForecastStrategy
+from strategies.weather_model import WeatherModelStrategy
 from strategies.bundle_arb import BundleArbitrageStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
@@ -62,6 +63,18 @@ COMPARISON_VIEW_CONFIG = {
         "strategy": "weather",
         "source": SignalSource.WEATHER_SWING.value,
         "signal_sources": (SignalSource.WEATHER_SWING.value,),
+    },
+    "weather_model_trader": {
+        "label": "Weather ML Trader",
+        "strategy": "weather_model_trader",
+        "source": SignalSource.WEATHER_MODEL_TRADER.value,
+        "signal_sources": (SignalSource.WEATHER_MODEL_TRADER.value,),
+    },
+    "weather_model_signal": {
+        "label": "Weather ML Signal",
+        "strategy": "weather_model_signal",
+        "source": SignalSource.WEATHER_MODEL_SIGNAL.value,
+        "signal_sources": (SignalSource.WEATHER_MODEL_SIGNAL.value,),
     },
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
     "news_whale": {"label": "News + Whale", "strategy": "news", "source": "news_whale"},
@@ -109,6 +122,12 @@ class Pipeline:
             ),
         }
         self.bundle_arb_strategy = BundleArbitrageStrategy(self.config)
+        self.comparison_only_strategies = {
+            "weather_model": WeatherModelStrategy(
+                self.config,
+                weather_strategy=self.strategies["weather"],
+            ),
+        }
 
         # Engine
         self.trader = PaperTrader(
@@ -255,6 +274,25 @@ class Pipeline:
                 self.bundle_arb_strategy._stats["errors"] += 1
                 strategy_signals["bundle_arb"] = []
                 self.health.record_strategy_error("bundle_arb", str(e))
+
+            weather_model: WeatherModelStrategy = self.comparison_only_strategies["weather_model"]
+            try:
+                _weather_model_start = _time.time()
+                weather_model_outputs = weather_model.scan_variants()
+                _weather_model_dur = (_time.time() - _weather_model_start) * 1000
+                for key, value in weather_model_outputs.items():
+                    strategy_signals[key] = value
+                self.health.record_strategy_run(
+                    "weather_model",
+                    sum(len(value) for value in weather_model_outputs.values()),
+                    _weather_model_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy weather_model error: {e}")
+                weather_model._stats["errors"] += 1
+                strategy_signals["weather_model_trader"] = []
+                strategy_signals["weather_model_signal"] = []
+                self.health.record_strategy_error("weather_model", str(e))
 
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
             # Whale data is still loaded and available for the dashboard
@@ -426,6 +464,10 @@ class Pipeline:
             return self.config.weather.latency_budget_usd
         if view_key == "weather_swing":
             return self.config.weather.swing_budget_usd
+        if view_key == "weather_model_trader":
+            return self.config.weather_model.trader_budget_usd
+        if view_key == "weather_model_signal":
+            return self.config.weather_model.signal_budget_usd
         return self.config.risk.max_total_exposure_usd
 
     def _write_diagnostic_entry(
@@ -559,7 +601,8 @@ class Pipeline:
             "strategies": {
                 name: strat.stats for name, strat in self.strategies.items()
             } | {
-                "bundle_arb": self.bundle_arb_strategy.stats
+                "bundle_arb": self.bundle_arb_strategy.stats,
+                "weather_model": self.comparison_only_strategies["weather_model"].stats,
             },
             "whale_wallets": [
                 {
@@ -673,6 +716,10 @@ class Pipeline:
                     "sniper": self.config.weather.sniper_budget_usd,
                     "latency": self.config.weather.latency_budget_usd,
                     "swing": self.config.weather.swing_budget_usd,
+                },
+                "weather_model_budgets": {
+                    "trader": self.config.weather_model.trader_budget_usd,
+                    "signal": self.config.weather_model.signal_budget_usd,
                 },
             },
             "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),

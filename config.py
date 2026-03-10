@@ -202,6 +202,31 @@ class WeatherForecastConfig:
 
 
 @dataclass
+class WeatherModelConfig:
+    """External-only weather ML experiments (comparison-book only)."""
+    enabled: bool = True
+    model_dir: str = os.getenv(
+        "WEATHER_MODEL_DIR",
+        "models/weather_ml/external_only/legacy-weather-ml-v1",
+    )
+
+    trader_budget_usd: float = float(os.getenv("WEATHER_MODEL_TRADER_BUDGET_USD", "750"))
+    signal_budget_usd: float = float(os.getenv("WEATHER_MODEL_SIGNAL_BUDGET_USD", "600"))
+
+    trader_min_edge: float = 0.07
+    trader_min_prob_distance: float = 0.10
+    trader_max_token_price: float = 0.82
+    trader_min_size_usd: float = 18.0
+    trader_max_size_usd: float = 140.0
+
+    signal_min_edge: float = 0.11
+    signal_min_prob_distance: float = 0.18
+    signal_max_token_price: float = 0.72
+    signal_min_size_usd: float = 15.0
+    signal_max_size_usd: float = 110.0
+
+
+@dataclass
 class MeanReversionConfig:
     """Mean reversion — competing signal strategy."""
     enabled: bool = True
@@ -233,6 +258,7 @@ class PipelineConfig:
     mean_reversion: MeanReversionConfig = field(default_factory=MeanReversionConfig)
     crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
+    weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     # Pipeline modes

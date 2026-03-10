@@ -101,8 +101,8 @@ def recommended_strategy_caps() -> dict[str, StrategyCap]:
 
 @dataclass(frozen=True)
 class RiskLimits:
-    max_portfolio_utilization_pct: float = 0.98
-    min_reserve_pct: float = 0.02
+    max_portfolio_utilization_pct: float = 0.995
+    min_reserve_pct: float = 0.005
     max_drawdown_pct: float = 0.15
     max_single_position_pct: float = 0.20
     max_single_position_usd: float = 2500.0
@@ -114,6 +114,12 @@ class RiskLimits:
             "politics": 1.0,
             "sports": 1.0,
             "other": 1.0,
+        }
+    )
+    family_caps: dict[str, int] = field(
+        default_factory=lambda: {
+            "relationship_arbitrage": 3,
+            "crypto_latency": 2,
         }
     )
     reentry_cooldown_hours: float = 0.0
@@ -204,6 +210,7 @@ class OrchestratorConfig:
                 "min_history_points": 3,
             },
             "crypto_latency": {
+                "enabled": os.getenv("OPUS_ENABLE_CRYPTO_LATENCY", "0").lower() in {"1", "true", "yes", "on"},
                 "temporal_min_move_pct": 0.003,
                 "temporal_max_entry_price": 0.75,
                 "barrier_min_edge": 0.04,

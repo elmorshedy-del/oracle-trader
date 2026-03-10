@@ -57,6 +57,13 @@ DEFAULT_CLOB_CONCURRENCY = 8
 DEFAULT_EXIT_CONVERGENCE_RATIO = 0.96
 DEFAULT_EXIT_MAX_HOLD_HOURS = 8.0
 DEFAULT_EXIT_STOP_LOSS_PCT = -0.18
+EXIT_CONVERGENCE_RATIO_BY_STRATEGY = {
+    "relationship_arbitrage": 0.92,
+}
+EXIT_MAX_HOLD_HOURS_BY_STRATEGY = {
+    "relationship_arbitrage": 4.0,
+    "crypto_latency": 4.0,
+}
 METRICS_LOG_PATH = LOG_DIR / "multiagent_metrics.jsonl"
 METRICS_DB_PATH = LOG_DIR / "multiagent_runtime.sqlite"
 STATE_FILE_PATH = LOG_DIR / "multiagent_runtime_state.json"
@@ -170,9 +177,11 @@ class InMemoryStateManager:
         *,
         starting_capital: float,
         reserve_pct: float,
+        disabled_strategies: set[str] | None = None,
     ) -> None:
         self._starting_capital = starting_capital
         self._reserve_pct = reserve_pct
+        self._disabled_strategies = set(disabled_strategies or set())
         self._positions: list[PositionState] = []
         self._closed_positions: list[dict[str, Any]] = []
         self._closed_event_queue: list[dict[str, Any]] = []
@@ -353,8 +362,15 @@ class InMemoryStateManager:
         )
 
     def _exit_reason(self, position: PositionState, now: datetime) -> str | None:
+        if position.strategy_name in self._disabled_strategies:
+            return "strategy_disabled"
+
         target_price = float(position.metadata.get("target_price", 0.0) or 0.0)
-        if target_price > 0 and position.current_price >= target_price * DEFAULT_EXIT_CONVERGENCE_RATIO:
+        convergence_ratio = EXIT_CONVERGENCE_RATIO_BY_STRATEGY.get(
+            position.strategy_name,
+            DEFAULT_EXIT_CONVERGENCE_RATIO,
+        )
+        if target_price > 0 and position.current_price >= target_price * convergence_ratio:
             return "target_converged"
 
         pnl_pct = 0.0
@@ -364,7 +380,11 @@ class InMemoryStateManager:
             return "stop_loss"
 
         held_hours = (now - position.opened_at).total_seconds() / 3600
-        if held_hours >= DEFAULT_EXIT_MAX_HOLD_HOURS:
+        max_hold_hours = EXIT_MAX_HOLD_HOURS_BY_STRATEGY.get(
+            position.strategy_name,
+            DEFAULT_EXIT_MAX_HOLD_HOURS,
+        )
+        if held_hours >= max_hold_hours:
             return "stale_rotation"
 
         return None
@@ -467,9 +487,14 @@ class PersistentStateManager(InMemoryStateManager):
         starting_capital: float,
         reserve_pct: float,
         state_path: Path,
+        disabled_strategies: set[str] | None = None,
     ) -> None:
         self._state_path = state_path
-        super().__init__(starting_capital=starting_capital, reserve_pct=reserve_pct)
+        super().__init__(
+            starting_capital=starting_capital,
+            reserve_pct=reserve_pct,
+            disabled_strategies=disabled_strategies,
+        )
         self._load()
 
     def save(self) -> None:
@@ -610,20 +635,32 @@ class MultiagentRuntime:
                 NewsEnrichmentProvider(self.pipeline_config, self.llm_router),
             ]
         )
+        self._strategy_factory = {
+            "relationship_arbitrage": RelationshipArbitrageStrategy,
+            "weather_sniper": WeatherSniperStrategy,
+            "weather_latency": WeatherLatencyStrategy,
+            "weather_swing": WeatherSwingStrategy,
+            "crypto_latency": CryptoLatencyStrategy,
+            "news_signal": NewsSignalStrategy,
+        }
+        self._configured_strategy_names = list(self._strategy_factory.keys())
+        self._disabled_strategies = {
+            name
+            for name in self._configured_strategy_names
+            if not bool((self.config.strategies.get(name) or {}).get("enabled", True))
+        }
         self.strategy_registry = StaticStrategyRegistry(
             strategies=[
-                RelationshipArbitrageStrategy(),
-                WeatherSniperStrategy(),
-                WeatherLatencyStrategy(),
-                WeatherSwingStrategy(),
-                CryptoLatencyStrategy(),
-                NewsSignalStrategy(),
+                factory()
+                for name, factory in self._strategy_factory.items()
+                if name not in self._disabled_strategies
             ]
         )
         self.state = PersistentStateManager(
             starting_capital=self.starting_capital,
             reserve_pct=self.config.risk_limits.min_reserve_pct,
             state_path=STATE_FILE_PATH,
+            disabled_strategies=self._disabled_strategies,
         )
         self.tracer = ScanCycleTracer()
         self.snapshot_store = SnapshotStore(self.config.audit)
@@ -682,23 +719,36 @@ class MultiagentRuntime:
         state_perf = self.state.performance_summary()
         blockers = self._build_blockers(report)
         comparison_views = self._build_comparison_views(report, portfolio, state_perf)
+        health = self._build_health(report)
+        diagnostics = self._build_diagnostics(report)
+        performance = self._build_performance(report)
+        latest_scan = self._build_latest_scan(report)
+        portfolio_summary = self._build_portfolio_summary(portfolio, state_perf)
+        comparison_overview = self._build_comparison_overview(comparison_views)
+        summary = {
+            "scan_count": self._scan_count,
+            "active_markets": len(self._last_markets),
+            "open_positions": portfolio.position_count,
+            "top_blocker": blockers[0]["title"] if blockers else "No dominant blocker detected",
+        }
         return {
             "bridge": {
                 "mode": "isolated_runtime",
                 "state": "running" if self._running else "stopped",
                 "next_step": "expand_opus_strategies",
             },
-            "summary": {
-                "scan_count": self._scan_count,
-                "active_markets": len(self._last_markets),
-                "open_positions": portfolio.position_count,
-                "top_blocker": blockers[0]["title"] if blockers else "No dominant blocker detected",
-            },
+            "state": "running" if self._running else "stopped",
+            "overall_status": health["overall_status"],
+            "scan_count": self._scan_count,
+            "active_markets": len(self._last_markets),
+            "summary": summary,
             "defaults": dataclass_to_dict(self.config),
             "portfolio": dataclass_to_dict(portfolio),
-            "performance": self._build_performance(report),
-            "health": self._build_health(report),
-            "diagnostics": self._build_diagnostics(report),
+            "portfolio_summary": portfolio_summary,
+            "performance": performance,
+            "health": health,
+            "diagnostics": diagnostics,
+            "latest_scan": latest_scan,
             "market_mix": self._build_market_mix(),
             "market_preview": self._build_market_preview(),
             "provider_cards": [card.__dict__ for card in self.enricher.provider_cards()],
@@ -706,8 +756,10 @@ class MultiagentRuntime:
             "module_cards": self._build_module_cards(report),
             "strategy_cards": self._build_strategy_cards(report),
             "comparison_views": comparison_views,
+            "comparison_overview": comparison_overview,
             "recent_trades": self._recent_trade_rows(limit=20),
             "recent_closed": state_perf["recent_closed"],
+            "recent_closed_positions": state_perf["recent_closed"],
             "export": {
                 "logs_url": "/api/multiagent/logs/export",
                 "metrics_log_path": str(METRICS_LOG_PATH),
@@ -884,6 +936,40 @@ class MultiagentRuntime:
             "resolved": 0,
         }
 
+    def _build_latest_scan(self, report: ScanCycleReport | None) -> dict[str, Any]:
+        if report is None:
+            return {
+                "scan": 0,
+                "markets_scanned": 0,
+                "markets_after_filter": 0,
+                "candidates_generated": 0,
+                "candidates_validated": 0,
+                "candidates_rejected": 0,
+                "intents_created": 0,
+                "allocation_rejections": 0,
+                "executions_succeeded": 0,
+                "executions_failed": 0,
+                "top_rejection_reason": None,
+                "top_allocation_rejection_reason": None,
+                "zero_trade_explanation": "",
+            }
+
+        return {
+            "scan": self._scan_count,
+            "markets_scanned": report.markets_scanned,
+            "markets_after_filter": report.markets_after_filter,
+            "candidates_generated": report.candidates_generated,
+            "candidates_validated": report.candidates_validated,
+            "candidates_rejected": report.candidates_rejected,
+            "intents_created": report.intents_created,
+            "allocation_rejections": report.allocation_rejections,
+            "executions_succeeded": report.executions_succeeded,
+            "executions_failed": report.executions_failed,
+            "top_rejection_reason": report.top_rejection_reason,
+            "top_allocation_rejection_reason": report.top_allocation_rejection_reason,
+            "zero_trade_explanation": report.zero_trade_explanation,
+        }
+
     def _build_module_cards(self, report: ScanCycleReport | None) -> list[dict[str, Any]]:
         if report is None:
             return [
@@ -906,21 +992,32 @@ class MultiagentRuntime:
                 }
             )
         for name, health in report.module_health.items():
+            detail = (
+                f"items in {health.items_in} | items out {health.items_out} | "
+                f"{health.last_duration_seconds:.2f}s"
+            )
+            if name == "scanner.discover":
+                detail = f"items in {report.markets_scanned} | items out {report.markets_after_filter} | {health.last_duration_seconds:.2f}s"
+            elif name == "enricher":
+                detail = f"items in {report.markets_after_filter} | items out {report.markets_enriched} | {health.last_duration_seconds:.2f}s"
+            elif name == "validator":
+                detail = f"items in {report.candidates_generated} | items out {report.candidates_validated} | {health.last_duration_seconds:.2f}s"
+            elif name == "allocator":
+                detail = f"items in {report.candidates_validated} | items out {report.intents_created} | {health.last_duration_seconds:.2f}s"
+            elif name == "executor":
+                detail = f"items in {report.executions_attempted} | items out {report.executions_succeeded} | {health.last_duration_seconds:.2f}s"
             cards.append(
                 {
                     "name": name,
                     "label": name,
                     "status": health.status.value,
-                    "detail": (
-                        f"items in {health.items_in} | items out {health.items_out} | "
-                        f"{health.last_duration_seconds:.2f}s"
-                    ),
+                    "detail": detail,
                 }
             )
         return cards
 
     def _build_strategy_cards(self, report: ScanCycleReport | None) -> list[dict[str, Any]]:
-        strategy_names = [strategy.name for strategy in self.strategy_registry.active_strategies()]
+        strategy_names = list(self._configured_strategy_names)
         if report is None or not strategy_names:
             return [
                 {
@@ -935,11 +1032,21 @@ class MultiagentRuntime:
 
         cards = []
         for name in strategy_names:
+            if name in self._disabled_strategies:
+                cards.append(
+                    {
+                        "name": name,
+                        "status": "healthy",
+                        "runs": self._scan_count,
+                        "errors": 0,
+                        "signals": 0,
+                        "last_error": "Strategy disabled by config.",
+                    }
+                )
+                continue
             count = report.candidates_per_strategy.get(name, 0)
-            status = "healthy" if count > 0 else "degraded"
+            status = "healthy"
             last_error = None
-            if count == 0:
-                last_error = "Strategy scanned successfully but did not emit candidates in the latest cycle."
             cards.append(
                 {
                     "name": name,
@@ -1306,6 +1413,48 @@ class MultiagentRuntime:
                 }
             )
         return blockers
+
+    def _build_portfolio_summary(
+        self,
+        portfolio: PortfolioSnapshot,
+        state_perf: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "total_value": portfolio.total_capital,
+            "available_capital": portfolio.available_capital,
+            "deployed_capital": portfolio.deployed_capital,
+            "realized_pnl": portfolio.total_realized_pnl,
+            "unrealized_pnl": portfolio.total_unrealized_pnl,
+            "open_positions": portfolio.position_count,
+            "mark_win_rate": portfolio.mark_win_rate,
+            "display_win_rate": state_perf.get("display_win_rate", state_perf.get("win_rate", 0.0)),
+            "win_rate_basis": state_perf.get("win_rate_basis", "no trades"),
+            "closed_positions": state_perf.get("closed_positions", 0),
+            "max_drawdown_pct": state_perf.get("max_drawdown_pct", portfolio.max_drawdown_pct),
+            "total_fees_paid": state_perf.get("total_fees_paid", portfolio.total_fees_paid),
+            "exposure_by_strategy": portfolio.exposure_by_strategy,
+            "exposure_by_category": portfolio.exposure_by_category,
+        }
+
+    @staticmethod
+    def _build_comparison_overview(comparison_views: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        overview: list[dict[str, Any]] = []
+        for view in comparison_views:
+            portfolio = view.get("portfolio") or {}
+            overview.append(
+                {
+                    "key": view.get("key"),
+                    "label": view.get("label"),
+                    "total_value": portfolio.get("total_value"),
+                    "total_pnl": portfolio.get("total_pnl"),
+                    "total_pnl_pct": portfolio.get("total_pnl_pct"),
+                    "win_rate": portfolio.get("win_rate"),
+                    "mark_win_rate": portfolio.get("mark_win_rate"),
+                    "open_positions": portfolio.get("open_positions"),
+                    "total_trades": portfolio.get("total_trades"),
+                }
+            )
+        return overview
 
     def _append_metrics_log(self, report: ScanCycleReport) -> None:
         METRICS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -122,6 +122,7 @@ class RelationshipArbitrageStrategy:
                     market_snapshot=cheapest,
                     metadata={
                         "opportunity_type": "duplicate_equivalence",
+                        "family_key": f"duplicate:{key}",
                         "peer_market_id": richest.market_id,
                         "peer_price": rich_yes,
                     },
@@ -181,6 +182,7 @@ class RelationshipArbitrageStrategy:
                                 "opportunity_type": "crypto_ladder",
                                 "symbol": symbol,
                                 "expiry": expiry,
+                                "family_key": f"ladder:{symbol}:{expiry}",
                                 "harder_market_id": harder.market.market_id,
                             },
                         )
@@ -210,6 +212,7 @@ class RelationshipArbitrageStrategy:
                                 "opportunity_type": "crypto_dip_ladder",
                                 "symbol": symbol,
                                 "expiry": expiry,
+                                "family_key": f"dip_ladder:{symbol}:{expiry}",
                                 "harder_market_id": harder.market.market_id,
                             },
                         )
@@ -245,6 +248,7 @@ class RelationshipArbitrageStrategy:
                                 "opportunity_type": "ath_implication",
                                 "symbol": symbol,
                                 "expiry": expiry,
+                                "family_key": f"ath_implication:{symbol}:{expiry}",
                                 "peer_market_id": reach.market.market_id,
                             },
                         )
@@ -294,6 +298,7 @@ class RelationshipArbitrageStrategy:
                         "opportunity_type": "crypto_duplicate",
                         "symbol": symbol,
                         "expiry": expiry,
+                        "family_key": f"crypto_duplicate:{symbol}:{kind}:{expiry}:{barrier}",
                         "peer_market_id": richest.market.market_id,
                     },
                 )

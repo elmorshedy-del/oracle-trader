@@ -177,6 +177,7 @@ class Allocator:
         running_category_exposure = dict(portfolio.exposure_by_category)
         running_strategy_positions = dict(portfolio.positions_by_strategy)
         running_market_ids = set(portfolio.open_market_ids)
+        running_family_positions = self._family_position_counts(portfolio)
 
         for signal in ranked:
             candidate = signal.signal
@@ -197,6 +198,7 @@ class Allocator:
             strategy = candidate.strategy_name
             category = snapshot.category.value
             strategy_cap = self.limits.strategy_caps.get(strategy)
+            family_key = self._family_key(signal)
 
             if market_id in portfolio.recently_closed:
                 closed_at = portfolio.recently_closed[market_id]
@@ -223,6 +225,21 @@ class Allocator:
                             constraint_name=f"strategy_max_positions.{strategy}",
                             constraint_limit=float(strategy_cap.max_positions),
                             current_utilization=float(current_positions),
+                        )
+                    )
+                    continue
+
+            family_cap = self.limits.family_caps.get(strategy)
+            if family_cap is not None and family_key is not None:
+                current_family_positions = running_family_positions.get((strategy, family_key), 0)
+                if current_family_positions >= family_cap:
+                    rejections.append(
+                        AllocationRejection(
+                            signal=signal,
+                            reason=AllocationRejectionReason.FAMILY_CAP_REACHED,
+                            constraint_name=f"family_cap.{strategy}",
+                            constraint_limit=float(family_cap),
+                            current_utilization=float(current_family_positions),
                         )
                     )
                     continue
@@ -373,6 +390,8 @@ class Allocator:
             running_category_exposure[category] = running_category_exposure.get(category, 0.0) + capped_size
             running_strategy_positions[strategy] = running_strategy_positions.get(strategy, 0) + 1
             running_market_ids.add(market_id)
+            if family_key is not None:
+                running_family_positions[(strategy, family_key)] = running_family_positions.get((strategy, family_key), 0) + 1
 
         return intents, rejections
 
@@ -435,3 +454,35 @@ class Allocator:
     @staticmethod
     def _priority_score(signal: ValidatedSignal) -> int:
         return int(abs(signal.signal.edge_estimate) * 10000)
+
+    @staticmethod
+    def _family_key(signal: ValidatedSignal) -> str | None:
+        metadata = signal.signal.metadata or {}
+        family_key = metadata.get("family_key")
+        if family_key:
+            return str(family_key)
+        opportunity_type = metadata.get("opportunity_type")
+        if opportunity_type:
+            peer = metadata.get("peer_market_id") or metadata.get("harder_market_id") or ""
+            symbol = metadata.get("symbol") or ""
+            expiry = metadata.get("expiry") or ""
+            return f"{opportunity_type}:{symbol}:{expiry}:{peer}"
+        return None
+
+    @staticmethod
+    def _family_position_counts(portfolio: PortfolioSnapshot) -> dict[tuple[str, str], int]:
+        counts: dict[tuple[str, str], int] = {}
+        for position in portfolio.positions:
+            family_key = position.metadata.get("family_key")
+            if not family_key:
+                opportunity_type = position.metadata.get("opportunity_type")
+                if opportunity_type:
+                    peer = position.metadata.get("peer_market_id") or position.metadata.get("harder_market_id") or ""
+                    symbol = position.metadata.get("symbol") or ""
+                    expiry = position.metadata.get("expiry") or ""
+                    family_key = f"{opportunity_type}:{symbol}:{expiry}:{peer}"
+            if not family_key:
+                continue
+            key = (position.strategy_name, str(family_key))
+            counts[key] = counts.get(key, 0) + 1
+        return counts

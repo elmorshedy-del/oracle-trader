@@ -59,6 +59,7 @@ class AllocationRejectionReason(str, Enum):
     POSITION_SIZE_EXCEEDS_MAX = "position_size_exceeds_max"
     EXECUTION_SLIPPAGE_LIMIT = "execution_slippage_limit"
     STRATEGY_CAP_REACHED = "strategy_cap_reached"
+    FAMILY_CAP_REACHED = "family_cap_reached"
     CATEGORY_CAP_REACHED = "category_cap_reached"
     MARKET_CAP_REACHED = "market_cap_reached"
     RESERVE_VIOLATED = "reserve_violated"

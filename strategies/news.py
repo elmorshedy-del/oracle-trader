@@ -465,13 +465,22 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             # Some Fireworks model routes reject advanced request knobs with HTTP 412.
             if response.status_code == 412:
                 relaxed_payload = dict(request_payload)
+                # First retry: keep JSON mode, only drop reasoning_effort.
                 relaxed_payload.pop("reasoning_effort", None)
-                relaxed_payload.pop("response_format", None)
                 response = await self.client.post(
                     FIREWORKS_API_URL,
                     headers=headers,
                     json=relaxed_payload,
                 )
+                # Second retry (last resort): drop JSON mode too.
+                if response.status_code == 412:
+                    minimal_payload = dict(relaxed_payload)
+                    minimal_payload.pop("response_format", None)
+                    response = await self.client.post(
+                        FIREWORKS_API_URL,
+                        headers=headers,
+                        json=minimal_payload,
+                    )
             response.raise_for_status()
             payload = self._decode_json_response(response, "fireworks")
             message = (payload.get("choices") or [{}])[0].get("message", {}) or {}

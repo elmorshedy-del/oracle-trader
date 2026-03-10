@@ -258,13 +258,21 @@ async def _call_fireworks(
         # 412 often indicates unsupported request knobs on specific model routes.
         if response.status_code == 412:
             relaxed_payload = dict(request_payload)
+            # First retry: keep JSON mode, only drop reasoning controls.
             relaxed_payload.pop("reasoning_effort", None)
-            relaxed_payload.pop("response_format", None)
             response = await client.post(
                 FIREWORKS_API_URL,
                 headers=headers,
                 json=relaxed_payload,
             )
+            if response.status_code == 412:
+                minimal_payload = dict(relaxed_payload)
+                minimal_payload.pop("response_format", None)
+                response = await client.post(
+                    FIREWORKS_API_URL,
+                    headers=headers,
+                    json=minimal_payload,
+                )
         response.raise_for_status()
         payload = _decode_json_response(response, "fireworks")
     choice = (payload.get("choices") or [{}])[0]

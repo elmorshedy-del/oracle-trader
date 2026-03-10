@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,6 +42,7 @@ from .enrichment import (
     NewsEnrichmentProvider,
     WeatherEnrichmentProvider,
 )
+from .decisioning import OpusDecisionLayer
 from .enums import MarketCategory, ModuleStatus, PositionStatus, SignalDirection
 from .llm import MultiagentLLMRouter
 from .orchestrator import Orchestrator
@@ -294,6 +296,14 @@ class InMemoryStateManager:
         self._snapshot = self._recompute_snapshot()
         self.save()
 
+    def remember_signals(self, signals: list[Any], *, seen_at: datetime, reason: str) -> None:
+        if not signals:
+            return
+        for signal in signals:
+            self._record_signal_entries(signal, seen_at)
+        self._prune_ledgers(seen_at)
+        self.save()
+
     def save(self) -> None:
         return
 
@@ -351,7 +361,12 @@ class InMemoryStateManager:
             metadata=merged,
         )
 
-    def refresh_prices(self, markets: list[NormalizedMarket]) -> None:
+    def refresh_prices(
+        self,
+        markets: list[NormalizedMarket],
+        *,
+        exit_advice: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
         if not self._positions:
             self._prune_ledgers(utc_now())
             self._snapshot = self._recompute_snapshot()
@@ -372,7 +387,8 @@ class InMemoryStateManager:
                 position.unrealized_pnl = (position.current_price - position.entry_price) * position.shares
                 position.last_updated = now
 
-            exit_reason = self._exit_reason(position, now, family_counts, theme_counts, theme_exposure)
+            advice = (exit_advice or {}).get(position.position_id)
+            exit_reason = self._exit_reason(position, now, family_counts, theme_counts, theme_exposure, advice)
             if exit_reason:
                 realized = position.unrealized_pnl
                 self._cash_balance += position.current_price * position.shares
@@ -395,6 +411,12 @@ class InMemoryStateManager:
                     "hold_hours": round((now - position.opened_at).total_seconds() / 3600, 2),
                     "close_reason": exit_reason,
                 }
+                if advice:
+                    event["llm_exit_action"] = advice.get("action")
+                    event["llm_exit_confidence"] = advice.get("confidence")
+                    event["llm_exit_reason"] = advice.get("reason")
+                    event["llm_exit_provider"] = advice.get("provider")
+                    event["llm_exit_model"] = advice.get("model")
                 self._closed_positions.append(event)
                 self._closed_event_queue.append(event)
                 self._closed_positions = self._closed_positions[-200:]
@@ -471,6 +493,7 @@ class InMemoryStateManager:
         family_counts: dict[str, int],
         theme_counts: dict[str, int],
         theme_exposure: dict[str, float],
+        llm_advice: dict[str, Any] | None = None,
     ) -> str | None:
         if position.strategy_name in self._disabled_strategies:
             return "strategy_disabled"
@@ -492,6 +515,9 @@ class InMemoryStateManager:
         held_hours = (now - position.opened_at).total_seconds() / 3600
         if held_hours >= DEFAULT_EXIT_FOLLOW_THROUGH_HOURS and pnl_pct <= DEFAULT_EXIT_FOLLOW_THROUGH_PCT:
             return "follow_through_failed"
+
+        if llm_advice and str(llm_advice.get("action", "")).lower() == "exit":
+            return "llm_exit_judge"
 
         family_key = family_key_from_position(position)
         if family_key is not None:
@@ -837,6 +863,7 @@ class MultiagentRuntime:
         )
         self.scanner = CollectorScanner()
         self.llm_router = MultiagentLLMRouter(self.config.llm)
+        self.decision_layer = OpusDecisionLayer(self.llm_router, self.config.decisioning)
         self.enricher = MultiProviderEnricher(
             providers=[
                 WeatherEnrichmentProvider(self.pipeline_config),
@@ -889,6 +916,7 @@ class MultiagentRuntime:
             tracer=self.tracer,
             snapshot_store=self.snapshot_store,
             config=self.config,
+            decision_layer=self.decision_layer,
         )
 
         self._running = False
@@ -934,6 +962,7 @@ class MultiagentRuntime:
         comparison_views = self._build_comparison_views(report, portfolio, state_perf)
         health = self._build_health(report)
         diagnostics = self._build_diagnostics(report)
+        llm_summary = self._build_llm_summary(report)
         performance = self._build_performance(report)
         latest_scan = self._build_latest_scan(report)
         portfolio_summary = self._build_portfolio_summary(portfolio, state_perf)
@@ -962,6 +991,7 @@ class MultiagentRuntime:
             "performance": performance,
             "health": health,
             "diagnostics": diagnostics,
+            "llm_summary": llm_summary,
             "latest_scan": latest_scan,
             "market_mix": self._build_market_mix(),
             "market_preview": self._build_market_preview(),
@@ -992,9 +1022,16 @@ class MultiagentRuntime:
         await self.enricher.refresh(raw_markets)
         raw_markets = self._merge_supplemental_markets(raw_markets, self.enricher.supplemental_markets())
         self.scanner.set_raw_markets(raw_markets)
-        self._last_report = self.orchestrator.run_scan_cycle()
+        self._last_report = await self.orchestrator.run_scan_cycle()
         self._last_markets = self.scanner.normalize(raw_markets)
-        self.state.refresh_prices(self._last_markets)
+        exit_advice, exit_health, exit_actions, exit_rows = await self.decision_layer.judge_exits(
+            portfolio=self.state.snapshot(),
+            context=self.state.context(),
+        )
+        self.state.refresh_prices(self._last_markets, exit_advice=exit_advice)
+        self._last_report.module_health["llm.exit_judge"] = exit_health
+        self._last_report.llm_exit_actions = dict(exit_actions)
+        self._last_report.llm_decisions_detail.extend(exit_rows)
         self._scan_count += 1
         self._total_candidates += self._last_report.candidates_generated
         self._total_validated += self._last_report.candidates_validated
@@ -1008,6 +1045,7 @@ class MultiagentRuntime:
             portfolio=self.state.snapshot(),
             closed_events=self.state.drain_closed_events(),
         )
+        self.snapshot_store.save(self._last_report)
         self._append_metrics_log(self._last_report)
         logger.info(
             "[MULTIAGENT] Scan #%s: %s markets | %s candidates | %s executed",
@@ -1137,6 +1175,8 @@ class MultiagentRuntime:
                 "executed": 0,
                 "exits": 0,
                 "resolved": 0,
+                "llm_trade_gate_actions": {},
+                "llm_exit_actions": {},
             }
 
         return {
@@ -1148,6 +1188,47 @@ class MultiagentRuntime:
             "executed": report.executions_succeeded,
             "exits": 0,
             "resolved": 0,
+            "llm_trade_gate_actions": report.llm_trade_gate_actions,
+            "llm_exit_actions": report.llm_exit_actions,
+        }
+
+    def _build_llm_summary(self, report: ScanCycleReport | None) -> dict[str, Any]:
+        tasks = self.config.llm.tasks
+        enabled_tasks = {
+            name: bool(cfg.enabled)
+            for name, cfg in tasks.items()
+        }
+        configured_providers = {
+            "anthropic": bool(os.getenv("ANTHROPIC_API_KEY", "")),
+            "fireworks": bool(os.getenv("FIREWORKS_API_KEY", "")),
+            "openai": bool(os.getenv("OPENAI_API_KEY", "")),
+        }
+        latest_trade_gate = report.llm_trade_gate_actions if report is not None else {}
+        latest_exit = report.llm_exit_actions if report is not None else {}
+        llm_rows = report.llm_decisions_detail if report is not None else []
+        recent_successes = [
+            row for row in llm_rows
+            if isinstance(row, dict) and row.get("provider") and not row.get("error")
+        ]
+        recent_failures = [
+            row for row in llm_rows
+            if isinstance(row, dict) and row.get("error")
+        ]
+        return {
+            "configured": any(configured_providers.values()),
+            "router_enabled": bool(self.config.llm.enabled),
+            "providers": configured_providers,
+            "tasks_enabled": enabled_tasks,
+            "trade_gate_active": bool(sum(int(v or 0) for v in latest_trade_gate.values())),
+            "exit_judge_active": bool(sum(int(v or 0) for v in latest_exit.values())),
+            "latest_trade_gate_actions": latest_trade_gate,
+            "latest_exit_actions": latest_exit,
+            "recent_decision_count": len(llm_rows),
+            "recent_success_count": len(recent_successes),
+            "recent_failure_count": len(recent_failures),
+            "last_provider": recent_successes[-1].get("provider") if recent_successes else None,
+            "last_model": recent_successes[-1].get("model") if recent_successes else None,
+            "last_error": recent_failures[-1].get("error") if recent_failures else None,
         }
 
     @staticmethod
@@ -1186,6 +1267,8 @@ class MultiagentRuntime:
                 "top_rejection_reason": None,
                 "top_allocation_rejection_reason": None,
                 "zero_trade_explanation": "",
+                "llm_trade_gate_actions": {},
+                "llm_exit_actions": {},
             }
 
         return {
@@ -1202,6 +1285,8 @@ class MultiagentRuntime:
             "top_rejection_reason": report.top_rejection_reason,
             "top_allocation_rejection_reason": report.top_allocation_rejection_reason,
             "zero_trade_explanation": report.zero_trade_explanation,
+            "llm_trade_gate_actions": report.llm_trade_gate_actions,
+            "llm_exit_actions": report.llm_exit_actions,
         }
 
     def _build_module_cards(self, report: ScanCycleReport | None) -> list[dict[str, Any]]:
@@ -1225,7 +1310,30 @@ class MultiagentRuntime:
                     "detail": provider_card.detail,
                 }
             )
+        for task_name, task_cfg in self.config.llm.tasks.items():
+            task_health = report.module_health.get(f"llm.{task_name}") if report is not None else None
+            if task_health is not None:
+                status = task_health.status.value
+                detail = (
+                    f"items in {task_health.items_in} | items out {task_health.items_out} | "
+                    f"{task_health.last_duration_seconds:.2f}s"
+                )
+                if task_health.last_error:
+                    detail = f"{detail} | last error: {task_health.last_error}"
+            else:
+                status = "healthy" if task_cfg.enabled and self.config.llm.enabled else "degraded"
+                detail = "enabled, waiting for eligible candidates" if task_cfg.enabled and self.config.llm.enabled else "disabled or no provider configured"
+            cards.append(
+                {
+                    "name": f"llm.{task_name}",
+                    "label": f"llm.{task_name}",
+                    "status": status,
+                    "detail": detail,
+                }
+            )
         for name, health in report.module_health.items():
+            if name.startswith("llm."):
+                continue
             detail = (
                 f"items in {health.items_in} | items out {health.items_out} | "
                 f"{health.last_duration_seconds:.2f}s"
@@ -1712,9 +1820,14 @@ class MultiagentRuntime:
                 "min_reserve_pct": self.config.risk_limits.min_reserve_pct,
                 "max_portfolio_utilization_pct": self.config.risk_limits.max_portfolio_utilization_pct,
                 "news_llm_max_calls_per_cycle": self.config.llm.tasks["news_relevance"].max_calls_per_cycle,
+                "trade_gate_enabled": self.config.llm.tasks["trade_gate"].enabled,
+                "exit_judge_enabled": self.config.llm.tasks["exit_judge"].enabled,
                 "news_signal_min_confidence": self.config.strategies["news_signal"]["min_confidence"],
                 "news_signal_min_edge": self.config.strategies["news_signal"]["min_edge"],
             },
+            "llm_trade_gate_actions": report.llm_trade_gate_actions,
+            "llm_exit_actions": report.llm_exit_actions,
+            "llm_decisions": report.llm_decisions_detail[-20:],
             "provider_cards": provider_cards,
         }
         try:
@@ -1759,6 +1872,8 @@ class MultiagentRuntime:
                 "top_rejection_reason": self._last_report.top_rejection_reason if self._last_report else None,
                 "top_allocation_rejection_reason": self._last_report.top_allocation_rejection_reason if self._last_report else None,
                 "zero_trade_explanation": self._last_report.zero_trade_explanation if self._last_report else "",
+                "llm_trade_gate_actions": self._last_report.llm_trade_gate_actions if self._last_report else {},
+                "llm_exit_actions": self._last_report.llm_exit_actions if self._last_report else {},
             },
             "provider_cards": [card.__dict__ for card in self.enricher.provider_cards()],
             "module_cards": status.get("module_cards", []),
@@ -1797,6 +1912,7 @@ class MultiagentRuntime:
             "recent_closed_positions": self.state.closed_positions(20),
             "recent_errors": list(self._recent_errors[-12:]),
             "snapshot_reports": self._compact_snapshot_reports(8),
+            "llm_decisions": (self._last_report.llm_decisions_detail[-30:] if self._last_report else []),
             "metrics_log_path": str(METRICS_LOG_PATH),
             "metrics_db_path": str(METRICS_DB_PATH),
             "state_path": str(STATE_FILE_PATH),

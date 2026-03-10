@@ -50,6 +50,8 @@ class RejectionReason(str, Enum):
     RECENT_SIGNAL_DUPLICATE = "recent_signal_duplicate"
     RECENT_HEADLINE_DUPLICATE = "recent_headline_duplicate"
     FAMILY_REENTRY_COOLDOWN = "family_reentry_cooldown"
+    LLM_TRADE_GATE_REJECTED = "llm_trade_gate_rejected"
+    LLM_TRADE_GATE_DEFERRED = "llm_trade_gate_deferred"
     MAX_MARKETS_PER_CATEGORY = "max_markets_per_category"
     ENRICHMENT_STALE = "enrichment_stale"
     ENRICHMENT_MISSING_CRITICAL = "enrichment_missing_critical"

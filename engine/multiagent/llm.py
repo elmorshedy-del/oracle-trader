@@ -314,6 +314,68 @@ def _parse_json(raw_text: str) -> dict[str, Any]:
 
 
 def _normalize_task_payload(task_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if task_name == "trade_gate":
+        normalized = dict(payload)
+        decisions = normalized.get("decisions")
+        if not isinstance(decisions, list):
+            normalized["decisions"] = []
+            return normalized
+        cleaned = []
+        for item in decisions:
+            if not isinstance(item, dict):
+                continue
+            action = str(item.get("action", "defer")).strip().lower()
+            if action not in {"take", "skip", "defer"}:
+                action = "defer"
+            confidence = item.get("confidence", 0.0)
+            try:
+                confidence = float(confidence)
+                if confidence > 1.0 and confidence <= 100.0:
+                    confidence = confidence / 100.0
+            except (TypeError, ValueError):
+                confidence = 0.0
+            cleaned.append(
+                {
+                    "signal_id": str(item.get("signal_id", "")).strip(),
+                    "action": action,
+                    "confidence": max(0.0, min(confidence, 1.0)),
+                    "reason": str(item.get("reason", "") or ""),
+                }
+            )
+        normalized["decisions"] = cleaned
+        return normalized
+
+    if task_name == "exit_judge":
+        normalized = dict(payload)
+        decisions = normalized.get("decisions")
+        if not isinstance(decisions, list):
+            normalized["decisions"] = []
+            return normalized
+        cleaned = []
+        for item in decisions:
+            if not isinstance(item, dict):
+                continue
+            action = str(item.get("action", "hold")).strip().lower()
+            if action not in {"hold", "exit"}:
+                action = "hold"
+            confidence = item.get("confidence", 0.0)
+            try:
+                confidence = float(confidence)
+                if confidence > 1.0 and confidence <= 100.0:
+                    confidence = confidence / 100.0
+            except (TypeError, ValueError):
+                confidence = 0.0
+            cleaned.append(
+                {
+                    "position_id": str(item.get("position_id", "")).strip(),
+                    "action": action,
+                    "confidence": max(0.0, min(confidence, 1.0)),
+                    "reason": str(item.get("reason", "") or ""),
+                }
+            )
+        normalized["decisions"] = cleaned
+        return normalized
+
     if task_name != "news_relevance":
         return payload
 

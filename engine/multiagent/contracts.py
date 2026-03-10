@@ -337,6 +337,9 @@ class ScanCycleReport:
     rejected_signals_detail: list[RejectedSignal] = field(default_factory=list)
     allocation_rejections_detail: list[AllocationRejection] = field(default_factory=list)
     execution_results_detail: list[ExecutionResult] = field(default_factory=list)
+    llm_trade_gate_actions: dict[str, int] = field(default_factory=dict)
+    llm_exit_actions: dict[str, int] = field(default_factory=dict)
+    llm_decisions_detail: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def top_rejection_reason(self) -> Optional[str]:

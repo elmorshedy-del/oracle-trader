@@ -17,6 +17,7 @@ from .contracts import (
     PortfolioSnapshot,
     ScanCycleReport,
 )
+from .decisioning import OpusDecisionLayer
 from .enums import ModuleStatus
 from .validation import Validator
 
@@ -73,6 +74,9 @@ class StateManager(Protocol):
     def apply_executions(self, results: list[Any]) -> None:
         ...
 
+    def remember_signals(self, signals: list[Any], *, seen_at: datetime, reason: str) -> None:
+        ...
+
     def save(self) -> None:
         ...
 
@@ -89,8 +93,9 @@ class Orchestrator:
     tracer: ScanCycleTracer
     snapshot_store: SnapshotStore
     config: OrchestratorConfig = field(default_factory=OrchestratorConfig)
+    decision_layer: OpusDecisionLayer | None = None
 
-    def run_scan_cycle(self) -> ScanCycleReport:
+    async def run_scan_cycle(self) -> ScanCycleReport:
         self.tracer.start_cycle()
         portfolio = self.state.snapshot()
         context = self.state.context()
@@ -143,10 +148,28 @@ class Orchestrator:
                 "validator",
                 lambda: self.validator.validate(all_candidates, portfolio, context),
             )
-            self.tracer.record_validation(validated, rejected)
         except Exception as exc:
             self.tracer.record_module_failure("validator", exc)
             return self._finalize_cycle(portfolio, abort_reason="validator_failed")
+
+        if self.decision_layer is not None:
+            validated, llm_rejected, llm_health, llm_actions, llm_rows, remembered_signals = await self.decision_layer.gate_signals(
+                validated,
+                portfolio=portfolio,
+                context=context,
+            )
+            self.tracer.record_health("llm.trade_gate", llm_health)
+            self.tracer.report.llm_trade_gate_actions = dict(llm_actions)  # type: ignore[union-attr]
+            self.tracer.report.llm_decisions_detail.extend(llm_rows)  # type: ignore[union-attr]
+            rejected.extend(llm_rejected)
+            if remembered_signals:
+                self.state.remember_signals(
+                    remembered_signals,
+                    seen_at=utc_now(),
+                    reason="llm_trade_gate",
+                )
+
+        self.tracer.record_validation(validated, rejected)
 
         try:
             intents, allocation_rejected = self._timed(

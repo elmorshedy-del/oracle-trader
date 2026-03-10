@@ -30,13 +30,23 @@ class ValidationConfig:
         }
     )
     min_liquidity: float = 2000.0
+    strategy_min_liquidity: dict[str, float] = field(
+        default_factory=lambda: {
+            "relationship_arbitrage": 2000.0,
+            "weather_sniper": 500.0,
+            "weather_latency": 900.0,
+            "weather_swing": 900.0,
+            "crypto_latency": 1500.0,
+            "news_signal": 750.0,
+        }
+    )
     min_hours_to_resolution: float = 4.0
     min_market_age_hours: float = 2.0
     min_edge_absolute: float = 0.03
     max_positions_per_category: int = 18
-    recent_signal_ttl_hours: float = 4.0
-    recent_headline_ttl_hours: float = 4.0
-    family_reentry_cooldown_hours: float = 3.0
+    recent_signal_ttl_hours: float = 1.0
+    recent_headline_ttl_hours: float = 2.0
+    family_reentry_cooldown_hours: float = 1.0
     max_enrichment_age_seconds: dict[str, float] = field(
         default_factory=lambda: {
             "weather": 7200.0,
@@ -134,7 +144,7 @@ class RiskLimits:
     )
     max_positions_per_theme: int = 6
     max_theme_capital_pct: float = 0.30
-    reentry_cooldown_hours: float = 1.0
+    reentry_cooldown_hours: float = 0.0
     max_correlated_positions: int = 4
 
 
@@ -157,34 +167,62 @@ class AuditConfig:
 @dataclass(frozen=True)
 class LLMTaskConfig:
     enabled: bool = False
-    primary_provider: str = "anthropic"
-    primary_model: str = "claude-sonnet-4-6"
-    fallback_provider: str = "fireworks"
-    fallback_model: str = "accounts/fireworks/models/glm-5"
+    primary_provider: str = "fireworks"
+    primary_model: str = "accounts/fireworks/models/glm-5"
+    fallback_provider: str = ""
+    fallback_model: str = "claude-sonnet-4-6"
     shadow_providers: tuple[str, ...] = ()
     max_calls_per_cycle: int = 6
     timeout_seconds: float = 20.0
 
 
 @dataclass(frozen=True)
+class DecisioningConfig:
+    trade_gate_batch_size: int = 8
+    trade_gate_fail_open: bool = True
+    trade_gate_memory_hours: float = 6.0
+    exit_judge_max_positions_per_cycle: int = 8
+    exit_judge_min_hold_hours: float = 1.5
+    exit_judge_fail_open: bool = True
+    exit_judge_require_nontrivial_context: bool = True
+
+
+@dataclass(frozen=True)
 class LLMConfig:
-    enabled: bool = bool(
-        os.getenv("ANTHROPIC_API_KEY", "")
-        or os.getenv("FIREWORKS_API_KEY", "")
-        or os.getenv("OPENAI_API_KEY", "")
-    )
+    enabled: bool = bool(os.getenv("FIREWORKS_API_KEY", ""))
     tasks: dict[str, LLMTaskConfig] = field(
         default_factory=lambda: {
             "news_relevance": LLMTaskConfig(
-                enabled=bool(
-                    os.getenv("ANTHROPIC_API_KEY", "")
-                    or os.getenv("FIREWORKS_API_KEY", "")
-                    or os.getenv("OPENAI_API_KEY", "")
-                ),
-                max_calls_per_cycle=15,
+                enabled=bool(os.getenv("FIREWORKS_API_KEY", "")),
+                fallback_provider="",
+                max_calls_per_cycle=int(os.getenv("OPUS_NEWS_MAX_CALLS_PER_CYCLE", "3")),
             ),
             "relationship_linking": LLMTaskConfig(enabled=False),
             "rule_extraction": LLMTaskConfig(enabled=False),
+            "trade_gate": LLMTaskConfig(
+                enabled=bool(
+                    os.getenv("OPUS_ENABLE_LLM_TRADE_GATE", "1").lower() in {"1", "true", "yes", "on"}
+                    and os.getenv("FIREWORKS_API_KEY", "")
+                ),
+                primary_provider=os.getenv("OPUS_TRADE_GATE_PROVIDER", "fireworks"),
+                primary_model=os.getenv("OPUS_TRADE_GATE_MODEL", "accounts/fireworks/models/glm-5"),
+                fallback_provider="",
+                fallback_model=os.getenv("OPUS_TRADE_GATE_FALLBACK_MODEL", "claude-sonnet-4-6"),
+                max_calls_per_cycle=int(os.getenv("OPUS_TRADE_GATE_MAX_CALLS_PER_CYCLE", "1")),
+                timeout_seconds=float(os.getenv("OPUS_TRADE_GATE_TIMEOUT_SECONDS", "25")),
+            ),
+            "exit_judge": LLMTaskConfig(
+                enabled=bool(
+                    os.getenv("OPUS_ENABLE_LLM_EXIT_JUDGE", "1").lower() in {"1", "true", "yes", "on"}
+                    and os.getenv("FIREWORKS_API_KEY", "")
+                ),
+                primary_provider=os.getenv("OPUS_EXIT_JUDGE_PROVIDER", "fireworks"),
+                primary_model=os.getenv("OPUS_EXIT_JUDGE_MODEL", "accounts/fireworks/models/glm-5"),
+                fallback_provider="",
+                fallback_model=os.getenv("OPUS_EXIT_JUDGE_FALLBACK_MODEL", "claude-sonnet-4-6"),
+                max_calls_per_cycle=int(os.getenv("OPUS_EXIT_JUDGE_MAX_CALLS_PER_CYCLE", "1")),
+                timeout_seconds=float(os.getenv("OPUS_EXIT_JUDGE_TIMEOUT_SECONDS", "25")),
+            ),
         }
     )
 
@@ -244,3 +282,4 @@ class OrchestratorConfig:
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    decisioning: DecisioningConfig = field(default_factory=DecisioningConfig)

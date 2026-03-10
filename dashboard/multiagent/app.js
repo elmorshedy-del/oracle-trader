@@ -596,7 +596,7 @@ let LIVE_STATUS_LOADED_AT = null;
 let CONSULT_LOADING = false;
 let CONSULT_RESPONSE = null;
 let CONSULT_QUESTION = "";
-let CONSULT_PROVIDER = "auto";
+let CONSULT_PROVIDER = "fireworks";
 let CONSULT_EXPANDED = false;
 let CONSULT_HISTORY = [];
 let selectedRuntimeView = "all";
@@ -1340,6 +1340,7 @@ function renderRuntimeSection() {
   const strategyCards = LIVE_STATUS.strategy_cards || [];
   const marketMix = LIVE_STATUS.market_mix || {};
   const marketPreview = LIVE_STATUS.market_preview || [];
+  const llmSummary = LIVE_STATUS.llm_summary || {};
   const activeView = getActiveRuntimeView();
   const activePortfolio = activeView.portfolio || {};
   const activePerformance = activeView.performance || {};
@@ -1374,6 +1375,10 @@ function renderRuntimeSection() {
         <div class="meta-box">
           <div class="meta-label">Last runtime refresh</div>
           <div class="meta-value">${escapeHtml(loadedAt)}</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">LLM layer</div>
+          <div class="meta-value">${escapeHtml(describeLlmStatus(llmSummary))}</div>
         </div>
       </div>
     </article>
@@ -1619,7 +1624,7 @@ function renderConsultPanel() {
           <label class="consult-provider-wrap">
             <span class="inline-meta">Model route</span>
             <select id="consult-provider" class="consult-select">
-              <option value="auto" ${CONSULT_PROVIDER === "auto" ? "selected" : ""}>Auto</option>
+              <option value="auto" ${CONSULT_PROVIDER === "auto" ? "selected" : ""}>Auto (cheap-first)</option>
               <option value="fireworks" ${CONSULT_PROVIDER === "fireworks" ? "selected" : ""}>GLM-5</option>
               <option value="anthropic" ${CONSULT_PROVIDER === "anthropic" ? "selected" : ""}>Anthropic</option>
               <option value="openai" ${CONSULT_PROVIDER === "openai" ? "selected" : ""}>OpenAI</option>
@@ -1691,6 +1696,7 @@ function buildSanityChecks() {
   const diagnostics = LIVE_STATUS?.diagnostics || {};
   const strategyCards = LIVE_STATUS?.strategy_cards || [];
   const blockers = LIVE_STATUS?.blockers || [];
+  const llmSummary = LIVE_STATUS?.llm_summary || {};
   const activeMarkets = Number(LIVE_STATUS?.summary?.active_markets || 0);
   const scanCount = Number(LIVE_STATUS?.summary?.scan_count || 0);
   const signalCount = sumRecordValues(diagnostics.signals_by_strategy || {});
@@ -1727,6 +1733,11 @@ function buildSanityChecks() {
       detail: strategyReady
         ? `${signalCount} candidates proposed in the latest cycle`
         : "No Opus-native strategy has been migrated into the isolated runtime yet",
+    },
+    {
+      title: "GLM decision layer",
+      status: glmHealthStatus(llmSummary),
+      detail: glmHealthDetail(llmSummary),
     },
     {
       title: "Validation funnel",
@@ -1766,6 +1777,45 @@ function buildSanityChecks() {
 
 function formatUsd(value) {
   return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function describeLlmStatus(summary) {
+  if (!summary?.configured || !summary?.router_enabled) {
+    return "off";
+  }
+  if (summary.trade_gate_active || summary.exit_judge_active) {
+    return `glm active (${summary.last_provider || "fireworks"})`;
+  }
+  if (summary.last_error) {
+    return `glm degraded`;
+  }
+  return "glm enabled";
+}
+
+function glmHealthStatus(summary) {
+  if (!summary?.configured || !summary?.router_enabled) {
+    return "failed";
+  }
+  if (summary.last_error && !summary.trade_gate_active && !summary.exit_judge_active) {
+    return "degraded";
+  }
+  return "healthy";
+}
+
+function glmHealthDetail(summary) {
+  if (!summary?.configured || !summary?.router_enabled) {
+    return "Fireworks / GLM-5 is not configured for the isolated decision layer";
+  }
+  const enabledTasks = Object.entries(summary.tasks_enabled || {})
+    .filter(([, enabled]) => Boolean(enabled))
+    .map(([name]) => name);
+  if (summary.trade_gate_active || summary.exit_judge_active) {
+    return `${enabledTasks.join(", ") || "llm"} active | ${summary.recent_decision_count || 0} decision rows this cycle | last model ${summary.last_model || "glm-5"}`;
+  }
+  if (summary.last_error) {
+    return `${enabledTasks.join(", ") || "llm"} enabled but last call failed: ${summary.last_error}`;
+  }
+  return `${enabledTasks.join(", ") || "llm"} enabled on GLM-5 and waiting for eligible candidates`;
 }
 
 function formatPct(value) {
@@ -1817,7 +1867,7 @@ async function loadLiveStatus() {
 async function submitConsult(question, provider) {
   CONSULT_LOADING = true;
   CONSULT_QUESTION = "";
-  CONSULT_PROVIDER = provider || "auto";
+  CONSULT_PROVIDER = provider || "fireworks";
   CONSULT_HISTORY = [
     ...CONSULT_HISTORY,
     {
@@ -1911,7 +1961,7 @@ function bindRuntimeActions() {
     const input = consultInput || document.getElementById("consult-question");
     const provider = document.getElementById("consult-provider");
     const question = input?.value?.trim() || "";
-    CONSULT_PROVIDER = provider?.value || "auto";
+    CONSULT_PROVIDER = provider?.value || "fireworks";
     if (!question) {
       return;
     }

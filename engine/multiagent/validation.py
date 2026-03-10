@@ -79,7 +79,10 @@ class MinLiquidityRule:
     def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         actual = snapshot.liquidity
-        threshold = self.config.min_liquidity
+        threshold = self.config.strategy_min_liquidity.get(
+            candidate.strategy_name,
+            self.config.min_liquidity,
+        )
         passed = actual >= threshold
         return ValidationCheck(
             rule_name=self.name,

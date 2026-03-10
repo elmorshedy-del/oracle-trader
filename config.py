@@ -108,9 +108,16 @@ class WhaleTrackingConfig:
 @dataclass
 class NewsConfig:
     """News-to-price latency engine (optional — requires LLM API key)."""
-    enabled: bool = bool(os.getenv("ANTHROPIC_API_KEY", ""))
+    enabled: bool = bool(os.getenv("FIREWORKS_API_KEY", "") or os.getenv("ANTHROPIC_API_KEY", ""))
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    fireworks_api_key: str = os.getenv("FIREWORKS_API_KEY", "")
+    primary_provider: str = os.getenv(
+        "NEWS_LLM_PRIMARY_PROVIDER",
+        "fireworks" if os.getenv("FIREWORKS_API_KEY", "") else "anthropic",
+    )
+    fallback_provider: str = os.getenv("NEWS_LLM_FALLBACK_PROVIDER", "")
     model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    fireworks_model: str = os.getenv("FIREWORKS_NEWS_MODEL", "accounts/fireworks/models/glm-5")
     escalation_model: str = os.getenv("ANTHROPIC_ESCALATION_MODEL", "claude-sonnet-4-6")
     # RSS / news sources
     rss_feeds: list = field(default_factory=lambda: [
@@ -132,7 +139,9 @@ class NewsConfig:
     # Scan interval in seconds
     scan_interval_secs: int = 30
     # Max API calls per hour (cost control)
-    max_calls_per_hour: int = 100
+    max_calls_per_hour: int = int(os.getenv("NEWS_MAX_CALLS_PER_HOUR", "24"))
+    # Hard cap on candidate headlines we will send to the LLM in one scan
+    max_headlines_per_scan: int = int(os.getenv("NEWS_MAX_HEADLINES_PER_SCAN", "4"))
 
 
 @dataclass

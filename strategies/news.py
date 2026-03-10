@@ -434,35 +434,51 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
 
     async def _call_llm(self, provider: str, prompt: str) -> dict:
         if provider == "fireworks":
+            headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+                "authorization": f"Bearer {self.cfg.fireworks_api_key}",
+            }
+            request_payload = {
+                "model": self.cfg.fireworks_model,
+                "max_tokens": LEGACY_NEWS_MAX_TOKENS,
+                "temperature": 0.1,
+                "reasoning_effort": "low",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Return only one JSON object matching the requested schema.",
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+            }
             response = await self.client.post(
                 FIREWORKS_API_URL,
-                headers={
-                    "accept": "application/json",
-                    "content-type": "application/json",
-                    "authorization": f"Bearer {self.cfg.fireworks_api_key}",
-                },
-                json={
-                    "model": self.cfg.fireworks_model,
-                    "max_tokens": LEGACY_NEWS_MAX_TOKENS,
-                    "temperature": 0.1,
-                    "reasoning_effort": "low",
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "Return only one JSON object matching the requested schema.",
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt,
-                        },
-                    ],
-                },
+                headers=headers,
+                json=request_payload,
             )
+            # Some Fireworks model routes reject advanced request knobs with HTTP 412.
+            if response.status_code == 412:
+                relaxed_payload = dict(request_payload)
+                relaxed_payload.pop("reasoning_effort", None)
+                relaxed_payload.pop("response_format", None)
+                response = await self.client.post(
+                    FIREWORKS_API_URL,
+                    headers=headers,
+                    json=relaxed_payload,
+                )
             response.raise_for_status()
-            payload = response.json()
+            payload = self._decode_json_response(response, "fireworks")
             message = (payload.get("choices") or [{}])[0].get("message", {}) or {}
             text = self._extract_chat_content(message.get("content")).strip()
+            if not text:
+                text = self._extract_chat_content(message.get("reasoning_content")).strip()
+            if not text:
+                text = self._extract_chat_content((payload.get("choices") or [{}])[0].get("text")).strip()
             if not text:
                 raise RuntimeError("fireworks_empty_response")
             return self._parse_classification_json(text)
@@ -506,6 +522,21 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             return json.loads(text[start:end + 1])
 
     @staticmethod
+    def _decode_json_response(response: httpx.Response, provider: str) -> dict:
+        try:
+            payload = response.json()
+        except Exception as exc:
+            snippet = (response.text or "").strip().replace("\n", " ")
+            if len(snippet) > 240:
+                snippet = f"{snippet[:240]}..."
+            raise RuntimeError(
+                f"{provider}_non_json_response status={response.status_code} body={snippet or '<empty>'}"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"{provider}_invalid_json_payload")
+        return payload
+
+    @staticmethod
     def _extract_chat_content(content: object) -> str:
         if isinstance(content, str):
             return content
@@ -513,12 +544,12 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             parts: list[str] = []
             for item in content:
                 if isinstance(item, dict):
-                    text = item.get("text")
+                    text = item.get("text") or item.get("content")
                     if isinstance(text, str):
                         parts.append(text)
             return "\n".join(parts).strip()
         if isinstance(content, dict):
-            text = content.get("text")
+            text = content.get("text") or content.get("content")
             if isinstance(text, str):
                 return text
         return ""

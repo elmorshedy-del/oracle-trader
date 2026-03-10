@@ -233,30 +233,46 @@ async def _call_fireworks(
     api_key = os.getenv("FIREWORKS_API_KEY", "")
     if not api_key:
         raise RuntimeError("fireworks_api_key_missing")
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "authorization": f"Bearer {api_key}",
+    }
+    request_payload = {
+        "model": model,
+        "max_tokens": 900,
+        "temperature": 0.1,
+        "reasoning_effort": "medium",
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+        ],
+    }
     async with httpx.AsyncClient(timeout=timeout_seconds) as client:
         response = await client.post(
             FIREWORKS_API_URL,
-            headers={
-                "accept": "application/json",
-                "content-type": "application/json",
-                "authorization": f"Bearer {api_key}",
-            },
-            json={
-                "model": model,
-                "max_tokens": 900,
-                "temperature": 0.1,
-                "reasoning_effort": "medium",
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
-                ],
-            },
+            headers=headers,
+            json=request_payload,
         )
+        # 412 often indicates unsupported request knobs on specific model routes.
+        if response.status_code == 412:
+            relaxed_payload = dict(request_payload)
+            relaxed_payload.pop("reasoning_effort", None)
+            relaxed_payload.pop("response_format", None)
+            response = await client.post(
+                FIREWORKS_API_URL,
+                headers=headers,
+                json=relaxed_payload,
+            )
         response.raise_for_status()
-        payload = response.json()
+        payload = _decode_json_response(response, "fireworks")
     choice = (payload.get("choices") or [{}])[0]
     raw = _extract_chat_content(choice.get("message", {}).get("content"))
+    if not raw:
+        raw = _extract_chat_content(choice.get("message", {}).get("reasoning_content"))
+    if not raw:
+        raw = _extract_chat_content(choice.get("text"))
     usage = payload.get("usage", {})
     tokens = int((usage.get("prompt_tokens", 0) or 0) + (usage.get("completion_tokens", 0) or 0)) if usage else None
     return raw.strip(), tokens
@@ -322,6 +338,21 @@ def _parse_json(raw_text: str) -> Any:
         raise
 
 
+def _decode_json_response(response: httpx.Response, provider: str) -> dict[str, Any]:
+    try:
+        payload = response.json()
+    except Exception as exc:
+        snippet = (response.text or "").strip().replace("\n", " ")
+        if len(snippet) > 240:
+            snippet = f"{snippet[:240]}..."
+        raise RuntimeError(
+            f"{provider}_non_json_response status={response.status_code} body={snippet or '<empty>'}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{provider}_invalid_json_payload")
+    return payload
+
+
 def _extract_chat_content(content: Any) -> str:
     if isinstance(content, str):
         return content
@@ -329,12 +360,12 @@ def _extract_chat_content(content: Any) -> str:
         parts: list[str] = []
         for item in content:
             if isinstance(item, dict):
-                text = item.get("text")
+                text = item.get("text") or item.get("content")
                 if isinstance(text, str):
                     parts.append(text)
         return "\n".join(parts).strip()
     if isinstance(content, dict):
-        text = content.get("text")
+        text = content.get("text") or content.get("content")
         if isinstance(text, str):
             return text
     return ""

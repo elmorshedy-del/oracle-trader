@@ -13,7 +13,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from config import PipelineConfig
 from data.collector import PolymarketCollector
-from data.models import DashboardState, Signal, SignalSource
+from data.models import DashboardState, Signal, SignalAction, SignalSource
 from strategies.liquidity import HedgedLiquidityStrategy
 from strategies.arbitrage import ArbitrageStrategy
 from strategies.whale import WhaleTrackingStrategy

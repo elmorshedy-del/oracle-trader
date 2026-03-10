@@ -30,11 +30,14 @@ class WhaleTrackingStrategy(BaseStrategy):
         self._last_refresh: datetime | None = None
         self._last_activity_refresh: datetime | None = None
         self._market_sentiment_cache: dict[str, dict] = {}
+        self._market_sentiment_by_slug: dict[str, dict] = {}
         self._stats.update(
             {
                 "activity_markets": 0,
                 "overlay_matches": 0,
+                "overlay_slug_matches": 0,
                 "standalone_candidates": 0,
+                "standalone_slug_matches": 0,
             }
         )
 
@@ -104,6 +107,7 @@ class WhaleTrackingStrategy(BaseStrategy):
         """Build a cached condition_id -> whale sentiment map from recent whale trades."""
         if not self.collector or not self.whale_wallets:
             self._market_sentiment_cache = {}
+            self._market_sentiment_by_slug = {}
             self._stats["activity_markets"] = 0
             return
 
@@ -186,6 +190,7 @@ class WhaleTrackingStrategy(BaseStrategy):
                         )
 
             sentiment_cache: dict[str, dict] = {}
+            slug_cache: dict[str, dict] = {}
             for condition_id, row in aggregated.items():
                 buy_size = row["buy_size"]
                 sell_size = row["sell_size"]
@@ -200,7 +205,7 @@ class WhaleTrackingStrategy(BaseStrategy):
                     direction = "bearish"
                 else:
                     direction = "neutral"
-                sentiment_cache[condition_id] = {
+                sentiment = {
                     "condition_id": condition_id,
                     "market_slug": row["market_slug"],
                     "whale_count": whale_count,
@@ -212,10 +217,21 @@ class WhaleTrackingStrategy(BaseStrategy):
                     + min(abs(buy_ratio - 0.5) * 0.8, max(self.cfg.confirmation_boost - 1.0, 0.0)),
                     "last_seen": row["last_seen"],
                 }
+                sentiment_cache[condition_id] = sentiment
+                normalized_slug = self._normalize_slug(row["market_slug"])
+                if normalized_slug:
+                    existing = slug_cache.get(normalized_slug)
+                    if existing is None or float(sentiment["total_volume"]) > float(existing.get("total_volume", 0.0) or 0.0):
+                        slug_cache[normalized_slug] = sentiment
             self._market_sentiment_cache = sentiment_cache
+            self._market_sentiment_by_slug = slug_cache
             self._last_activity_refresh = datetime.now(timezone.utc)
             self._stats["activity_markets"] = len(sentiment_cache)
-            logger.info("[WHALE] Activity cache refreshed: %s markets", len(sentiment_cache))
+            logger.info(
+                "[WHALE] Activity cache refreshed: %s markets | %s slug mappings",
+                len(sentiment_cache),
+                len(slug_cache),
+            )
         except Exception as e:
             self._stats["errors"] += 1
             logger.error(f"[WHALE] Failed to refresh activity cache: {e}")
@@ -291,6 +307,13 @@ class WhaleTrackingStrategy(BaseStrategy):
 
     def apply_cached_confirmation(self, signal: Signal) -> tuple[Signal, bool]:
         sentiment = self.get_cached_whale_sentiment(signal.condition_id)
+        used_slug_fallback = False
+        if not sentiment:
+            normalized_slug = self._normalize_slug(signal.market_slug)
+            if normalized_slug:
+                sentiment = self._market_sentiment_by_slug.get(normalized_slug)
+                if sentiment and self._is_fresh(sentiment.get("last_seen")):
+                    used_slug_fallback = True
         cloned = signal.model_copy(deep=True)
         if not sentiment or not self._eligible_sentiment(
             sentiment,
@@ -299,6 +322,8 @@ class WhaleTrackingStrategy(BaseStrategy):
         ):
             return cloned, False
         self._stats["overlay_matches"] += 1
+        if used_slug_fallback:
+            self._stats["overlay_slug_matches"] += 1
         return self.confirm_signal(cloned, sentiment), True
 
     def build_standalone_signals(self, markets: list[Market]) -> list[Signal]:
@@ -308,17 +333,33 @@ class WhaleTrackingStrategy(BaseStrategy):
             return []
 
         market_by_condition = {market.condition_id: market for market in markets}
+        market_by_slug = {
+            self._normalize_slug(market.slug): market
+            for market in markets
+            if self._normalize_slug(market.slug)
+        }
         signals: list[Signal] = []
-        for condition_id, sentiment in self._market_sentiment_cache.items():
+        standalone_slug_matches = 0
+        seen_markets: set[str] = set()
+        for sentiment in self._iter_cached_sentiments():
             if not self._eligible_sentiment(
                 sentiment,
                 min_whales=self.cfg.standalone_min_whales,
                 min_total_size=self.cfg.standalone_min_total_size,
             ):
                 continue
+            condition_id = str(sentiment.get("condition_id", "") or "")
             market = market_by_condition.get(condition_id)
+            if market is None:
+                normalized_slug = self._normalize_slug(sentiment.get("market_slug"))
+                market = market_by_slug.get(normalized_slug)
+                if market is not None:
+                    standalone_slug_matches += 1
             if not market or not market.active or market.closed or len(market.outcomes) < 2:
                 continue
+            if market.condition_id in seen_markets:
+                continue
+            seen_markets.add(market.condition_id)
 
             bullish = sentiment["net_direction"] == "bullish"
             outcome = market.outcomes[0] if bullish else market.outcomes[1]
@@ -364,6 +405,7 @@ class WhaleTrackingStrategy(BaseStrategy):
 
         self._stats["signals_generated"] += len(signals)
         self._stats["standalone_candidates"] = len(signals)
+        self._stats["standalone_slug_matches"] = standalone_slug_matches
         return signals
 
     def confirm_signal(self, signal: Signal, whale_data: dict) -> Signal:
@@ -423,6 +465,25 @@ class WhaleTrackingStrategy(BaseStrategy):
             return False
         age = datetime.now(timezone.utc) - seen_at
         return age <= timedelta(minutes=self.cfg.signal_ttl_minutes)
+
+    def _iter_cached_sentiments(self):
+        seen: set[str] = set()
+        for condition_id, sentiment in self._market_sentiment_cache.items():
+            key = f"condition:{condition_id}"
+            seen.add(key)
+            yield sentiment
+        for slug, sentiment in self._market_sentiment_by_slug.items():
+            condition_id = str(sentiment.get("condition_id", "") or "")
+            if condition_id and f"condition:{condition_id}" in seen:
+                continue
+            if f"slug:{slug}" in seen:
+                continue
+            seen.add(f"slug:{slug}")
+            yield sentiment
+
+    @staticmethod
+    def _normalize_slug(value: str | None) -> str:
+        return str(value or "").strip().lower()
 
     @staticmethod
     def _coerce_float(value) -> float:

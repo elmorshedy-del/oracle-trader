@@ -85,22 +85,22 @@ class WhaleTrackingConfig:
     # Refresh recent whale activity cache every N minutes
     activity_refresh_minutes: int = 15
     # Number of whale wallets to inspect when building cached sentiment
-    activity_wallet_limit: int = 12
+    activity_wallet_limit: int = 20
     # Recent trades to fetch per whale wallet
-    activity_trades_per_wallet: int = 15
+    activity_trades_per_wallet: int = 25
     # Cached whale sentiment must be fresher than this to be used
-    signal_ttl_minutes: int = 240
+    signal_ttl_minutes: int = 720
     # Minimum activity needed before whale sentiment can influence another strategy
     overlay_min_whales: int = 1
-    overlay_min_total_size: float = 25.0
+    overlay_min_total_size: float = 10.0
     # Standalone whale experiment settings (comparison-book only)
     standalone_enabled: bool = True
-    standalone_min_whales: int = 2
-    standalone_min_total_size: float = 75.0
-    standalone_min_confidence: float = 0.58
+    standalone_min_whales: int = 1
+    standalone_min_total_size: float = 25.0
+    standalone_min_confidence: float = 0.54
     standalone_max_entry_price: float = 0.75
     standalone_min_size_usd: float = 15.0
-    standalone_max_size_usd: float = 60.0
+    standalone_max_size_usd: float = 100.0
     # Confidence boost multiplier when whale confirms a signal
     confirmation_boost: float = 1.5
 

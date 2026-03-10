@@ -34,6 +34,10 @@ BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
 LEGACY_DIAGNOSTICS_LOG_PATH = LOG_DIR / "diagnostics.jsonl"
 LEGACY_APP_LOG_PATH = LOG_DIR / "app.log"
 OVERLAY_SIGNAL_BUFFER_LIMIT = 120
+OVERLAY_SEED_CONFIDENCE = 0.55
+OVERLAY_SEED_MIN_SIZE_USD = 10.0
+OVERLAY_SEED_MAX_SIZE_USD = 50.0
+OVERLAY_SEED_POSITION_LIMIT = 20
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
@@ -446,11 +450,18 @@ class Pipeline:
     ) -> list[Signal]:
         base_signals = strategy_signals.get(strategy_name, [])
         if view_key == "news_whale":
-            return self._apply_whale_overlay(self._recent_overlay_signals.get("news", []), whale_strategy)
+            source_signals = self._merge_overlay_signal_sets(
+                self._recent_overlay_signals.get("news", []),
+                self._build_overlay_seed_signals("news"),
+            )
+            return self._apply_whale_overlay(source_signals, whale_strategy)
         if view_key == "bitcoin_whale":
             bitcoin_signals = self._filter_comparison_signals(
                 view_key="bitcoin",
-                signals=self._recent_overlay_signals.get("crypto_arb", []),
+                signals=self._merge_overlay_signal_sets(
+                    self._recent_overlay_signals.get("crypto_arb", []),
+                    self._build_overlay_seed_signals("bitcoin"),
+                ),
             )
             return self._apply_whale_overlay(bitcoin_signals, whale_strategy)
         if view_key == "whale_follow":
@@ -485,6 +496,56 @@ class Pipeline:
                 merged[key] = signal
         ordered = sorted(merged.values(), key=lambda signal: signal.timestamp, reverse=True)
         self._recent_overlay_signals[strategy_name] = ordered[:OVERLAY_SIGNAL_BUFFER_LIMIT]
+
+    @staticmethod
+    def _merge_overlay_signal_sets(*signal_sets: list[Signal]) -> list[Signal]:
+        merged: dict[tuple[str, str], Signal] = {}
+        for signal_set in signal_sets:
+            for signal in signal_set or []:
+                key = (signal.condition_id, signal.action.value)
+                current = merged.get(key)
+                if current is None or signal.timestamp > current.timestamp:
+                    merged[key] = signal
+        return sorted(merged.values(), key=lambda signal: signal.timestamp, reverse=True)
+
+    def _build_overlay_seed_signals(self, base_view_key: str) -> list[Signal]:
+        trader = self.comparison_traders.get(base_view_key)
+        if not trader:
+            return []
+
+        now = datetime.now(timezone.utc)
+        seeds: dict[tuple[str, str], Signal] = {}
+        positions = sorted(
+            trader.portfolio.positions,
+            key=lambda position: position.opened_at,
+            reverse=True,
+        )
+        for position in positions[:OVERLAY_SEED_POSITION_LIMIT]:
+            if position.side not in {"YES", "NO"}:
+                continue
+            token_id = position.token_id or None
+            if not token_id or token_id in {"HEDGE", "ARB_ALL"}:
+                continue
+            action = SignalAction.BUY_YES if position.side == "YES" else SignalAction.BUY_NO
+            key = (position.condition_id, action.value)
+            suggested_size_usd = min(
+                max(position.shares * max(position.avg_entry_price, 0.01), OVERLAY_SEED_MIN_SIZE_USD),
+                OVERLAY_SEED_MAX_SIZE_USD,
+            )
+            seeds[key] = Signal(
+                source=position.source,
+                action=action,
+                market_slug=position.market_slug,
+                condition_id=position.condition_id,
+                token_id=token_id,
+                confidence=OVERLAY_SEED_CONFIDENCE,
+                expected_edge=0.0,
+                reasoning=f"Whale overlay seed from active {base_view_key} sleeve position",
+                suggested_size_usd=suggested_size_usd,
+                group_key=position.group_key,
+                timestamp=now,
+            )
+        return list(seeds.values())
 
     def _comparison_starting_capital(self, view_key: str) -> float:
         if view_key == "weather_all":

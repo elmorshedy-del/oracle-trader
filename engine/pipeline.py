@@ -10,7 +10,7 @@ import asyncio
 import time as _time
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from config import PipelineConfig
 from data.collector import PolymarketCollector
 from data.models import DashboardState, Signal, SignalSource
@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
 LEGACY_DIAGNOSTICS_LOG_PATH = LOG_DIR / "diagnostics.jsonl"
 LEGACY_APP_LOG_PATH = LOG_DIR / "app.log"
+OVERLAY_SIGNAL_BUFFER_LIMIT = 120
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
@@ -172,6 +173,10 @@ class Pipeline:
         self._latest_comparison_signals: dict[str, list[Signal]] = {
             key: [] for key in COMPARISON_VIEW_CONFIG
         }
+        self._recent_overlay_signals: dict[str, list[Signal]] = {
+            "news": [],
+            "crypto_arb": [],
+        }
         self._errors: list[str] = []
         self._scan_count = 0
         self._latest_diagnostics: dict = {}
@@ -297,6 +302,8 @@ class Pipeline:
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
             # Whale data is still loaded and available for the dashboard
             # TODO: implement cached whale sentiment lookup instead of per-signal API calls
+            self._refresh_recent_overlay_signals("news", strategy_signals.get("news", []))
+            self._refresh_recent_overlay_signals("crypto_arb", strategy_signals.get("crypto_arb", []))
 
             # Highest-confidence signals get first claim on remaining capacity.
             all_signals.sort(key=lambda s: s.confidence, reverse=True)
@@ -379,6 +386,10 @@ class Pipeline:
             self._latest_comparison_signals = {
                 key: [] for key in COMPARISON_VIEW_CONFIG
             }
+            self._recent_overlay_signals = {
+                "news": [],
+                "crypto_arb": [],
+            }
             self._errors = []
             self._scan_count = 0
             self._latest_diagnostics = {}
@@ -435,9 +446,12 @@ class Pipeline:
     ) -> list[Signal]:
         base_signals = strategy_signals.get(strategy_name, [])
         if view_key == "news_whale":
-            return self._apply_whale_overlay(base_signals, whale_strategy)
+            return self._apply_whale_overlay(self._recent_overlay_signals.get("news", []), whale_strategy)
         if view_key == "bitcoin_whale":
-            bitcoin_signals = self._filter_comparison_signals(view_key="bitcoin", signals=base_signals)
+            bitcoin_signals = self._filter_comparison_signals(
+                view_key="bitcoin",
+                signals=self._recent_overlay_signals.get("crypto_arb", []),
+            )
             return self._apply_whale_overlay(bitcoin_signals, whale_strategy)
         if view_key == "whale_follow":
             return whale_strategy.build_standalone_signals(self._markets)
@@ -454,6 +468,23 @@ class Pipeline:
             if applied:
                 overlaid.append(adjusted)
         return overlaid
+
+    def _refresh_recent_overlay_signals(self, strategy_name: str, new_signals: list[Signal]) -> None:
+        ttl = timedelta(minutes=self.config.whale.signal_ttl_minutes)
+        cutoff = datetime.now(timezone.utc) - ttl
+        existing = [
+            signal
+            for signal in self._recent_overlay_signals.get(strategy_name, [])
+            if signal.timestamp >= cutoff
+        ]
+        merged: dict[tuple[str, str], Signal] = {}
+        for signal in existing + list(new_signals):
+            key = (signal.condition_id, signal.action.value)
+            current = merged.get(key)
+            if current is None or signal.timestamp > current.timestamp:
+                merged[key] = signal
+        ordered = sorted(merged.values(), key=lambda signal: signal.timestamp, reverse=True)
+        self._recent_overlay_signals[strategy_name] = ordered[:OVERLAY_SIGNAL_BUFFER_LIMIT]
 
     def _comparison_starting_capital(self, view_key: str) -> float:
         if view_key == "weather_all":

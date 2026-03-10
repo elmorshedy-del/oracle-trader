@@ -1,13 +1,16 @@
 """
 Strategy: News-to-Price Latency (Optional LLM Layer)
 ====================================================
-Ingests breaking news, classifies relevance + direction via Claude API,
+Ingests breaking news, classifies relevance + direction via an LLM,
 and generates signals before the market fully prices in the information.
 
-Requires ANTHROPIC_API_KEY environment variable.
+Uses cheap-first routing for background scans:
+- primary: Fireworks / GLM-5
+- optional fallback: Anthropic / Sonnet
 """
 
 import hashlib
+import json
 import logging
 import re
 import xml.etree.ElementTree as ET
@@ -18,9 +21,12 @@ from data.models import Market, Event, Signal, SignalSource, SignalAction, NewsH
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+FIREWORKS_API_URL = "https://api.fireworks.ai/inference/v1/chat/completions"
 ANTHROPIC_BILLING_RETRY = timedelta(minutes=5)
 ANTHROPIC_TRANSIENT_RETRY = timedelta(minutes=2)
 MAX_PENDING_HEADLINES = 200
+LEGACY_NEWS_MAX_TOKENS = 300
 
 
 class NewsLatencyStrategy(BaseStrategy):
@@ -47,10 +53,11 @@ class NewsLatencyStrategy(BaseStrategy):
             "last_context_markets": 0,
             "pending_headlines": 0,
             "anthropic_pause_until": "",
+            "llm_primary_provider": self.cfg.primary_provider,
         })
 
     async def scan(self, markets: list[Market], events: list[Event]) -> list[Signal]:
-        if not self.cfg.enabled or not self.cfg.anthropic_api_key:
+        if not self.cfg.enabled or not self._available_llm_providers():
             return []
 
         self._stats["scans_completed"] += 1
@@ -96,11 +103,10 @@ class NewsLatencyStrategy(BaseStrategy):
         ]
         relevant_count = len(relevant_headlines)
         if not relevant_headlines:
-            # If prefilter finds nothing, send top 3 as fallback
-            relevant_headlines = ready_headlines[:3]
-        else:
-            # Cap at 10 most relevant
-            relevant_headlines = relevant_headlines[:10]
+            return []
+
+        # Keep background spend bounded; manual consults are where richer models belong.
+        relevant_headlines = relevant_headlines[: self.cfg.max_headlines_per_scan]
 
         signals = []
         classified_count = 0
@@ -339,7 +345,7 @@ class NewsLatencyStrategy(BaseStrategy):
     async def _classify_headline(
         self, headline: NewsHeadline, markets: list[Market]
     ) -> dict | None:
-        """Use Claude API to classify a headline against active markets."""
+        """Use cheap-first LLM routing to classify a headline against active markets."""
         market_list = "\n".join(
             f"- {m.slug}: \"{m.question}\" (current YES: {m.outcomes[0].price:.2f})"
             for m in markets[:15]
@@ -364,9 +370,106 @@ Respond ONLY with JSON (no markdown, no backticks):
 
 If no market is relevant, return {{"market_slug": null, "direction": "neutral", "confidence": 0.0, "expected_impact_cents": 0, "reasoning": "not relevant"}}"""
 
-        try:
-            resp = await self.client.post(
-                "https://api.anthropic.com/v1/messages",
+        last_error: Exception | None = None
+        for provider in self._available_llm_providers():
+            try:
+                classification = await self._call_llm(provider, prompt)
+                self._api_calls_this_hour += 1
+                headline.classification = classification
+                logger.debug(
+                    "[NEWS] Classified via %s: '%s' → market=%s dir=%s conf=%s",
+                    provider,
+                    headline.title[:60],
+                    classification.get("market_slug", "none"),
+                    classification.get("direction", "?"),
+                    classification.get("confidence", 0),
+                )
+                return classification
+            except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_error = exc
+                self._stats["errors"] += 1
+                delay = self._anthropic_retry_delay(exc)
+                if provider == "anthropic" and delay > timedelta():
+                    self._defer_headline(headline, delay)
+                    message = exc.response.text if isinstance(exc, httpx.HTTPStatusError) else str(exc)
+                    self._pause_anthropic(delay, message)
+                    logger.warning(
+                        "[NEWS] Anthropic unavailable, retrying after %ss | pending=%s | %s",
+                        int(delay.total_seconds()),
+                        len(self._pending_headlines),
+                        message[:180],
+                    )
+                    return None
+                logger.warning("[NEWS] %s classification failed: %s", provider, exc)
+                continue
+            except Exception as exc:
+                last_error = exc
+                self._stats["errors"] += 1
+                logger.warning("[NEWS] %s classification failed: %s", provider, exc)
+                continue
+
+        self._defer_headline(headline, ANTHROPIC_TRANSIENT_RETRY)
+        if last_error is not None:
+            logger.error("[NEWS] All LLM providers failed: %s", last_error)
+        return None
+
+    def _available_llm_providers(self) -> list[str]:
+        providers: list[str] = []
+        primary = (self.cfg.primary_provider or "").strip().lower()
+        fallback = (self.cfg.fallback_provider or "").strip().lower()
+        if primary == "fireworks" and self.cfg.fireworks_api_key:
+            providers.append("fireworks")
+        elif primary == "anthropic" and self.cfg.anthropic_api_key:
+            providers.append("anthropic")
+        if fallback == "fireworks" and self.cfg.fireworks_api_key and "fireworks" not in providers:
+            providers.append("fireworks")
+        elif fallback == "anthropic" and self.cfg.anthropic_api_key and "anthropic" not in providers:
+            providers.append("anthropic")
+        if not providers:
+            if self.cfg.fireworks_api_key:
+                providers.append("fireworks")
+            if self.cfg.anthropic_api_key:
+                providers.append("anthropic")
+        return providers
+
+    async def _call_llm(self, provider: str, prompt: str) -> dict:
+        if provider == "fireworks":
+            response = await self.client.post(
+                FIREWORKS_API_URL,
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                    "authorization": f"Bearer {self.cfg.fireworks_api_key}",
+                },
+                json={
+                    "model": self.cfg.fireworks_model,
+                    "max_tokens": LEGACY_NEWS_MAX_TOKENS,
+                    "temperature": 0.1,
+                    "reasoning_effort": "low",
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Return only one JSON object matching the requested schema.",
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        },
+                    ],
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+            message = (payload.get("choices") or [{}])[0].get("message", {}) or {}
+            text = self._extract_chat_content(message.get("content")).strip()
+            if not text:
+                raise RuntimeError("fireworks_empty_response")
+            return self._parse_classification_json(text)
+
+        if provider == "anthropic":
+            response = await self.client.post(
+                ANTHROPIC_API_URL,
                 headers={
                     "x-api-key": self.cfg.anthropic_api_key,
                     "anthropic-version": "2023-06-01",
@@ -374,58 +477,51 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
                 },
                 json={
                     "model": self.cfg.model,
-                    "max_tokens": 300,
+                    "max_tokens": LEGACY_NEWS_MAX_TOKENS,
                     "messages": [{"role": "user", "content": prompt}],
                 },
             )
-            resp.raise_for_status()
-            self._api_calls_this_hour += 1
+            response.raise_for_status()
+            payload = response.json()
+            text = payload["content"][0]["text"].strip()
+            return self._parse_classification_json(text)
 
-            data = resp.json()
-            text = data["content"][0]["text"].strip()
+        raise RuntimeError(f"unsupported_provider:{provider}")
 
-            # Strip markdown code blocks if Claude wrapped the JSON
-            if text.startswith("```"):
-                lines = text.split("\n")
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].strip() == "```":
-                    lines = lines[:-1]
-                text = "\n".join(lines).strip()
+    def _parse_classification_json(self, text: str) -> dict:
+        if text.startswith("```"):
+            lines = text.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise
+            return json.loads(text[start:end + 1])
 
-            import json
-            classification = json.loads(text)
-            headline.classification = classification
-            logger.debug(
-                f"[NEWS] Classified: '{headline.title[:60]}' → "
-                f"market={classification.get('market_slug', 'none')}, "
-                f"dir={classification.get('direction', '?')}, "
-                f"conf={classification.get('confidence', 0)}"
-            )
-            return classification
-
-        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.NetworkError) as e:
-            self._stats["errors"] += 1
-            delay = self._anthropic_retry_delay(e)
-            if delay > timedelta():
-                self._defer_headline(headline, delay)
-                message = e.response.text if isinstance(e, httpx.HTTPStatusError) else str(e)
-                self._pause_anthropic(delay, message)
-                logger.warning(
-                    "[NEWS] Anthropic unavailable, retrying after %ss | pending=%s | %s",
-                    int(delay.total_seconds()),
-                    len(self._pending_headlines),
-                    message[:180],
-                )
-                return None
-            logger.error(f"[NEWS] LLM classification failed: {e}")
-            self._defer_headline(headline, ANTHROPIC_TRANSIENT_RETRY)
-            return None
-        except Exception as e:
-            self._stats["errors"] += 1
-            self._defer_headline(headline, ANTHROPIC_TRANSIENT_RETRY)
-            logger.error(f"[NEWS] LLM classification failed: {e}")
-            return None
+    @staticmethod
+    def _extract_chat_content(content: object) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+            return "\n".join(parts).strip()
+        if isinstance(content, dict):
+            text = content.get("text")
+            if isinstance(text, str):
+                return text
+        return ""
 
     # ------------------------------------------------------------------
     # Signal Building

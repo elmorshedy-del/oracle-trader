@@ -123,7 +123,12 @@ async def _call_provider(
         else:
             raise RuntimeError(f"unsupported_provider:{provider}")
 
-        parsed_json = _normalize_task_payload(task_name, _parse_json(raw_text))
+        parsed_raw = _parse_json(raw_text)
+        if isinstance(parsed_raw, list) and task_name in {"trade_gate", "exit_judge"}:
+            parsed_raw = {"decisions": parsed_raw}
+        if not isinstance(parsed_raw, dict):
+            raise ValueError("llm_output_not_object")
+        parsed_json = _normalize_task_payload(task_name, parsed_raw)
         missing = [key for key in required_keys if key not in parsed_json]
         if missing:
             return LLMTaskResult(
@@ -241,6 +246,7 @@ async def _call_fireworks(
                 "max_tokens": 900,
                 "temperature": 0.1,
                 "reasoning_effort": "medium",
+                "response_format": {"type": "json_object"},
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
@@ -250,7 +256,7 @@ async def _call_fireworks(
         response.raise_for_status()
         payload = response.json()
     choice = (payload.get("choices") or [{}])[0]
-    raw = choice.get("message", {}).get("content", "")
+    raw = _extract_chat_content(choice.get("message", {}).get("content"))
     usage = payload.get("usage", {})
     tokens = int((usage.get("prompt_tokens", 0) or 0) + (usage.get("completion_tokens", 0) or 0)) if usage else None
     return raw.strip(), tokens
@@ -285,14 +291,16 @@ async def _call_openai(
         response.raise_for_status()
         payload = response.json()
     choice = (payload.get("choices") or [{}])[0]
-    raw = choice.get("message", {}).get("content", "")
+    raw = _extract_chat_content(choice.get("message", {}).get("content"))
     usage = payload.get("usage", {})
     tokens = int((usage.get("prompt_tokens", 0) or 0) + (usage.get("completion_tokens", 0) or 0)) if usage else None
     return raw.strip(), tokens
 
 
-def _parse_json(raw_text: str) -> dict[str, Any]:
+def _parse_json(raw_text: str) -> Any:
     text = raw_text.strip()
+    if not text:
+        raise ValueError("empty_llm_output")
     if text.startswith("```"):
         lines = text.splitlines()
         if lines and lines[0].startswith("```"):
@@ -301,16 +309,35 @@ def _parse_json(raw_text: str) -> dict[str, Any]:
             lines = lines[:-1]
         text = "\n".join(lines).strip()
     try:
-        parsed = json.loads(text)
+        return json.loads(text)
     except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise
-        parsed = json.loads(text[start : end + 1])
-    if not isinstance(parsed, dict):
-        raise ValueError("llm_output_not_object")
-    return parsed
+        obj_start = text.find("{")
+        obj_end = text.rfind("}")
+        if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+            return json.loads(text[obj_start : obj_end + 1])
+        arr_start = text.find("[")
+        arr_end = text.rfind("]")
+        if arr_start != -1 and arr_end != -1 and arr_end > arr_start:
+            return json.loads(text[arr_start : arr_end + 1])
+        raise
+
+
+def _extract_chat_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(parts).strip()
+    if isinstance(content, dict):
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+    return ""
 
 
 def _normalize_task_payload(task_name: str, payload: dict[str, Any]) -> dict[str, Any]:

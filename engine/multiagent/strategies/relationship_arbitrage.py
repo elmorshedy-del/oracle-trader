@@ -68,6 +68,9 @@ class RelationshipArbitrageStrategy:
             reverse=True,
         )
         max_candidates = int(cfg.get("max_candidates_per_cycle", 8))
+        fresh = [item for item in ordered if not context.has_open_market(item.market_id)]
+        if fresh:
+            return fresh[:max_candidates]
         return ordered[:max_candidates]
 
     def _build_duplicate_candidates(

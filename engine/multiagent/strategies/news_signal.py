@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..context import PipelineContext, compact_topic_key
 from ..contracts import MarketContext, PortfolioSnapshot, SignalCandidate
 from ..enums import SignalDirection
 
@@ -13,6 +14,7 @@ class NewsSignalStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         cfg = config or {}
@@ -30,6 +32,19 @@ class NewsSignalStrategy:
             impact_cents = float(data.get("expected_impact_cents", 0.0) or 0.0)
             direction = (data.get("direction") or "neutral").lower()
             if confidence < min_confidence or impact_cents <= 0:
+                continue
+
+            headline = str(data.get("headline") or "").strip()
+            market_slug = str(data.get("market_slug") or market.market_id)
+            topic_key = compact_topic_key(headline or market.question)
+            family_key = f"news:{market_slug}"
+            theme_key = f"news:{topic_key}"
+            headline_key = f"{data.get('source') or 'unknown'}:{topic_key}"
+            if context.has_open_market(market.market_id):
+                continue
+            if context.family_positions(family_key) > 0:
+                continue
+            if context.seen_headline(headline_key, 4.0):
                 continue
 
             if direction == "bullish":
@@ -77,6 +92,9 @@ class NewsSignalStrategy:
                         "source": data.get("source"),
                         "llm_provider": data.get("llm_provider"),
                         "llm_model": data.get("llm_model"),
+                        "market_slug": market_slug,
+                        "family_key": family_key,
+                        "theme_key": theme_key,
                     },
                 )
             )

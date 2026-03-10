@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 import re
 
+from ..context import PipelineContext
 from ..contracts import MarketContext, PortfolioSnapshot, SignalCandidate
 from ..enums import MarketCategory, SignalDirection
 
@@ -46,13 +47,14 @@ class RelationshipArbitrageStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         cfg = config or {}
         candidates: list[SignalCandidate] = []
 
-        candidates.extend(self._build_duplicate_candidates(markets, cfg))
-        candidates.extend(self._build_crypto_structure_candidates(markets, cfg))
+        candidates.extend(self._build_duplicate_candidates(markets, context, cfg))
+        candidates.extend(self._build_crypto_structure_candidates(markets, context, cfg))
 
         best_by_market: dict[str, SignalCandidate] = {}
         for candidate in candidates:
@@ -71,6 +73,7 @@ class RelationshipArbitrageStrategy:
     def _build_duplicate_candidates(
         self,
         markets: list[MarketContext],
+        context: PipelineContext,
         cfg: dict[str, Any],
     ) -> list[SignalCandidate]:
         min_edge = float(cfg.get("duplicate_min_edge", 0.045))
@@ -99,6 +102,9 @@ class RelationshipArbitrageStrategy:
             edge = rich_yes - cheap_yes
             if edge < min_edge:
                 continue
+            family_key = f"duplicate:{key}"
+            if context.family_positions(family_key) > 0 or context.seen_family(family_key, 3.0):
+                continue
 
             candidates.append(
                 SignalCandidate(
@@ -122,7 +128,8 @@ class RelationshipArbitrageStrategy:
                     market_snapshot=cheapest,
                     metadata={
                         "opportunity_type": "duplicate_equivalence",
-                        "family_key": f"duplicate:{key}",
+                        "family_key": family_key,
+                        "theme_key": f"equivalence:{key}",
                         "peer_market_id": richest.market_id,
                         "peer_price": rich_yes,
                     },
@@ -134,6 +141,7 @@ class RelationshipArbitrageStrategy:
     def _build_crypto_structure_candidates(
         self,
         markets: list[MarketContext],
+        context: PipelineContext,
         cfg: dict[str, Any],
     ) -> list[SignalCandidate]:
         parsed = [item for item in (_parse_barrier_market(market) for market in markets) if item is not None]
@@ -154,7 +162,7 @@ class RelationshipArbitrageStrategy:
         for (symbol, kind, expiry), items in buckets.items():
             items.sort(key=lambda item: item.barrier_price)
             candidates.extend(
-                self._build_duplicate_barrier_candidates(symbol, kind, expiry, items, cfg)
+                self._build_duplicate_barrier_candidates(symbol, kind, expiry, items, context, cfg)
             )
 
             if kind == "reach":
@@ -183,6 +191,7 @@ class RelationshipArbitrageStrategy:
                                 "symbol": symbol,
                                 "expiry": expiry,
                                 "family_key": f"ladder:{symbol}:{expiry}",
+                                "theme_key": f"crypto:{symbol.lower()}",
                                 "harder_market_id": harder.market.market_id,
                             },
                         )
@@ -213,6 +222,7 @@ class RelationshipArbitrageStrategy:
                                 "symbol": symbol,
                                 "expiry": expiry,
                                 "family_key": f"dip_ladder:{symbol}:{expiry}",
+                                "theme_key": f"crypto:{symbol.lower()}",
                                 "harder_market_id": harder.market.market_id,
                             },
                         )
@@ -249,6 +259,7 @@ class RelationshipArbitrageStrategy:
                                 "symbol": symbol,
                                 "expiry": expiry,
                                 "family_key": f"ath_implication:{symbol}:{expiry}",
+                                "theme_key": f"crypto:{symbol.lower()}",
                                 "peer_market_id": reach.market.market_id,
                             },
                         )
@@ -262,6 +273,7 @@ class RelationshipArbitrageStrategy:
         kind: str,
         expiry: str,
         items: list[ParsedBarrier],
+        context: PipelineContext,
         cfg: dict[str, Any],
     ) -> list[SignalCandidate]:
         min_edge = float(cfg.get("duplicate_min_edge", 0.045))
@@ -278,6 +290,9 @@ class RelationshipArbitrageStrategy:
             richest = ordered[-1]
             edge = richest.yes_price - cheapest.yes_price
             if edge < min_edge:
+                continue
+            family_key = f"crypto_duplicate:{symbol}:{kind}:{expiry}:{barrier}"
+            if context.family_positions(family_key) > 0 or context.seen_family(family_key, 3.0):
                 continue
             candidates.append(
                 self._candidate_from_market(
@@ -298,7 +313,8 @@ class RelationshipArbitrageStrategy:
                         "opportunity_type": "crypto_duplicate",
                         "symbol": symbol,
                         "expiry": expiry,
-                        "family_key": f"crypto_duplicate:{symbol}:{kind}:{expiry}:{barrier}",
+                        "family_key": family_key,
+                        "theme_key": f"crypto:{symbol.lower()}",
                         "peer_market_id": richest.market.market_id,
                     },
                 )

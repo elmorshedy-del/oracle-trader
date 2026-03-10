@@ -4,6 +4,7 @@ from typing import Any
 
 from strategies.crypto_arb import MAX_SIGNAL_CONFIDENCE, TEMPORAL_CONFIDENCE_SCALE
 
+from ..context import PipelineContext
 from ..contracts import MarketContext, PortfolioSnapshot, SignalCandidate
 from ..enums import SignalDirection
 
@@ -15,6 +16,7 @@ class CryptoLatencyStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         cfg = config or {}
@@ -36,6 +38,7 @@ class CryptoLatencyStrategy:
             move_pct = float(data.get("move_pct", 0.0) or 0.0)
             move_direction = data.get("move_direction", "flat")
             symbol = data.get("symbol")
+            theme_key = f"crypto:{str(symbol or 'unknown').lower()}"
 
             if kind == "temporal":
                 if abs(move_pct) < temporal_min_move:
@@ -51,6 +54,9 @@ class CryptoLatencyStrategy:
                     direction = SignalDirection.BUY_NO
                     outcome = "NO"
                 if current_price <= 0 or current_price >= temporal_max_entry:
+                    continue
+                family_key = f"crypto:{symbol}:{kind}:{market.market_id}"
+                if context.family_positions(family_key) > 0 or context.seen_family(family_key, 2.0):
                     continue
                 edge = fair - current_price
                 confidence = min(abs(move_pct) / TEMPORAL_CONFIDENCE_SCALE, MAX_SIGNAL_CONFIDENCE)
@@ -74,7 +80,13 @@ class CryptoLatencyStrategy:
                         ),
                         llm_involved=False,
                         market_snapshot=market,
-                        metadata={"confidence_hint": confidence, "symbol": symbol, "kind": kind},
+                        metadata={
+                            "confidence_hint": confidence,
+                            "symbol": symbol,
+                            "kind": kind,
+                            "family_key": family_key,
+                            "theme_key": theme_key,
+                        },
                     )
                 )
                 continue
@@ -86,6 +98,9 @@ class CryptoLatencyStrategy:
             no_price = float(data.get("no_price", 0.0) or 0.0)
             modeled_yes = float(modeled_yes)
             if modeled_yes - yes_price >= barrier_min_edge and yes_price < max_entry:
+                family_key = f"crypto:{symbol}:{kind}:{market.market_id}"
+                if context.family_positions(family_key) > 0 or context.seen_family(family_key, 2.0):
+                    continue
                 candidates.append(
                     SignalCandidate(
                         market_id=market.market_id,
@@ -105,10 +120,13 @@ class CryptoLatencyStrategy:
                             f"barrier_price={float(data.get('barrier_price', 0.0) or 0.0):.0f}",
                         ),
                         market_snapshot=market,
-                        metadata={"symbol": symbol, "kind": kind},
+                        metadata={"symbol": symbol, "kind": kind, "family_key": family_key, "theme_key": theme_key},
                     )
                 )
             elif yes_price - modeled_yes >= barrier_min_edge and no_price < max_entry:
+                family_key = f"crypto:{symbol}:{kind}:{market.market_id}"
+                if context.family_positions(family_key) > 0 or context.seen_family(family_key, 2.0):
+                    continue
                 candidates.append(
                     SignalCandidate(
                         market_id=market.market_id,
@@ -128,7 +146,7 @@ class CryptoLatencyStrategy:
                             f"barrier_price={float(data.get('barrier_price', 0.0) or 0.0):.0f}",
                         ),
                         market_snapshot=market,
-                        metadata={"symbol": symbol, "kind": kind},
+                        metadata={"symbol": symbol, "kind": kind, "family_key": family_key, "theme_key": theme_key},
                     )
                 )
 

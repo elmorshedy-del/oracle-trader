@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..context import PipelineContext
 from ..contracts import MarketContext, PortfolioSnapshot, SignalCandidate
 from ..enums import SignalDirection
 
@@ -17,6 +18,7 @@ class WeatherSniperStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         min_edge = float((config or {}).get("min_edge", 0.08))
@@ -34,6 +36,11 @@ class WeatherSniperStrategy:
             current_prob = float(data.get("current_prob", 0.0) or 0.0)
             yes_price = market.yes_price
             if yes_price is None:
+                continue
+            city = data.get("city")
+            target_date = data.get("target_date")
+            family_key = f"weather:sniper:{city}:{target_date}"
+            if context.family_positions(family_key) > 0 or context.seen_family(family_key, 6.0):
                 continue
             if len(current_temps) < min_models or current_prob < min_probability or yes_price > max_yes_price:
                 continue
@@ -63,8 +70,10 @@ class WeatherSniperStrategy:
                     market_snapshot=market,
                     metadata={
                         "variant": "sniper",
-                        "city": data.get("city"),
-                        "target_date": data.get("target_date"),
+                        "city": city,
+                        "target_date": target_date,
+                        "family_key": family_key,
+                        "theme_key": f"weather:{str(city).lower()}",
                     },
                 )
             )
@@ -78,6 +87,7 @@ class WeatherLatencyStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         min_edge = float((config or {}).get("min_edge", 0.04))
@@ -96,6 +106,11 @@ class WeatherLatencyStrategy:
                 continue
             shift = current_prob - float(previous_prob)
             if abs(shift) < min_shift or not data.get("changed_models"):
+                continue
+            city = data.get("city")
+            target_date = data.get("target_date")
+            family_key = f"weather:latency:{city}:{target_date}"
+            if context.family_positions(family_key) > 0 or context.seen_family(family_key, 3.0):
                 continue
 
             if shift > 0:
@@ -135,8 +150,10 @@ class WeatherLatencyStrategy:
                     metadata={
                         "variant": "latency",
                         "probability_shift": shift,
-                        "city": data.get("city"),
-                        "target_date": data.get("target_date"),
+                        "city": city,
+                        "target_date": target_date,
+                        "family_key": family_key,
+                        "theme_key": f"weather:{str(city).lower()}",
                     },
                 )
             )
@@ -150,6 +167,7 @@ class WeatherSwingStrategy:
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[SignalCandidate]:
         min_edge = float((config or {}).get("min_edge", 0.04))
@@ -188,6 +206,11 @@ class WeatherSwingStrategy:
 
             if current_price is None or recent_peak is None or history_points < min_history_points:
                 continue
+            city = data.get("city")
+            target_date = data.get("target_date")
+            family_key = f"weather:swing:{city}:{target_date}:{side}"
+            if context.family_positions(family_key) > 0 or context.seen_family(family_key, 3.0):
+                continue
             dip = float(recent_peak) - current_price
             if dip < min_token_dip:
                 continue
@@ -216,8 +239,10 @@ class WeatherSwingStrategy:
                     metadata={
                         "variant": "swing",
                         "dip": dip,
-                        "city": data.get("city"),
-                        "target_date": data.get("target_date"),
+                        "city": city,
+                        "target_date": target_date,
+                        "family_key": family_key,
+                        "theme_key": f"weather:{str(city).lower()}",
                     },
                 )
             )

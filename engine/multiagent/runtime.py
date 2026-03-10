@@ -15,6 +15,17 @@ from runtime_paths import LOG_DIR
 from .allocation import Allocator, Executor
 from .audit import ScanCycleTracer, SnapshotStore
 from .config import OrchestratorConfig
+from .context import (
+    LedgerEntry,
+    PipelineContext,
+    build_pipeline_context,
+    family_key_from_position,
+    family_key_from_signal,
+    headline_memory_key,
+    signal_memory_key,
+    theme_key_from_position,
+    theme_key_from_signal,
+)
 from .contracts import (
     MarketContext,
     NormalizedMarket,
@@ -57,6 +68,9 @@ DEFAULT_CLOB_CONCURRENCY = 8
 DEFAULT_EXIT_CONVERGENCE_RATIO = 0.96
 DEFAULT_EXIT_MAX_HOLD_HOURS = 8.0
 DEFAULT_EXIT_STOP_LOSS_PCT = -0.18
+DEFAULT_EXIT_FOLLOW_THROUGH_HOURS = 1.5
+DEFAULT_EXIT_FOLLOW_THROUGH_PCT = -0.08
+DEFAULT_EXIT_RELIEF_HOURS = 1.0
 EXIT_CONVERGENCE_RATIO_BY_STRATEGY = {
     "relationship_arbitrage": 0.92,
 }
@@ -177,15 +191,25 @@ class InMemoryStateManager:
         *,
         starting_capital: float,
         reserve_pct: float,
+        family_caps: dict[str, int] | None = None,
+        max_positions_per_theme: int = 6,
+        max_theme_capital_pct: float = 0.30,
         disabled_strategies: set[str] | None = None,
     ) -> None:
         self._starting_capital = starting_capital
         self._reserve_pct = reserve_pct
+        self._family_caps = dict(family_caps or {})
+        self._max_positions_per_theme = max_positions_per_theme
+        self._max_theme_capital_pct = max_theme_capital_pct
         self._disabled_strategies = set(disabled_strategies or set())
         self._positions: list[PositionState] = []
         self._closed_positions: list[dict[str, Any]] = []
         self._closed_event_queue: list[dict[str, Any]] = []
         self._recently_closed: dict[str, datetime] = {}
+        self._signal_ledger: dict[str, LedgerEntry] = {}
+        self._headline_ledger: dict[str, LedgerEntry] = {}
+        self._family_ledger: dict[str, LedgerEntry] = {}
+        self._theme_ledger: dict[str, LedgerEntry] = {}
         self._cash_balance = starting_capital
         self._realized_pnl = 0.0
         self._fees_paid = 0.0
@@ -195,6 +219,15 @@ class InMemoryStateManager:
 
     def snapshot(self) -> PortfolioSnapshot:
         return self._snapshot
+
+    def context(self) -> PipelineContext:
+        return build_pipeline_context(
+            self._snapshot,
+            signal_entries=dict(self._signal_ledger),
+            headline_entries=dict(self._headline_ledger),
+            family_entries=dict(self._family_ledger),
+            theme_entries=dict(self._theme_ledger),
+        )
 
     def apply_executions(self, results: list[Any]) -> None:
         if not results:
@@ -243,6 +276,7 @@ class InMemoryStateManager:
             positions.append(position)
             cash_balance -= cost_basis + fees_paid
             self._fees_paid += fees_paid
+            self._record_signal_entries(signal, result.executed_at)
             open_market_ids.add(signal.market_id)
             exposure_by_strategy[signal.strategy_name] = (
                 exposure_by_strategy.get(signal.strategy_name, 0.0) + cost_basis
@@ -256,19 +290,77 @@ class InMemoryStateManager:
 
         self._positions = positions
         self._cash_balance = max(0.0, cash_balance)
+        self._prune_ledgers(utc_now())
         self._snapshot = self._recompute_snapshot()
         self.save()
 
     def save(self) -> None:
         return
 
+    def _record_signal_entries(self, signal: Any, seen_at: datetime) -> None:
+        signal_key = signal_memory_key(signal)
+        self._signal_ledger[signal_key] = self._merge_entry(
+            self._signal_ledger.get(signal_key),
+            signal_key,
+            seen_at,
+            {"strategy": signal.strategy_name, "market_id": signal.market_id},
+        )
+
+        headline_key = headline_memory_key(signal)
+        if headline_key:
+            self._headline_ledger[headline_key] = self._merge_entry(
+                self._headline_ledger.get(headline_key),
+                headline_key,
+                seen_at,
+                {"strategy": signal.strategy_name, "market_id": signal.market_id},
+            )
+
+        family_key = family_key_from_signal(signal)
+        if family_key:
+            self._family_ledger[family_key] = self._merge_entry(
+                self._family_ledger.get(family_key),
+                family_key,
+                seen_at,
+                {"strategy": signal.strategy_name, "market_id": signal.market_id},
+            )
+
+        theme_key = theme_key_from_signal(signal)
+        if theme_key:
+            self._theme_ledger[theme_key] = self._merge_entry(
+                self._theme_ledger.get(theme_key),
+                theme_key,
+                seen_at,
+                {"strategy": signal.strategy_name, "market_id": signal.market_id},
+            )
+
+    @staticmethod
+    def _merge_entry(
+        entry: LedgerEntry | None,
+        key: str,
+        seen_at: datetime,
+        metadata: dict[str, Any],
+    ) -> LedgerEntry:
+        if entry is None:
+            return LedgerEntry(key=key, last_seen_at=seen_at, count=1, metadata=metadata)
+        merged = dict(entry.metadata)
+        merged.update(metadata)
+        return LedgerEntry(
+            key=key,
+            last_seen_at=seen_at,
+            count=entry.count + 1,
+            metadata=merged,
+        )
+
     def refresh_prices(self, markets: list[NormalizedMarket]) -> None:
         if not self._positions:
+            self._prune_ledgers(utc_now())
             self._snapshot = self._recompute_snapshot()
             return
 
         market_map = {market.market_id: market for market in markets}
         now = utc_now()
+        family_counts = self._open_family_counts()
+        theme_counts, theme_exposure = self._open_theme_state()
         open_positions: list[PositionState] = []
 
         for position in self._positions:
@@ -280,7 +372,7 @@ class InMemoryStateManager:
                 position.unrealized_pnl = (position.current_price - position.entry_price) * position.shares
                 position.last_updated = now
 
-            exit_reason = self._exit_reason(position, now)
+            exit_reason = self._exit_reason(position, now, family_counts, theme_counts, theme_exposure)
             if exit_reason:
                 realized = position.unrealized_pnl
                 self._cash_balance += position.current_price * position.shares
@@ -306,12 +398,23 @@ class InMemoryStateManager:
                 self._closed_positions.append(event)
                 self._closed_event_queue.append(event)
                 self._closed_positions = self._closed_positions[-200:]
+                family_key = family_key_from_position(position)
+                if family_key and family_counts.get(family_key, 0) > 0:
+                    family_counts[family_key] -= 1
+                theme_key = theme_key_from_position(position)
+                if theme_key and theme_counts.get(theme_key, 0) > 0:
+                    theme_counts[theme_key] -= 1
+                    theme_exposure[theme_key] = max(
+                        0.0,
+                        theme_exposure.get(theme_key, 0.0) - (position.current_price * position.shares),
+                    )
                 continue
 
             open_positions.append(position)
 
         self._positions = open_positions
         self._cleanup_recently_closed(now)
+        self._prune_ledgers(now)
         self._snapshot = self._recompute_snapshot()
         self.save()
 
@@ -361,7 +464,14 @@ class InMemoryStateManager:
             recently_closed=dict(self._recently_closed),
         )
 
-    def _exit_reason(self, position: PositionState, now: datetime) -> str | None:
+    def _exit_reason(
+        self,
+        position: PositionState,
+        now: datetime,
+        family_counts: dict[str, int],
+        theme_counts: dict[str, int],
+        theme_exposure: dict[str, float],
+    ) -> str | None:
         if position.strategy_name in self._disabled_strategies:
             return "strategy_disabled"
 
@@ -380,6 +490,31 @@ class InMemoryStateManager:
             return "stop_loss"
 
         held_hours = (now - position.opened_at).total_seconds() / 3600
+        if held_hours >= DEFAULT_EXIT_FOLLOW_THROUGH_HOURS and pnl_pct <= DEFAULT_EXIT_FOLLOW_THROUGH_PCT:
+            return "follow_through_failed"
+
+        family_key = family_key_from_position(position)
+        if family_key is not None:
+            family_cap = self._family_cap_for(position.strategy_name)
+            if family_cap and family_counts.get(family_key, 0) > family_cap and held_hours >= DEFAULT_EXIT_RELIEF_HOURS:
+                return "family_relief"
+
+        theme_key = theme_key_from_position(position)
+        if theme_key is not None:
+            configured_theme_limit = self._snapshot.total_capital * self._max_theme_capital_pct
+            if (
+                held_hours >= DEFAULT_EXIT_RELIEF_HOURS
+                and theme_counts.get(theme_key, 0) > self._max_positions_per_theme
+                and pnl_pct <= 0.02
+            ):
+                return "theme_relief"
+            if (
+                held_hours >= DEFAULT_EXIT_RELIEF_HOURS
+                and theme_exposure.get(theme_key, 0.0) > configured_theme_limit
+                and pnl_pct <= 0.01
+            ):
+                return "theme_exposure_relief"
+
         max_hold_hours = EXIT_MAX_HOLD_HOURS_BY_STRATEGY.get(
             position.strategy_name,
             DEFAULT_EXIT_MAX_HOLD_HOURS,
@@ -479,6 +614,28 @@ class InMemoryStateManager:
         self._snapshot = self._recompute_snapshot()
         self.save()
 
+    def _open_family_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for position in self._positions:
+            family_key = family_key_from_position(position)
+            if family_key:
+                counts[family_key] = counts.get(family_key, 0) + 1
+        return counts
+
+    def _open_theme_state(self) -> tuple[dict[str, int], dict[str, float]]:
+        counts: dict[str, int] = {}
+        exposure: dict[str, float] = {}
+        for position in self._positions:
+            theme_key = theme_key_from_position(position)
+            if not theme_key:
+                continue
+            counts[theme_key] = counts.get(theme_key, 0) + 1
+            exposure[theme_key] = exposure.get(theme_key, 0.0) + (position.current_price * position.shares)
+        return counts, exposure
+
+    def _family_cap_for(self, strategy_name: str) -> int:
+        return self._family_caps.get(strategy_name, 1)
+
 
 class PersistentStateManager(InMemoryStateManager):
     def __init__(
@@ -487,12 +644,18 @@ class PersistentStateManager(InMemoryStateManager):
         starting_capital: float,
         reserve_pct: float,
         state_path: Path,
+        family_caps: dict[str, int] | None = None,
+        max_positions_per_theme: int = 6,
+        max_theme_capital_pct: float = 0.30,
         disabled_strategies: set[str] | None = None,
     ) -> None:
         self._state_path = state_path
         super().__init__(
             starting_capital=starting_capital,
             reserve_pct=reserve_pct,
+            family_caps=family_caps,
+            max_positions_per_theme=max_positions_per_theme,
+            max_theme_capital_pct=max_theme_capital_pct,
             disabled_strategies=disabled_strategies,
         )
         self._load()
@@ -514,6 +677,10 @@ class PersistentStateManager(InMemoryStateManager):
                 market_id: closed_at.isoformat()
                 for market_id, closed_at in self._recently_closed.items()
             },
+            "signal_ledger": self._serialize_ledger(self._signal_ledger),
+            "headline_ledger": self._serialize_ledger(self._headline_ledger),
+            "family_ledger": self._serialize_ledger(self._family_ledger),
+            "theme_ledger": self._serialize_ledger(self._theme_ledger),
         }
         _write_json_atomically(self._state_path, payload)
 
@@ -553,7 +720,12 @@ class PersistentStateManager(InMemoryStateManager):
             parsed = _parse_datetime(closed_at)
             if parsed is not None:
                 self._recently_closed[str(market_id)] = parsed
+        self._signal_ledger = self._deserialize_ledger(payload.get("signal_ledger", {}))
+        self._headline_ledger = self._deserialize_ledger(payload.get("headline_ledger", {}))
+        self._family_ledger = self._deserialize_ledger(payload.get("family_ledger", {}))
+        self._theme_ledger = self._deserialize_ledger(payload.get("theme_ledger", {}))
         self._cleanup_recently_closed(utc_now())
+        self._prune_ledgers(utc_now())
         self._snapshot = self._recompute_snapshot()
 
     @staticmethod
@@ -605,6 +777,43 @@ class PersistentStateManager(InMemoryStateManager):
             metadata=dict(data.get("metadata", {})),
             last_updated=_parse_datetime(data.get("last_updated")) or utc_now(),
         )
+
+    @staticmethod
+    def _serialize_ledger(ledger: dict[str, LedgerEntry]) -> dict[str, dict[str, Any]]:
+        return {
+            key: {
+                "last_seen_at": entry.last_seen_at.isoformat(),
+                "count": entry.count,
+                "metadata": dict(entry.metadata),
+            }
+            for key, entry in ledger.items()
+        }
+
+    @staticmethod
+    def _deserialize_ledger(payload: Any) -> dict[str, LedgerEntry]:
+        entries: dict[str, LedgerEntry] = {}
+        if not isinstance(payload, dict):
+            return entries
+        for key, item in payload.items():
+            if not isinstance(item, dict):
+                continue
+            seen_at = _parse_datetime(item.get("last_seen_at"))
+            if seen_at is None:
+                continue
+            entries[str(key)] = LedgerEntry(
+                key=str(key),
+                last_seen_at=seen_at,
+                count=int(item.get("count", 1) or 1),
+                metadata=dict(item.get("metadata", {})),
+            )
+        return entries
+
+    def _prune_ledgers(self, now: datetime) -> None:
+        cutoff = now - timedelta(hours=72)
+        self._signal_ledger = {key: entry for key, entry in self._signal_ledger.items() if entry.last_seen_at >= cutoff}
+        self._headline_ledger = {key: entry for key, entry in self._headline_ledger.items() if entry.last_seen_at >= cutoff}
+        self._family_ledger = {key: entry for key, entry in self._family_ledger.items() if entry.last_seen_at >= cutoff}
+        self._theme_ledger = {key: entry for key, entry in self._theme_ledger.items() if entry.last_seen_at >= cutoff}
 
 
 class MultiagentRuntime:
@@ -660,6 +869,9 @@ class MultiagentRuntime:
             starting_capital=self.starting_capital,
             reserve_pct=self.config.risk_limits.min_reserve_pct,
             state_path=STATE_FILE_PATH,
+            family_caps=self.config.risk_limits.family_caps,
+            max_positions_per_theme=self.config.risk_limits.max_positions_per_theme,
+            max_theme_capital_pct=self.config.risk_limits.max_theme_capital_pct,
             disabled_strategies=self._disabled_strategies,
         )
         self.tracer = ScanCycleTracer()
@@ -716,6 +928,7 @@ class MultiagentRuntime:
     def get_status(self) -> dict[str, Any]:
         report = self._last_report
         portfolio = self.state.snapshot()
+        context = self.state.context()
         state_perf = self.state.performance_summary()
         blockers = self._build_blockers(report)
         comparison_views = self._build_comparison_views(report, portfolio, state_perf)
@@ -745,6 +958,7 @@ class MultiagentRuntime:
             "defaults": dataclass_to_dict(self.config),
             "portfolio": dataclass_to_dict(portfolio),
             "portfolio_summary": portfolio_summary,
+            "memory_summary": self._build_memory_summary(context),
             "performance": performance,
             "health": health,
             "diagnostics": diagnostics,
@@ -934,6 +1148,26 @@ class MultiagentRuntime:
             "executed": report.executions_succeeded,
             "exits": 0,
             "resolved": 0,
+        }
+
+    @staticmethod
+    def _build_memory_summary(context: PipelineContext) -> dict[str, Any]:
+        top_themes = sorted(
+            context.open_theme_exposure.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:6]
+        return {
+            "open_families": len(context.open_family_counts),
+            "open_themes": len(context.open_theme_counts),
+            "recent_signal_keys": len(context.recent_signal_entries),
+            "recent_headlines": len(context.recent_headline_entries),
+            "recent_families": len(context.recent_family_entries),
+            "recent_themes": len(context.recent_theme_entries),
+            "top_theme_exposure": [
+                {"theme": key, "exposure": value}
+                for key, value in top_themes
+            ],
         }
 
     def _build_latest_scan(self, report: ScanCycleReport | None) -> dict[str, Any]:

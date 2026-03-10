@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from .allocation import Allocator, Executor
 from .audit import ScanCycleTracer, SnapshotStore
 from .config import OrchestratorConfig
+from .context import PipelineContext
 from .contracts import (
     MarketContext,
     ModuleHealth,
@@ -31,6 +32,7 @@ class Strategy(Protocol):
         self,
         markets: list[MarketContext],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
         config: Any,
     ) -> list[Any]:
         ...
@@ -65,6 +67,9 @@ class StateManager(Protocol):
     def snapshot(self) -> PortfolioSnapshot:
         ...
 
+    def context(self) -> PipelineContext:
+        ...
+
     def apply_executions(self, results: list[Any]) -> None:
         ...
 
@@ -88,6 +93,7 @@ class Orchestrator:
     def run_scan_cycle(self) -> ScanCycleReport:
         self.tracer.start_cycle()
         portfolio = self.state.snapshot()
+        context = self.state.context()
 
         try:
             raw_markets = self._timed(
@@ -122,7 +128,7 @@ class Orchestrator:
                 candidates = self._timed(
                     f"strategy.{strategy.name}",
                     lambda strat=strategy, cfg=strategy_config: strat.generate(
-                        enriched, portfolio, cfg
+                        enriched, portfolio, context, cfg
                     ),
                 )
                 all_candidates.extend(candidates)
@@ -135,7 +141,7 @@ class Orchestrator:
         try:
             validated, rejected = self._timed(
                 "validator",
-                lambda: self.validator.validate(all_candidates, portfolio),
+                lambda: self.validator.validate(all_candidates, portfolio, context),
             )
             self.tracer.record_validation(validated, rejected)
         except Exception as exc:
@@ -145,7 +151,7 @@ class Orchestrator:
         try:
             intents, allocation_rejected = self._timed(
                 "allocator",
-                lambda: self.allocator.allocate(validated, portfolio),
+                lambda: self.allocator.allocate(validated, portfolio, context),
             )
             self.tracer.record_allocation(intents, allocation_rejected)
         except Exception as exc:

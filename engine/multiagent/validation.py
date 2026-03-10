@@ -5,6 +5,12 @@ from datetime import datetime, timezone
 from typing import Protocol
 
 from .config import ValidationConfig
+from .context import (
+    PipelineContext,
+    family_key_from_signal,
+    headline_memory_key,
+    signal_memory_key,
+)
 from .contracts import (
     MarketContext,
     PortfolioSnapshot,
@@ -28,6 +34,7 @@ class ValidationRule(Protocol):
         self,
         candidate: SignalCandidate,
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
     ) -> ValidationCheck:
         ...
 
@@ -44,7 +51,7 @@ class MinVolumeRule:
     name: str = "min_volume"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         actual = snapshot.volume_24h
         threshold = self.config.strategy_min_volume_24h.get(
@@ -69,7 +76,7 @@ class MinLiquidityRule:
     name: str = "min_liquidity"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         actual = snapshot.liquidity
         threshold = self.config.min_liquidity
@@ -91,7 +98,7 @@ class ResolutionProximityRule:
     name: str = "resolution_proximity"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         hours = snapshot.hours_to_resolution
         if hours is None:
@@ -120,7 +127,7 @@ class MarketAgeRule:
     name: str = "market_age"
     blocking: bool = False
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         age_hours = (utc_now() - snapshot.created_date).total_seconds() / 3600
         threshold = self.config.min_market_age_hours
@@ -142,7 +149,7 @@ class MinEdgeRule:
     name: str = "min_edge"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         actual = abs(candidate.edge_estimate)
         threshold = self.config.min_edge_absolute
         passed = actual >= threshold
@@ -163,7 +170,7 @@ class ReasoningPresentRule:
     name: str = "reasoning_present"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         has_reasoning = bool(candidate.reasoning and len(candidate.reasoning.strip()) > 20)
         return ValidationCheck(
             rule_name=self.name,
@@ -180,7 +187,7 @@ class EdgeBasisPresentRule:
     name: str = "edge_basis_present"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         has_basis = bool(candidate.edge_basis and candidate.edge_basis.strip())
         return ValidationCheck(
             rule_name=self.name,
@@ -197,7 +204,7 @@ class EvidencePresentRule:
     name: str = "evidence_present"
     blocking: bool = False
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         has_evidence = len(candidate.evidence) > 0
         return ValidationCheck(
             rule_name=self.name,
@@ -214,7 +221,7 @@ class DuplicatePositionRule:
     name: str = "duplicate_position"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         if self.config.allow_duplicate_positions:
             existing_count = sum(
                 1
@@ -226,13 +233,9 @@ class DuplicatePositionRule:
                 passed=True,
                 blocking=self.blocking,
                 actual_value=float(existing_count),
-                reason=(
-                    "same-market pyramiding allowed"
-                    if existing_count
-                    else "no existing position"
-                ),
+                reason="same-market pyramiding allowed" if existing_count else "no existing position",
             )
-        duplicate = portfolio.has_position_in(candidate.market_id)
+        duplicate = context.has_open_market(candidate.market_id)
         return ValidationCheck(
             rule_name=self.name,
             passed=not duplicate,
@@ -243,12 +246,93 @@ class DuplicatePositionRule:
 
 
 @dataclass
+class RecentSignalRule:
+    config: ValidationConfig
+    name: str = "recent_signal"
+    blocking: bool = True
+
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
+        signal_key = signal_memory_key(candidate)
+        seen_recently = context.seen_signal(signal_key, self.config.recent_signal_ttl_hours)
+        return ValidationCheck(
+            rule_name=self.name,
+            passed=not seen_recently,
+            blocking=self.blocking,
+            threshold=self.config.recent_signal_ttl_hours,
+            reason="signal not recently acted on" if not seen_recently else f"same signal acted on within {self.config.recent_signal_ttl_hours:.1f}h",
+            rejection_code=RejectionReason.RECENT_SIGNAL_DUPLICATE if seen_recently else None,
+        )
+
+
+@dataclass
+class RecentHeadlineRule:
+    config: ValidationConfig
+    name: str = "recent_headline"
+    blocking: bool = True
+
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
+        headline_key = headline_memory_key(candidate)
+        if headline_key is None:
+            return ValidationCheck(
+                rule_name=self.name,
+                passed=True,
+                blocking=self.blocking,
+                reason="no headline key present",
+            )
+        seen_recently = context.seen_headline(headline_key, self.config.recent_headline_ttl_hours)
+        return ValidationCheck(
+            rule_name=self.name,
+            passed=not seen_recently,
+            blocking=self.blocking,
+            threshold=self.config.recent_headline_ttl_hours,
+            reason="headline not recently acted on" if not seen_recently else f"headline acted on within {self.config.recent_headline_ttl_hours:.1f}h",
+            rejection_code=RejectionReason.RECENT_HEADLINE_DUPLICATE if seen_recently else None,
+        )
+
+
+@dataclass
+class FamilyReentryRule:
+    config: ValidationConfig
+    name: str = "family_reentry"
+    blocking: bool = True
+
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
+        family_key = family_key_from_signal(candidate)
+        if family_key is None:
+            return ValidationCheck(
+                rule_name=self.name,
+                passed=True,
+                blocking=self.blocking,
+                reason="no family key present",
+            )
+        open_family = context.family_positions(family_key)
+        if open_family > 0:
+            return ValidationCheck(
+                rule_name=self.name,
+                passed=False,
+                blocking=self.blocking,
+                actual_value=float(open_family),
+                reason=f"family already held ({open_family})",
+                rejection_code=RejectionReason.FAMILY_REENTRY_COOLDOWN,
+            )
+        seen_recently = context.seen_family(family_key, self.config.family_reentry_cooldown_hours)
+        return ValidationCheck(
+            rule_name=self.name,
+            passed=not seen_recently,
+            blocking=self.blocking,
+            threshold=self.config.family_reentry_cooldown_hours,
+            reason="family not recently traded" if not seen_recently else f"family traded within {self.config.family_reentry_cooldown_hours:.1f}h",
+            rejection_code=RejectionReason.FAMILY_REENTRY_COOLDOWN if seen_recently else None,
+        )
+
+
+@dataclass
 class MaxMarketsPerCategoryRule:
     config: ValidationConfig
     name: str = "max_markets_per_category"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         snapshot = _require_snapshot(candidate)
         category = snapshot.category.value
         current_count = sum(
@@ -275,7 +359,7 @@ class EnrichmentStalenessRule:
     name: str = "enrichment_staleness"
     blocking: bool = True
 
-    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot) -> ValidationCheck:
+    def check(self, candidate: SignalCandidate, portfolio: PortfolioSnapshot, context: PipelineContext) -> ValidationCheck:
         critical_provider = self._critical_provider_for(candidate.strategy_name)
         if critical_provider is None:
             return ValidationCheck(
@@ -345,6 +429,9 @@ class Validator:
             EdgeBasisPresentRule(self.config),
             EvidencePresentRule(self.config),
             DuplicatePositionRule(self.config),
+            RecentSignalRule(self.config),
+            RecentHeadlineRule(self.config),
+            FamilyReentryRule(self.config),
             MaxMarketsPerCategoryRule(self.config),
             EnrichmentStalenessRule(self.config),
         ]
@@ -353,6 +440,7 @@ class Validator:
         self,
         candidates: list[SignalCandidate],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
     ) -> tuple[list[ValidatedSignal], list[RejectedSignal]]:
         validated: list[ValidatedSignal] = []
         rejected: list[RejectedSignal] = []
@@ -361,7 +449,7 @@ class Validator:
             checks: list[ValidationCheck] = []
             try:
                 for rule in self.rules:
-                    checks.append(rule.check(candidate, portfolio))
+                    checks.append(rule.check(candidate, portfolio, context))
             except Exception as exc:
                 checks.append(
                     ValidationCheck(
@@ -389,9 +477,7 @@ class Validator:
                 )
                 continue
 
-            warnings = tuple(
-                check.reason for check in checks if not check.blocking and not check.passed
-            )
+            warnings = tuple(check.reason for check in checks if not check.blocking and not check.passed)
             validated.append(
                 ValidatedSignal(
                     signal=candidate,

@@ -5,6 +5,12 @@ from datetime import datetime, timezone
 from typing import Protocol
 
 from .config import ExecutionConfig, RiskLimits, SizingConfig, SlippageConfig
+from .context import (
+    PipelineContext,
+    family_key_from_position,
+    family_key_from_signal,
+    theme_key_from_signal,
+)
 from .contracts import (
     AllocationRejection,
     ExecutionIntent,
@@ -153,6 +159,7 @@ class Allocator:
         self,
         signals: list[ValidatedSignal],
         portfolio: PortfolioSnapshot,
+        context: PipelineContext,
     ) -> tuple[list[ExecutionIntent], list[AllocationRejection]]:
         intents: list[ExecutionIntent] = []
         rejections: list[AllocationRejection] = []
@@ -178,6 +185,8 @@ class Allocator:
         running_strategy_positions = dict(portfolio.positions_by_strategy)
         running_market_ids = set(portfolio.open_market_ids)
         running_family_positions = self._family_position_counts(portfolio)
+        running_theme_positions = dict(context.open_theme_counts)
+        running_theme_exposure = dict(context.open_theme_exposure)
 
         for signal in ranked:
             candidate = signal.signal
@@ -199,6 +208,7 @@ class Allocator:
             category = snapshot.category.value
             strategy_cap = self.limits.strategy_caps.get(strategy)
             family_key = self._family_key(signal)
+            theme_key = self._theme_key(signal)
 
             if market_id in portfolio.recently_closed:
                 closed_at = portfolio.recently_closed[market_id]
@@ -240,6 +250,20 @@ class Allocator:
                             constraint_name=f"family_cap.{strategy}",
                             constraint_limit=float(family_cap),
                             current_utilization=float(current_family_positions),
+                        )
+                    )
+                    continue
+
+            if theme_key is not None:
+                current_theme_positions = running_theme_positions.get(theme_key, 0)
+                if current_theme_positions >= self.limits.max_positions_per_theme:
+                    rejections.append(
+                        AllocationRejection(
+                            signal=signal,
+                            reason=AllocationRejectionReason.THEME_CAP_REACHED,
+                            constraint_name="max_positions_per_theme",
+                            constraint_limit=float(self.limits.max_positions_per_theme),
+                            current_utilization=float(current_theme_positions),
                         )
                     )
                     continue
@@ -325,6 +349,24 @@ class Allocator:
                     continue
                 capped_size = remaining
 
+            if theme_key is not None:
+                current_theme_exposure = running_theme_exposure.get(theme_key, 0.0)
+                theme_limit_usd = portfolio.total_capital * self.limits.max_theme_capital_pct
+                if current_theme_exposure + capped_size > theme_limit_usd:
+                    remaining = theme_limit_usd - current_theme_exposure
+                    if remaining < self.sizing_config.min_position_usd:
+                        rejections.append(
+                            AllocationRejection(
+                                signal=signal,
+                                reason=AllocationRejectionReason.THEME_CAP_REACHED,
+                                constraint_name="theme_capital",
+                                constraint_limit=theme_limit_usd,
+                                current_utilization=current_theme_exposure,
+                            )
+                        )
+                        continue
+                    capped_size = remaining
+
             max_deployed = portfolio.total_capital * self.limits.max_portfolio_utilization_pct
             if running_deployed + capped_size > max_deployed:
                 remaining = max_deployed - running_deployed
@@ -392,6 +434,9 @@ class Allocator:
             running_market_ids.add(market_id)
             if family_key is not None:
                 running_family_positions[(strategy, family_key)] = running_family_positions.get((strategy, family_key), 0) + 1
+            if theme_key is not None:
+                running_theme_positions[theme_key] = running_theme_positions.get(theme_key, 0) + 1
+                running_theme_exposure[theme_key] = running_theme_exposure.get(theme_key, 0.0) + capped_size
 
         return intents, rejections
 
@@ -457,30 +502,17 @@ class Allocator:
 
     @staticmethod
     def _family_key(signal: ValidatedSignal) -> str | None:
-        metadata = signal.signal.metadata or {}
-        family_key = metadata.get("family_key")
-        if family_key:
-            return str(family_key)
-        opportunity_type = metadata.get("opportunity_type")
-        if opportunity_type:
-            peer = metadata.get("peer_market_id") or metadata.get("harder_market_id") or ""
-            symbol = metadata.get("symbol") or ""
-            expiry = metadata.get("expiry") or ""
-            return f"{opportunity_type}:{symbol}:{expiry}:{peer}"
-        return None
+        return family_key_from_signal(signal.signal)
+
+    @staticmethod
+    def _theme_key(signal: ValidatedSignal) -> str | None:
+        return theme_key_from_signal(signal.signal)
 
     @staticmethod
     def _family_position_counts(portfolio: PortfolioSnapshot) -> dict[tuple[str, str], int]:
         counts: dict[tuple[str, str], int] = {}
         for position in portfolio.positions:
-            family_key = position.metadata.get("family_key")
-            if not family_key:
-                opportunity_type = position.metadata.get("opportunity_type")
-                if opportunity_type:
-                    peer = position.metadata.get("peer_market_id") or position.metadata.get("harder_market_id") or ""
-                    symbol = position.metadata.get("symbol") or ""
-                    expiry = position.metadata.get("expiry") or ""
-                    family_key = f"{opportunity_type}:{symbol}:{expiry}:{peer}"
+            family_key = family_key_from_position(position)
             if not family_key:
                 continue
             key = (position.strategy_name, str(family_key))

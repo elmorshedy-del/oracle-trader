@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import re
+import ast
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
@@ -512,14 +513,87 @@ If no market is relevant, return {{"market_slug": null, "direction": "neutral", 
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
+        if not text:
+            raise RuntimeError("fireworks_empty_content_after_fence_strip")
         try:
-            return json.loads(text)
+            parsed = json.loads(text)
+            if isinstance(parsed, list) and parsed:
+                first = parsed[0]
+                if isinstance(first, dict):
+                    return first
+            if isinstance(parsed, dict):
+                return parsed
+            raise RuntimeError("classification_payload_not_object")
         except json.JSONDecodeError:
             start = text.find("{")
             end = text.rfind("}")
-            if start == -1 or end == -1 or end <= start:
-                raise
-            return json.loads(text[start:end + 1])
+            if start != -1 and end != -1 and end > start:
+                return json.loads(text[start:end + 1])
+            # Some providers answer with python-ish dicts using single quotes.
+            try:
+                parsed = ast.literal_eval(text)
+                if isinstance(parsed, dict):
+                    return parsed
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                    return parsed[0]
+            except Exception:
+                pass
+            kv = self._parse_classification_key_values(text)
+            if kv is not None:
+                return kv
+            snippet = text.replace("\n", " ").strip()
+            if len(snippet) > 220:
+                snippet = f"{snippet[:220]}..."
+            raise RuntimeError(f"classification_json_invalid body={snippet or '<empty>'}")
+
+    @staticmethod
+    def _parse_classification_key_values(text: str) -> dict | None:
+        """Best-effort parser for non-JSON key/value responses."""
+        lowered = text.lower()
+        if "direction" not in lowered and "market_slug" not in lowered and "slug" not in lowered:
+            return None
+
+        def _match(pattern: str) -> str | None:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if not m:
+                return None
+            value = m.group(1).strip().strip('"').strip("'")
+            return value
+
+        slug = _match(r"(?:market_slug|slug)\s*[:=]\s*([^\n,;]+)")
+        if slug and slug.lower() in {"null", "none", "n/a", "na"}:
+            slug = None
+
+        direction = (_match(r"(?:direction|bias|sentiment)\s*[:=]\s*([^\n,;]+)") or "neutral").lower()
+        if direction in {"positive", "up", "yes"}:
+            direction = "bullish"
+        elif direction in {"negative", "down", "no"}:
+            direction = "bearish"
+        elif direction not in {"bullish", "bearish", "neutral"}:
+            direction = "neutral"
+
+        confidence_raw = _match(r"(?:confidence|score|probability)\s*[:=]\s*([0-9]*\.?[0-9]+)")
+        impact_raw = _match(r"(?:expected_impact_cents|impact_cents|impact)\s*[:=]\s*([0-9]*\.?[0-9]+)")
+        reasoning = _match(r"(?:reasoning|explanation)\s*[:=]\s*(.+)") or "parsed from non-json llm output"
+
+        try:
+            confidence = float(confidence_raw) if confidence_raw is not None else 0.0
+            if confidence > 1.0 and confidence <= 100.0:
+                confidence = confidence / 100.0
+        except ValueError:
+            confidence = 0.0
+        try:
+            impact = float(impact_raw) if impact_raw is not None else 0.0
+        except ValueError:
+            impact = 0.0
+
+        return {
+            "market_slug": slug,
+            "direction": direction,
+            "confidence": max(0.0, min(confidence, 1.0)),
+            "expected_impact_cents": max(0.0, impact),
+            "reasoning": reasoning,
+        }
 
     @staticmethod
     def _decode_json_response(response: httpx.Response, provider: str) -> dict:

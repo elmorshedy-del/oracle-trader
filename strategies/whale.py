@@ -15,6 +15,14 @@ from data.models import Market, Event, Signal, WhaleWallet, SignalSource, Signal
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
+WHALE_OVERLAY_STOPWORDS = {
+    "will", "the", "and", "for", "with", "that", "this", "from", "before", "after",
+    "another", "there", "create", "major", "launch", "ground", "called", "strike",
+    "offensive", "reach", "reaches", "called", "party", "house", "government",
+    "january", "february", "march", "april", "may", "june", "july", "august",
+    "september", "october", "november", "december", "2026", "2027", "2028",
+}
+BITCOIN_FAMILY_TOKENS = {"bitcoin", "btc"}
 
 
 class WhaleTrackingStrategy(BaseStrategy):
@@ -36,6 +44,7 @@ class WhaleTrackingStrategy(BaseStrategy):
                 "activity_markets": 0,
                 "overlay_matches": 0,
                 "overlay_slug_matches": 0,
+                "overlay_theme_matches": 0,
                 "standalone_candidates": 0,
                 "standalone_slug_matches": 0,
             }
@@ -308,12 +317,16 @@ class WhaleTrackingStrategy(BaseStrategy):
     def apply_cached_confirmation(self, signal: Signal) -> tuple[Signal, bool]:
         sentiment = self.get_cached_whale_sentiment(signal.condition_id)
         used_slug_fallback = False
+        used_theme_fallback = False
         if not sentiment:
             normalized_slug = self._normalize_slug(signal.market_slug)
             if normalized_slug:
                 sentiment = self._market_sentiment_by_slug.get(normalized_slug)
                 if sentiment and self._is_fresh(sentiment.get("last_seen")):
                     used_slug_fallback = True
+        if not sentiment:
+            sentiment = self._find_related_sentiment(signal.market_slug)
+            used_theme_fallback = sentiment is not None
         cloned = signal.model_copy(deep=True)
         if not sentiment or not self._eligible_sentiment(
             sentiment,
@@ -324,6 +337,8 @@ class WhaleTrackingStrategy(BaseStrategy):
         self._stats["overlay_matches"] += 1
         if used_slug_fallback:
             self._stats["overlay_slug_matches"] += 1
+        if used_theme_fallback:
+            self._stats["overlay_theme_matches"] += 1
         return self.confirm_signal(cloned, sentiment), True
 
     def build_standalone_signals(self, markets: list[Market]) -> list[Signal]:
@@ -481,9 +496,72 @@ class WhaleTrackingStrategy(BaseStrategy):
             seen.add(f"slug:{slug}")
             yield sentiment
 
+    def _find_related_sentiment(self, market_slug: str | None) -> dict | None:
+        signal_tokens = self._slug_tokens(market_slug)
+        if not signal_tokens:
+            return None
+
+        best_match: dict | None = None
+        best_score = 0
+        bitcoin_family = bool(signal_tokens & BITCOIN_FAMILY_TOKENS)
+
+        for sentiment in self._iter_cached_sentiments():
+            if not self._eligible_sentiment(
+                sentiment,
+                min_whales=self.cfg.overlay_min_whales,
+                min_total_size=self.cfg.overlay_min_total_size,
+            ):
+                continue
+            candidate_tokens = self._slug_tokens(sentiment.get("market_slug"))
+            if not candidate_tokens:
+                continue
+
+            if bitcoin_family:
+                if not candidate_tokens & BITCOIN_FAMILY_TOKENS:
+                    continue
+                score = 10
+            else:
+                overlap = signal_tokens & candidate_tokens
+                if len(overlap) >= 2:
+                    score = len(overlap)
+                elif any(len(token) >= 6 for token in overlap):
+                    score = 1
+                else:
+                    continue
+
+            if best_match is None:
+                best_match = sentiment
+                best_score = score
+                continue
+
+            current_volume = float(sentiment.get("total_volume", 0.0) or 0.0)
+            best_volume = float(best_match.get("total_volume", 0.0) or 0.0)
+            if score > best_score or (score == best_score and current_volume > best_volume):
+                best_match = sentiment
+                best_score = score
+
+        return best_match
+
     @staticmethod
     def _normalize_slug(value: str | None) -> str:
         return str(value or "").strip().lower()
+
+    @staticmethod
+    def _slug_tokens(value: str | None) -> set[str]:
+        normalized = str(value or "").strip().lower()
+        if not normalized:
+            return set()
+        tokens: set[str] = set()
+        for token in normalized.replace("_", "-").split("-"):
+            token = token.strip()
+            if not token or token in WHALE_OVERLAY_STOPWORDS:
+                continue
+            if token.isdigit():
+                continue
+            if len(token) < 3 and token not in BITCOIN_FAMILY_TOKENS:
+                continue
+            tokens.add(token)
+        return tokens
 
     @staticmethod
     def _coerce_float(value) -> float:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -40,6 +41,15 @@ DEFAULT_BUCKET_SECONDS = 5
 DEFAULT_HORIZON_SECONDS = 60
 DEFAULT_COST_BPS = 4.0
 DEFAULT_OUTPUT_ROOT = Path("output/futures_ml")
+DEFAULT_LABEL_MODE = "broad"
+DEFAULT_MIN_SOURCE_COMPLETENESS = 1.0
+DEFAULT_CANDIDATE_MIN_SIGNED_RATIO = 0.08
+DEFAULT_CANDIDATE_MIN_DEPTH_IMBALANCE = 0.02
+DEFAULT_CANDIDATE_MIN_TRADE_Z = 0.75
+DEFAULT_MAX_TRADE_AGE_BUCKETS = 12
+DEFAULT_MAX_DEPTH_AGE_BUCKETS = 12
+DEFAULT_MAX_METRICS_AGE_BUCKETS = 120
+DEFAULT_MAX_FUNDING_AGE_BUCKETS = 5760
 
 RAW_DATASETS = ("aggTrades", "bookDepth", "metrics")
 FEATURE_DEPTH_LEVELS = (1, 2, 5)
@@ -74,6 +84,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bucket-seconds", type=int, default=DEFAULT_BUCKET_SECONDS, help="Feature aggregation bucket")
     parser.add_argument("--horizon-seconds", type=int, default=DEFAULT_HORIZON_SECONDS, help="Prediction horizon")
     parser.add_argument("--cost-bps", type=float, default=DEFAULT_COST_BPS, help="Net move threshold in basis points")
+    parser.add_argument(
+        "--label-mode",
+        choices=("broad", "continuation"),
+        default=DEFAULT_LABEL_MODE,
+        help="Broad predicts every bucket. Continuation only trains on plausible follow-through setups.",
+    )
+    parser.add_argument("--candidate-min-signed-ratio", type=float, default=DEFAULT_CANDIDATE_MIN_SIGNED_RATIO, help="Minimum signed flow ratio for continuation setup")
+    parser.add_argument("--candidate-min-depth-imbalance", type=float, default=DEFAULT_CANDIDATE_MIN_DEPTH_IMBALANCE, help="Minimum top-depth imbalance for continuation setup")
+    parser.add_argument("--candidate-min-trade-z", type=float, default=DEFAULT_CANDIDATE_MIN_TRADE_Z, help="Minimum trade-burst z-score for continuation setup")
+    parser.add_argument(
+        "--min-source-completeness",
+        type=float,
+        default=DEFAULT_MIN_SOURCE_COMPLETENESS,
+        help="Minimum fraction of source families that must be fresh for a row to be kept",
+    )
+    parser.add_argument("--max-trade-age-buckets", type=int, default=DEFAULT_MAX_TRADE_AGE_BUCKETS, help="Maximum trade staleness in buckets")
+    parser.add_argument("--max-depth-age-buckets", type=int, default=DEFAULT_MAX_DEPTH_AGE_BUCKETS, help="Maximum depth staleness in buckets")
+    parser.add_argument("--max-metrics-age-buckets", type=int, default=DEFAULT_MAX_METRICS_AGE_BUCKETS, help="Maximum metrics staleness in buckets")
+    parser.add_argument("--max-funding-age-buckets", type=int, default=DEFAULT_MAX_FUNDING_AGE_BUCKETS, help="Maximum funding staleness in buckets")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Local output directory")
     parser.add_argument("--skip-download", action="store_true", help="Reuse existing downloaded archives")
     parser.add_argument("--skip-train", action="store_true", help="Only download data")
@@ -90,14 +119,16 @@ def main() -> None:
     if start_date > end_date:
         raise SystemExit("start-date must be on or before end-date")
 
-    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_v1"
+    completeness_tag = int(round(args.min_source_completeness * 100))
+    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_c{completeness_tag:03d}_v1"
     run_root = output_root / run_name
-    raw_root = run_root / "raw"
+    raw_root = resolve_raw_root(output_root=output_root, symbol=symbol, skip_download=args.skip_download)
     dataset_root = run_root / "dataset"
     model_root = run_root / "models"
     report_root = run_root / "reports"
-    for path in (raw_root, dataset_root, model_root, report_root):
+    for path in (dataset_root, model_root, report_root):
         path.mkdir(parents=True, exist_ok=True)
+    raw_root.mkdir(parents=True, exist_ok=True)
 
     manifest = {
         "symbol": symbol,
@@ -106,7 +137,9 @@ def main() -> None:
         "bucket_seconds": args.bucket_seconds,
         "horizon_seconds": args.horizon_seconds,
         "cost_bps": args.cost_bps,
+        "label_mode": args.label_mode,
         "run_root": str(run_root),
+        "raw_root": str(raw_root),
         "downloaded_at": datetime.now(UTC).isoformat(),
         "raw_files": [],
     }
@@ -117,6 +150,7 @@ def main() -> None:
             start_date=start_date,
             end_date=end_date,
             raw_root=raw_root,
+            max_download_workers=args.max_download_workers,
         )
         (report_root / "download_manifest.json").write_text(
             json.dumps(manifest, indent=2),
@@ -134,6 +168,15 @@ def main() -> None:
         bucket_seconds=args.bucket_seconds,
         horizon_seconds=args.horizon_seconds,
         cost_bps=args.cost_bps,
+        label_mode=args.label_mode,
+        candidate_min_signed_ratio=args.candidate_min_signed_ratio,
+        candidate_min_depth_imbalance=args.candidate_min_depth_imbalance,
+        candidate_min_trade_z=args.candidate_min_trade_z,
+        min_source_completeness=args.min_source_completeness,
+        max_trade_age_buckets=args.max_trade_age_buckets,
+        max_depth_age_buckets=args.max_depth_age_buckets,
+        max_metrics_age_buckets=args.max_metrics_age_buckets,
+        max_funding_age_buckets=args.max_funding_age_buckets,
     )
     if dataset.empty:
         raise SystemExit("No dataset rows were built. Check downloaded archive coverage.")
@@ -152,6 +195,7 @@ def main() -> None:
         bucket_seconds=args.bucket_seconds,
         horizon_seconds=args.horizon_seconds,
         cost_bps=args.cost_bps,
+        label_mode=args.label_mode,
     )
 
     metadata = {
@@ -165,6 +209,22 @@ def main() -> None:
         "bucket_seconds": args.bucket_seconds,
         "horizon_seconds": args.horizon_seconds,
         "cost_bps": args.cost_bps,
+        "label_mode": args.label_mode,
+        "candidate_thresholds": {
+            "min_signed_ratio": args.candidate_min_signed_ratio,
+            "min_depth_imbalance": args.candidate_min_depth_imbalance,
+            "min_trade_z": args.candidate_min_trade_z,
+        },
+        "source_completeness": {
+            "min_source_completeness": args.min_source_completeness,
+            "max_age_buckets": {
+                "trade": args.max_trade_age_buckets,
+                "depth": args.max_depth_age_buckets,
+                "metrics": args.max_metrics_age_buckets,
+                "funding": args.max_funding_age_buckets,
+            },
+            "coverage_summary": summarise_source_coverage(dataset),
+        },
         "rows": int(len(dataset)),
         "features": feature_columns,
         "dataset_path": str(dataset_path),
@@ -182,6 +242,31 @@ def main() -> None:
 
 def parse_iso_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def resolve_raw_root(*, output_root: Path, symbol: str, skip_download: bool) -> Path:
+    shared_raw_root = output_root / f"binance_{symbol.lower()}_raw"
+    if raw_archive_count(shared_raw_root) > 0 or not skip_download:
+        return shared_raw_root
+
+    legacy_candidates = sorted(path for path in output_root.glob(f"binance_{symbol.lower()}_*") if path.is_dir())
+    best_candidate: Path | None = None
+    best_count = -1
+    for candidate in legacy_candidates:
+        legacy_raw = candidate / "raw"
+        count = raw_archive_count(legacy_raw)
+        if count > best_count:
+            best_candidate = legacy_raw
+            best_count = count
+    if best_candidate and best_count > 0:
+        return best_candidate
+    return shared_raw_root
+
+
+def raw_archive_count(raw_root: Path) -> int:
+    if not raw_root.exists():
+        return 0
+    return sum(1 for _ in raw_root.rglob("*.zip"))
 
 
 def iter_days(start_date: date, end_date: date) -> list[date]:
@@ -221,26 +306,42 @@ def download_archives(
     start_date: date,
     end_date: date,
     raw_root: Path,
+    max_download_workers: int,
 ) -> list[dict[str, Any]]:
-    files: list[dict[str, Any]] = []
+    download_jobs: list[tuple[str, Path]] = []
     for dataset in RAW_DATASETS:
         target_dir = raw_root / dataset
         target_dir.mkdir(parents=True, exist_ok=True)
         for day in iter_days(start_date, end_date):
             url = archive_url(dataset, symbol, day)
             target = target_dir / Path(url).name
-            info = download_file(url, target)
-            if info:
-                files.append(info)
+            download_jobs.append((url, target))
 
     funding_dir = raw_root / "fundingRate"
     funding_dir.mkdir(parents=True, exist_ok=True)
     for month_start in iter_month_starts(start_date, end_date):
         url = archive_url("fundingRate", symbol, month_start)
         target = funding_dir / Path(url).name
-        info = download_file(url, target)
-        if info:
-            files.append(info)
+        download_jobs.append((url, target))
+
+    files: list[dict[str, Any]] = []
+    if max_download_workers <= 1:
+        for url, target in download_jobs:
+            info = download_file(url, target)
+            if info:
+                files.append(info)
+        return files
+
+    with ThreadPoolExecutor(max_workers=max_download_workers) as executor:
+        future_map = {
+            executor.submit(download_file, url, target): (url, target)
+            for url, target in download_jobs
+        }
+        for future in as_completed(future_map):
+            info = future.result()
+            if info:
+                files.append(info)
+    files.sort(key=lambda item: (item["dataset"], item["path"]))
     return files
 
 
@@ -282,6 +383,15 @@ def build_feature_dataset(
     bucket_seconds: int,
     horizon_seconds: int,
     cost_bps: float,
+    label_mode: str,
+    candidate_min_signed_ratio: float,
+    candidate_min_depth_imbalance: float,
+    candidate_min_trade_z: float,
+    min_source_completeness: float,
+    max_trade_age_buckets: int,
+    max_depth_age_buckets: int,
+    max_metrics_age_buckets: int,
+    max_funding_age_buckets: int,
 ) -> pd.DataFrame:
     trades = load_trades(raw_root / "aggTrades", symbol, start_date, end_date, bucket_seconds)
     depth = load_depth(raw_root / "bookDepth", symbol, start_date, end_date, bucket_seconds)
@@ -293,7 +403,22 @@ def build_feature_dataset(
     combined = combined.join(funding, how="left")
     combined = combined.sort_index()
 
-    fill_zero_columns = [column for column in combined.columns if column.startswith(("buy_", "sell_", "signed_", "trade_", "quote_", "depth_", "notional_"))]
+    combined = add_source_coverage(
+        combined,
+        max_age_buckets={
+            "trade": max_trade_age_buckets,
+            "depth": max_depth_age_buckets,
+            "metrics": max_metrics_age_buckets,
+            "funding": max_funding_age_buckets,
+        },
+    )
+
+    observed_columns = [column for column in combined.columns if column.endswith("_observed")]
+    fill_zero_columns = [
+        column for column in combined.columns
+        if column.startswith(("buy_", "sell_", "signed_", "trade_", "quote_", "depth_", "notional_"))
+        or column in observed_columns
+    ]
     if fill_zero_columns:
         combined[fill_zero_columns] = combined[fill_zero_columns].fillna(0.0)
 
@@ -302,8 +427,19 @@ def build_feature_dataset(
         combined[ffill_columns] = combined[ffill_columns].ffill()
 
     combined = combined.dropna(subset=["price_last"])
-    combined = add_derived_features(combined, bucket_seconds=bucket_seconds, horizon_seconds=horizon_seconds, cost_bps=cost_bps)
+    combined = add_derived_features(
+        combined,
+        bucket_seconds=bucket_seconds,
+        horizon_seconds=horizon_seconds,
+        cost_bps=cost_bps,
+        candidate_min_signed_ratio=candidate_min_signed_ratio,
+        candidate_min_depth_imbalance=candidate_min_depth_imbalance,
+        candidate_min_trade_z=candidate_min_trade_z,
+    )
     combined = combined.replace([np.inf, -np.inf], np.nan).dropna()
+    combined = combined[combined["source_fresh_score"] >= min_source_completeness]
+    if label_mode == "continuation":
+        combined = combined[combined["setup_active"] == 1]
     combined = combined.reset_index(names="timestamp")
     return combined
 
@@ -352,6 +488,7 @@ def load_trades(directory: Path, symbol: str, start_date: date, end_date: date, 
     combined = pd.concat(frames).sort_index()
     full_index = pd.date_range(combined.index.min(), combined.index.max(), freq=f"{bucket_seconds}s", tz=UTC)
     combined = combined.groupby(level=0).last().reindex(full_index)
+    combined["trade_observed"] = combined["price_last"].notna().astype(float)
     quantity_columns = [
         "quantity_total",
         "quote_qty_total",
@@ -411,6 +548,7 @@ def load_depth(directory: Path, symbol: str, start_date: date, end_date: date, b
 
     combined = pd.concat(frames).sort_index()
     combined = combined.groupby(level=0).last()
+    combined["depth_observed"] = 1.0
     return combined
 
 
@@ -431,7 +569,11 @@ def load_metrics(directory: Path, symbol: str, start_date: date, end_date: date,
 
     combined = pd.concat(frames).sort_index()
     full_index = pd.date_range(combined.index.min(), combined.index.max(), freq=f"{bucket_seconds}s", tz=UTC)
-    combined = combined.groupby(level=0).last().reindex(full_index).ffill()
+    combined["metrics_observed"] = 1.0
+    combined = combined.groupby(level=0).last().reindex(full_index)
+    combined["metrics_observed"] = combined["metrics_observed"].fillna(0.0)
+    metric_columns = [column for column in combined.columns if column != "metrics_observed"]
+    combined[metric_columns] = combined[metric_columns].ffill()
     return combined
 
 
@@ -453,8 +595,50 @@ def load_funding(directory: Path, symbol: str, start_date: date, end_date: date,
 
     combined = pd.concat(frames).sort_index()
     full_index = pd.date_range(combined.index.min(), combined.index.max(), freq=f"{bucket_seconds}s", tz=UTC)
-    combined = combined.groupby(level=0).last().reindex(full_index).ffill()
+    combined["funding_observed"] = 1.0
+    combined = combined.groupby(level=0).last().reindex(full_index)
+    combined["funding_observed"] = combined["funding_observed"].fillna(0.0)
+    funding_columns = [column for column in combined.columns if column != "funding_observed"]
+    combined[funding_columns] = combined[funding_columns].ffill()
     return combined
+
+
+def add_source_coverage(frame: pd.DataFrame, *, max_age_buckets: dict[str, int]) -> pd.DataFrame:
+    out = frame.copy()
+    source_flags = {
+        "trade": out.get("trade_observed", pd.Series(0.0, index=out.index)),
+        "depth": out.get("depth_observed", pd.Series(0.0, index=out.index)),
+        "metrics": out.get("metrics_observed", pd.Series(0.0, index=out.index)),
+        "funding": out.get("funding_observed", pd.Series(0.0, index=out.index)),
+    }
+
+    fresh_columns: list[str] = []
+    for source_name, raw_flag in source_flags.items():
+        flag = raw_flag.fillna(0.0).astype(float)
+        out[f"{source_name}_observed"] = flag
+        age = buckets_since_last_seen(flag.astype(bool))
+        out[f"{source_name}_age_buckets"] = age
+        freshness = (age <= float(max_age_buckets[source_name])).astype(float)
+        out[f"{source_name}_fresh"] = freshness
+        fresh_columns.append(f"{source_name}_fresh")
+
+    out["source_fresh_count"] = out[fresh_columns].sum(axis=1)
+    out["source_fresh_score"] = out["source_fresh_count"] / float(len(fresh_columns))
+    out["source_all_fresh"] = (out["source_fresh_score"] >= 0.999).astype(float)
+    return out
+
+
+def buckets_since_last_seen(flags: pd.Series) -> pd.Series:
+    values = flags.to_numpy(dtype=bool)
+    ages = np.full(len(values), np.inf, dtype=float)
+    last_seen = -1
+    for idx, is_seen in enumerate(values):
+        if is_seen:
+            last_seen = idx
+            ages[idx] = 0.0
+        elif last_seen >= 0:
+            ages[idx] = float(idx - last_seen)
+    return pd.Series(ages, index=flags.index, dtype=float)
 
 
 def add_derived_features(
@@ -463,6 +647,9 @@ def add_derived_features(
     bucket_seconds: int,
     horizon_seconds: int,
     cost_bps: float,
+    candidate_min_signed_ratio: float,
+    candidate_min_depth_imbalance: float,
+    candidate_min_trade_z: float,
 ) -> pd.DataFrame:
     bucket_horizon = max(1, int(horizon_seconds / bucket_seconds))
     out = frame.copy()
@@ -490,14 +677,31 @@ def add_derived_features(
             out[f"quantity_sum_{window}"].replace(0.0, np.nan),
         )
 
+    out["flow_accel_3v12"] = out["signed_ratio_3"] - out["signed_ratio_12"]
+    out["flow_accel_12v36"] = out["signed_ratio_12"] - out["signed_ratio_36"]
+
     out["range_1"] = safe_divide(out["price_high"] - out["price_low"], out["price_last"])
     out["vwap_gap"] = safe_divide(out["price_last"] - out["price_vwap"], out["price_vwap"])
     out["vol_12"] = out["ret_1"].rolling(12).std()
     out["vol_36"] = out["ret_1"].rolling(36).std()
 
+    out["trade_count_mean_72"] = out["trade_count_sum_12"].rolling(72).mean()
+    out["trade_count_std_72"] = out["trade_count_sum_12"].rolling(72).std()
+    out["trade_count_z_12"] = safe_divide(
+        out["trade_count_sum_12"] - out["trade_count_mean_72"],
+        out["trade_count_std_72"].replace(0.0, np.nan),
+    )
+    out["signed_quote_mean_72"] = out["signed_quote_sum_12"].rolling(72).mean()
+    out["signed_quote_std_72"] = out["signed_quote_sum_12"].rolling(72).std()
+    out["signed_quote_z_12"] = safe_divide(
+        out["signed_quote_sum_12"] - out["signed_quote_mean_72"],
+        out["signed_quote_std_72"].replace(0.0, np.nan),
+    )
+
     for level in FEATURE_DEPTH_LEVELS:
         out[f"depth_imbalance_{level}pct_diff_3"] = out[f"depth_imbalance_{level}pct"].diff(3)
         out[f"notional_imbalance_{level}pct_diff_3"] = out[f"notional_imbalance_{level}pct"].diff(3)
+        out[f"flow_depth_align_{level}pct_12"] = out["signed_ratio_12"] * out[f"depth_imbalance_{level}pct"]
 
     for column in (
         "sum_open_interest",
@@ -512,15 +716,52 @@ def add_derived_features(
             out[f"{column}_diff_1"] = out[column].diff()
             out[f"{column}_diff_12"] = out[column].diff(12)
 
+    if "sum_open_interest_diff_12" in out.columns:
+        out["oi_flow_align_12"] = out["sum_open_interest_diff_12"] * out["signed_quote_sum_12"]
+    if "last_funding_rate" in out.columns:
+        out["funding_flow_align_12"] = out["last_funding_rate"] * out["signed_ratio_12"]
+    if "count_long_short_ratio" in out.columns and "sum_taker_long_short_vol_ratio" in out.columns:
+        out["crowding_pressure"] = out["count_long_short_ratio"] * out["sum_taker_long_short_vol_ratio"]
+
     out["future_return"] = out["price_last"].shift(-bucket_horizon) / out["price_last"] - 1.0
     threshold = cost_bps / 10000.0
     out["long_label"] = (out["future_return"] > threshold).astype(int)
     out["short_label"] = (out["future_return"] < -threshold).astype(int)
+    out["long_candidate"] = (
+        (out["signed_ratio_12"] >= candidate_min_signed_ratio)
+        & (out["depth_imbalance_1pct"] >= candidate_min_depth_imbalance)
+        & (out["trade_count_z_12"] >= candidate_min_trade_z)
+        & (out["flow_accel_3v12"] >= 0.0)
+    ).astype(int)
+    out["short_candidate"] = (
+        (out["signed_ratio_12"] <= -candidate_min_signed_ratio)
+        & (out["depth_imbalance_1pct"] <= -candidate_min_depth_imbalance)
+        & (out["trade_count_z_12"] >= candidate_min_trade_z)
+        & (out["flow_accel_3v12"] <= 0.0)
+    ).astype(int)
+    out["setup_active"] = ((out["long_candidate"] == 1) | (out["short_candidate"] == 1)).astype(int)
     return out
 
 
 def safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     return numerator.astype(float) / denominator.astype(float)
+
+
+def summarise_source_coverage(dataset: pd.DataFrame) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "rows": int(len(dataset)),
+        "source_fresh_score_mean": float(dataset["source_fresh_score"].mean()),
+        "all_fresh_rate": float(dataset["source_all_fresh"].mean()),
+    }
+    for source_name in ("trade", "depth", "metrics", "funding"):
+        age_series = dataset[f"{source_name}_age_buckets"].replace([np.inf, -np.inf], np.nan).dropna()
+        summary[source_name] = {
+            "fresh_rate": float(dataset[f"{source_name}_fresh"].mean()),
+            "observed_rate": float(dataset[f"{source_name}_observed"].mean()),
+            "age_buckets_mean": float(age_series.mean()) if not age_series.empty else None,
+            "age_buckets_p95": float(age_series.quantile(0.95)) if not age_series.empty else None,
+        }
+    return summary
 
 
 def train_models(
@@ -531,6 +772,7 @@ def train_models(
     bucket_seconds: int,
     horizon_seconds: int,
     cost_bps: float,
+    label_mode: str,
 ) -> dict[str, Any]:
     train_frame, valid_frame, test_frame = chronological_split(dataset)
     model_root.mkdir(parents=True, exist_ok=True)
@@ -540,6 +782,7 @@ def train_models(
         "bucket_seconds": bucket_seconds,
         "horizon_seconds": horizon_seconds,
         "cost_bps": cost_bps,
+        "label_mode": label_mode,
         "rows": {
             "train": int(len(train_frame)),
             "valid": int(len(valid_frame)),
@@ -548,6 +791,12 @@ def train_models(
     }
 
     for label_name in ("long_label", "short_label"):
+        candidate_flag = "long_candidate" if label_name == "long_label" else "short_candidate"
+        label_train = train_frame if label_mode == "broad" else train_frame[train_frame[candidate_flag] == 1].copy()
+        label_valid = valid_frame if label_mode == "broad" else valid_frame[valid_frame[candidate_flag] == 1].copy()
+        label_test = test_frame if label_mode == "broad" else test_frame[test_frame[candidate_flag] == 1].copy()
+        if min(len(label_train), len(label_valid), len(label_test)) == 0:
+            raise SystemExit(f"No rows available for {label_name} under label_mode={label_mode}")
         model = CatBoostClassifier(
             loss_function="Logloss",
             eval_metric="AUC",
@@ -558,9 +807,9 @@ def train_models(
             random_seed=42,
             verbose=False,
         )
-        train_pool = Pool(train_frame[feature_columns], label=train_frame[label_name])
-        valid_pool = Pool(valid_frame[feature_columns], label=valid_frame[label_name])
-        test_pool = Pool(test_frame[feature_columns], label=test_frame[label_name])
+        train_pool = Pool(label_train[feature_columns], label=label_train[label_name])
+        valid_pool = Pool(label_valid[feature_columns], label=label_valid[label_name])
+        test_pool = Pool(label_test[feature_columns], label=label_test[label_name])
         model.fit(train_pool, eval_set=valid_pool, use_best_model=True)
 
         model_file = model_root / f"{label_name}.cbm"
@@ -568,12 +817,12 @@ def train_models(
 
         summary = ModelSummary(
             label_name=label_name,
-            positive_rate_train=float(train_frame[label_name].mean()),
-            positive_rate_valid=float(valid_frame[label_name].mean()),
-            positive_rate_test=float(test_frame[label_name].mean()),
-            train=evaluate_split(model, train_pool, train_frame[label_name]),
-            valid=evaluate_split(model, valid_pool, valid_frame[label_name]),
-            test=evaluate_split(model, test_pool, test_frame[label_name]),
+            positive_rate_train=float(label_train[label_name].mean()),
+            positive_rate_valid=float(label_valid[label_name].mean()),
+            positive_rate_test=float(label_test[label_name].mean()),
+            train=evaluate_split(model, train_pool, label_train[label_name]),
+            valid=evaluate_split(model, valid_pool, label_valid[label_name]),
+            test=evaluate_split(model, test_pool, label_test[label_name]),
         )
 
         importances = model.get_feature_importance(train_pool)
@@ -589,6 +838,16 @@ def train_models(
         report["labels"][label_name] = {
             **asdict(summary),
             "best_iteration": int(model.get_best_iteration()),
+            "candidate_rows": {
+                "train": int(len(label_train)),
+                "valid": int(len(label_valid)),
+                "test": int(len(label_test)),
+            },
+            "candidate_rate": {
+                "train": float(train_frame[candidate_flag].mean()),
+                "valid": float(valid_frame[candidate_flag].mean()),
+                "test": float(test_frame[candidate_flag].mean()),
+            },
             "top_features": top_features,
         }
     return report
@@ -626,6 +885,7 @@ def evaluate_split(model: CatBoostClassifier, pool: Pool, labels: pd.Series) -> 
 
 
 def render_report_markdown(metadata: dict[str, Any]) -> str:
+    source_coverage = metadata.get("source_completeness", {})
     lines = [
         "# Futures ML Training Report",
         "",
@@ -634,7 +894,14 @@ def render_report_markdown(metadata: dict[str, Any]) -> str:
         f"- Bucket: `{metadata['bucket_seconds']}s`",
         f"- Horizon: `{metadata['horizon_seconds']}s`",
         f"- Cost threshold: `{metadata['cost_bps']}` bps",
+        f"- Label mode: `{metadata['label_mode']}`",
         f"- Rows: `{metadata['rows']:,}`",
+        "",
+        "## Source Coverage",
+        "",
+        f"- Minimum source completeness: `{source_coverage.get('min_source_completeness', 'n/a')}`",
+        f"- Mean fresh score: `{source_coverage.get('coverage_summary', {}).get('source_fresh_score_mean', 0.0):.4f}`",
+        f"- All-fresh row rate: `{source_coverage.get('coverage_summary', {}).get('all_fresh_rate', 0.0):.4f}`",
         "",
         "## Models",
         "",

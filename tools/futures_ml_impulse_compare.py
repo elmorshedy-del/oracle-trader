@@ -107,9 +107,16 @@ def main() -> None:
     train_tags = "-".join(threshold_tag(value) for value in train_thresholds)
     eval_tags = "-".join(threshold_tag(value) for value in eval_thresholds)
     date_tag = f"{start_date:%Y%m%d}_{end_date:%Y%m%d}"
+    setup_tag = (
+        f"sig{value_tag(args.min_signed_ratio)}_"
+        f"dep{value_tag(args.min_depth_imbalance)}_"
+        f"tz{value_tag(args.min_trade_z)}_"
+        f"eff{value_tag(args.min_directional_efficiency)}_"
+        f"ctx{context_tag(args.price_context_interval)}"
+    )
     run_name = (
         f"binance_{symbol.lower()}_{args.bucket_seconds}s_impulse_{args.horizon_seconds}s_"
-        f"tp{int(round(args.profit_bps))}_sl{int(round(args.stop_bps))}_{date_tag}_"
+        f"tp{int(round(args.profit_bps))}_sl{int(round(args.stop_bps))}_{setup_tag}_{date_tag}_"
         f"compare_train-{train_tags}_eval-{eval_tags}_v1"
     )
     run_root = output_root / run_name
@@ -183,6 +190,11 @@ def main() -> None:
         "profit_bps": args.profit_bps,
         "stop_bps": args.stop_bps,
         "cost_bps": args.cost_bps,
+        "min_signed_ratio": args.min_signed_ratio,
+        "min_depth_imbalance": args.min_depth_imbalance,
+        "min_trade_z": args.min_trade_z,
+        "min_directional_efficiency": args.min_directional_efficiency,
+        "price_context_interval": args.price_context_interval,
         "train_thresholds": train_thresholds,
         "eval_thresholds": eval_thresholds,
         "anchor_threshold": anchor_threshold,
@@ -293,6 +305,14 @@ def parse_thresholds(value: str) -> list[float]:
 
 def threshold_tag(threshold: float) -> str:
     return f"c{int(round(threshold * 100)):03d}"
+
+
+def value_tag(value: float) -> str:
+    return f"{int(round(value * 100)):03d}"
+
+
+def context_tag(value: str) -> str:
+    return value if value else "core"
 
 
 def threshold_frame(frame: pd.DataFrame, threshold: float) -> pd.DataFrame:

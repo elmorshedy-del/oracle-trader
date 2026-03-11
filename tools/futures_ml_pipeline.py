@@ -53,6 +53,7 @@ DEFAULT_MAX_FUNDING_AGE_BUCKETS = 5760
 
 RAW_DATASETS = ("aggTrades", "bookDepth", "metrics")
 FEATURE_DEPTH_LEVELS = (1, 2, 5)
+TARGET_COLUMNS = {"timestamp", "future_return", "long_label", "short_label"}
 
 
 @dataclass(frozen=True)
@@ -184,10 +185,7 @@ def main() -> None:
     dataset_path = dataset_root / "features.csv.gz"
     dataset.to_csv(dataset_path, index=False, compression="gzip")
 
-    feature_columns = [
-        column for column in dataset.columns
-        if column not in {"timestamp", "future_return", "long_label", "short_label"}
-    ]
+    feature_columns = feature_columns_for_dataset(dataset)
     model_report = train_models(
         dataset=dataset,
         feature_columns=feature_columns,
@@ -764,6 +762,50 @@ def summarise_source_coverage(dataset: pd.DataFrame) -> dict[str, Any]:
     return summary
 
 
+def feature_columns_for_dataset(dataset: pd.DataFrame) -> list[str]:
+    return [column for column in dataset.columns if column not in TARGET_COLUMNS]
+
+
+def candidate_flag_for_label(label_name: str) -> str:
+    if label_name == "long_label":
+        return "long_candidate"
+    if label_name == "short_label":
+        return "short_candidate"
+    raise ValueError(f"unsupported label: {label_name}")
+
+
+def select_label_frame(frame: pd.DataFrame, *, label_mode: str, label_name: str) -> pd.DataFrame:
+    if label_mode == "broad":
+        return frame.copy()
+    candidate_flag = candidate_flag_for_label(label_name)
+    return frame[frame[candidate_flag] == 1].copy()
+
+
+def build_classifier() -> CatBoostClassifier:
+    return CatBoostClassifier(
+        loss_function="Logloss",
+        eval_metric="AUC",
+        auto_class_weights="Balanced",
+        iterations=350,
+        learning_rate=0.05,
+        depth=6,
+        random_seed=42,
+        verbose=False,
+    )
+
+
+def top_feature_importances(model: CatBoostClassifier, feature_columns: list[str], pool: Pool, *, limit: int = 20) -> list[dict[str, float | str]]:
+    importances = model.get_feature_importance(pool)
+    return [
+        {"feature": feature, "importance": float(importance)}
+        for feature, importance in sorted(
+            zip(feature_columns, importances, strict=False),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:limit]
+    ]
+
+
 def train_models(
     *,
     dataset: pd.DataFrame,
@@ -791,22 +833,13 @@ def train_models(
     }
 
     for label_name in ("long_label", "short_label"):
-        candidate_flag = "long_candidate" if label_name == "long_label" else "short_candidate"
-        label_train = train_frame if label_mode == "broad" else train_frame[train_frame[candidate_flag] == 1].copy()
-        label_valid = valid_frame if label_mode == "broad" else valid_frame[valid_frame[candidate_flag] == 1].copy()
-        label_test = test_frame if label_mode == "broad" else test_frame[test_frame[candidate_flag] == 1].copy()
+        candidate_flag = candidate_flag_for_label(label_name)
+        label_train = select_label_frame(train_frame, label_mode=label_mode, label_name=label_name)
+        label_valid = select_label_frame(valid_frame, label_mode=label_mode, label_name=label_name)
+        label_test = select_label_frame(test_frame, label_mode=label_mode, label_name=label_name)
         if min(len(label_train), len(label_valid), len(label_test)) == 0:
             raise SystemExit(f"No rows available for {label_name} under label_mode={label_mode}")
-        model = CatBoostClassifier(
-            loss_function="Logloss",
-            eval_metric="AUC",
-            auto_class_weights="Balanced",
-            iterations=350,
-            learning_rate=0.05,
-            depth=6,
-            random_seed=42,
-            verbose=False,
-        )
+        model = build_classifier()
         train_pool = Pool(label_train[feature_columns], label=label_train[label_name])
         valid_pool = Pool(label_valid[feature_columns], label=label_valid[label_name])
         test_pool = Pool(label_test[feature_columns], label=label_test[label_name])
@@ -824,16 +857,7 @@ def train_models(
             valid=evaluate_split(model, valid_pool, label_valid[label_name]),
             test=evaluate_split(model, test_pool, label_test[label_name]),
         )
-
-        importances = model.get_feature_importance(train_pool)
-        top_features = [
-            {"feature": feature, "importance": float(importance)}
-            for feature, importance in sorted(
-                zip(feature_columns, importances, strict=False),
-                key=lambda item: item[1],
-                reverse=True,
-            )[:20]
-        ]
+        top_features = top_feature_importances(model, feature_columns, train_pool)
 
         report["labels"][label_name] = {
             **asdict(summary),

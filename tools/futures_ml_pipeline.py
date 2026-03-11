@@ -50,8 +50,10 @@ DEFAULT_MAX_TRADE_AGE_BUCKETS = 12
 DEFAULT_MAX_DEPTH_AGE_BUCKETS = 12
 DEFAULT_MAX_METRICS_AGE_BUCKETS = 120
 DEFAULT_MAX_FUNDING_AGE_BUCKETS = 5760
+DEFAULT_PRICE_CONTEXT_INTERVAL = "1m"
 
 RAW_DATASETS = ("aggTrades", "bookDepth", "metrics")
+KLINE_CONTEXT_DATASETS = ("markPriceKlines", "indexPriceKlines", "premiumIndexKlines")
 FEATURE_DEPTH_LEVELS = (1, 2, 5)
 TARGET_COLUMNS = {"timestamp", "future_return", "long_label", "short_label"}
 
@@ -104,6 +106,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-depth-age-buckets", type=int, default=DEFAULT_MAX_DEPTH_AGE_BUCKETS, help="Maximum depth staleness in buckets")
     parser.add_argument("--max-metrics-age-buckets", type=int, default=DEFAULT_MAX_METRICS_AGE_BUCKETS, help="Maximum metrics staleness in buckets")
     parser.add_argument("--max-funding-age-buckets", type=int, default=DEFAULT_MAX_FUNDING_AGE_BUCKETS, help="Maximum funding staleness in buckets")
+    parser.add_argument("--price-context-interval", default=DEFAULT_PRICE_CONTEXT_INTERVAL, help="Interval for mark/index/premium price context klines")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Local output directory")
     parser.add_argument("--skip-download", action="store_true", help="Reuse existing downloaded archives")
     parser.add_argument("--skip-train", action="store_true", help="Only download data")
@@ -121,7 +124,8 @@ def main() -> None:
         raise SystemExit("start-date must be on or before end-date")
 
     completeness_tag = int(round(args.min_source_completeness * 100))
-    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_c{completeness_tag:03d}_v1"
+    date_tag = f"{start_date:%Y%m%d}_{end_date:%Y%m%d}"
+    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_c{completeness_tag:03d}_{date_tag}_v1"
     run_root = output_root / run_name
     raw_root = resolve_raw_root(output_root=output_root, symbol=symbol, skip_download=args.skip_download)
     dataset_root = run_root / "dataset"
@@ -139,6 +143,7 @@ def main() -> None:
         "horizon_seconds": args.horizon_seconds,
         "cost_bps": args.cost_bps,
         "label_mode": args.label_mode,
+        "price_context_interval": args.price_context_interval,
         "run_root": str(run_root),
         "raw_root": str(raw_root),
         "downloaded_at": datetime.now(UTC).isoformat(),
@@ -152,6 +157,7 @@ def main() -> None:
             end_date=end_date,
             raw_root=raw_root,
             max_download_workers=args.max_download_workers,
+            price_context_interval=args.price_context_interval,
         )
         (report_root / "download_manifest.json").write_text(
             json.dumps(manifest, indent=2),
@@ -178,6 +184,7 @@ def main() -> None:
         max_depth_age_buckets=args.max_depth_age_buckets,
         max_metrics_age_buckets=args.max_metrics_age_buckets,
         max_funding_age_buckets=args.max_funding_age_buckets,
+        price_context_interval=args.price_context_interval,
     )
     if dataset.empty:
         raise SystemExit("No dataset rows were built. Check downloaded archive coverage.")
@@ -208,6 +215,7 @@ def main() -> None:
         "horizon_seconds": args.horizon_seconds,
         "cost_bps": args.cost_bps,
         "label_mode": args.label_mode,
+        "price_context_interval": args.price_context_interval,
         "candidate_thresholds": {
             "min_signed_ratio": args.candidate_min_signed_ratio,
             "min_depth_imbalance": args.candidate_min_depth_imbalance,
@@ -290,9 +298,13 @@ def iter_month_starts(start_date: date, end_date: date) -> list[date]:
     return months
 
 
-def archive_url(dataset: str, symbol: str, stamp: date) -> str:
+def archive_url(dataset: str, symbol: str, stamp: date, *, interval: str | None = None) -> str:
     if dataset == "fundingRate":
         return f"{ARCHIVE_BASE_URL}/monthly/fundingRate/{symbol}/{symbol}-fundingRate-{stamp:%Y-%m}.zip"
+    if dataset in KLINE_CONTEXT_DATASETS:
+        if not interval:
+            raise ValueError(f"interval required for dataset: {dataset}")
+        return f"{ARCHIVE_BASE_URL}/daily/{dataset}/{symbol}/{interval}/{symbol}-{interval}-{stamp:%Y-%m-%d}.zip"
     if dataset not in RAW_DATASETS:
         raise ValueError(f"unsupported dataset: {dataset}")
     return f"{ARCHIVE_BASE_URL}/daily/{dataset}/{symbol}/{symbol}-{dataset}-{stamp:%Y-%m-%d}.zip"
@@ -305,6 +317,7 @@ def download_archives(
     end_date: date,
     raw_root: Path,
     max_download_workers: int,
+    price_context_interval: str,
 ) -> list[dict[str, Any]]:
     download_jobs: list[tuple[str, Path]] = []
     for dataset in RAW_DATASETS:
@@ -321,6 +334,14 @@ def download_archives(
         url = archive_url("fundingRate", symbol, month_start)
         target = funding_dir / Path(url).name
         download_jobs.append((url, target))
+
+    for dataset in KLINE_CONTEXT_DATASETS:
+        target_dir = raw_root / dataset / price_context_interval
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for day in iter_days(start_date, end_date):
+            url = archive_url(dataset, symbol, day, interval=price_context_interval)
+            target = target_dir / Path(url).name
+            download_jobs.append((url, target))
 
     files: list[dict[str, Any]] = []
     if max_download_workers <= 1:
@@ -390,15 +411,18 @@ def build_feature_dataset(
     max_depth_age_buckets: int,
     max_metrics_age_buckets: int,
     max_funding_age_buckets: int,
+    price_context_interval: str,
 ) -> pd.DataFrame:
     trades = load_trades(raw_root / "aggTrades", symbol, start_date, end_date, bucket_seconds)
     depth = load_depth(raw_root / "bookDepth", symbol, start_date, end_date, bucket_seconds)
     metrics = load_metrics(raw_root / "metrics", symbol, start_date, end_date, bucket_seconds)
     funding = load_funding(raw_root / "fundingRate", symbol, start_date, end_date, bucket_seconds)
+    price_context = load_price_context(raw_root, symbol, start_date, end_date, bucket_seconds, price_context_interval)
 
     combined = trades.join(depth, how="left")
     combined = combined.join(metrics, how="left")
     combined = combined.join(funding, how="left")
+    combined = combined.join(price_context, how="left")
     combined = combined.sort_index()
 
     combined = add_source_coverage(
@@ -601,6 +625,113 @@ def load_funding(directory: Path, symbol: str, start_date: date, end_date: date,
     return combined
 
 
+def load_price_context(
+    raw_root: Path,
+    symbol: str,
+    start_date: date,
+    end_date: date,
+    bucket_seconds: int,
+    interval: str,
+) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    dataset_map = {
+        "markPriceKlines": ("mark_ctx_open", "mark_ctx_close"),
+        "indexPriceKlines": ("index_ctx_open", "index_ctx_close"),
+        "premiumIndexKlines": ("premium_ctx_open", "premium_ctx_close"),
+    }
+    for dataset_name, (open_name, close_name) in dataset_map.items():
+        directory = raw_root / dataset_name / interval
+        frame = load_kline_context_dataset(
+            directory,
+            symbol,
+            start_date,
+            end_date,
+            bucket_seconds,
+            open_name=open_name,
+            close_name=close_name,
+            interval=interval,
+        )
+        if not frame.empty:
+            frames.append(frame)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, axis=1).sort_index()
+    combined = combined.groupby(level=0).last()
+    combined["price_context_observed"] = (
+        combined.filter(regex=r"_(open|close)$").notna().any(axis=1)
+    ).astype(float)
+    context_columns = [column for column in combined.columns if column != "price_context_observed"]
+    combined[context_columns] = combined[context_columns].ffill()
+    return combined
+
+
+def load_kline_context_dataset(
+    directory: Path,
+    symbol: str,
+    start_date: date,
+    end_date: date,
+    bucket_seconds: int,
+    *,
+    open_name: str,
+    close_name: str,
+    interval: str,
+) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for day in iter_days(start_date, end_date):
+        file_path = directory / f"{symbol}-{interval}-{day:%Y-%m-%d}.zip"
+        if not file_path.exists():
+            continue
+        frame = pd.read_csv(file_path, compression="zip", header=None)
+        if frame.empty:
+            continue
+        if str(frame.iloc[0, 0]).lower() == "open_time":
+            frame = frame.iloc[1:].copy()
+        if frame.empty:
+            continue
+        frame = frame.iloc[:, :12].copy()
+        frame.columns = [
+            "open_time",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "close_time",
+            "quote_volume",
+            "count",
+            "taker_buy_volume",
+            "taker_buy_quote_volume",
+            "ignore",
+        ]
+        frame["open_timestamp"] = pd.to_datetime(frame["open_time"].astype("int64"), unit="ms", utc=True)
+        frame["close_timestamp"] = pd.to_datetime(frame["close_time"].astype("int64"), unit="ms", utc=True) + pd.Timedelta(milliseconds=1)
+        frame[open_name] = frame["open"].astype(float)
+        frame[close_name] = frame["close"].astype(float)
+
+        open_grouped = (
+            frame.assign(bucket=frame["open_timestamp"].dt.floor(f"{bucket_seconds}s"))
+            .groupby("bucket")
+            .agg(**{open_name: (open_name, "first")})
+        )
+        close_grouped = (
+            frame.assign(bucket=frame["close_timestamp"].dt.floor(f"{bucket_seconds}s"))
+            .groupby("bucket")
+            .agg(**{close_name: (close_name, "last")})
+        )
+        grouped = open_grouped.join(close_grouped, how="outer")
+        frames.append(grouped)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames).sort_index()
+    full_index = pd.date_range(combined.index.min(), combined.index.max(), freq=f"{bucket_seconds}s", tz=UTC)
+    combined = combined.groupby(level=0).last().reindex(full_index)
+    return combined
+
+
 def add_source_coverage(frame: pd.DataFrame, *, max_age_buckets: dict[str, int]) -> pd.DataFrame:
     out = frame.copy()
     source_flags = {
@@ -720,6 +851,20 @@ def add_derived_features(
         out["funding_flow_align_12"] = out["last_funding_rate"] * out["signed_ratio_12"]
     if "count_long_short_ratio" in out.columns and "sum_taker_long_short_vol_ratio" in out.columns:
         out["crowding_pressure"] = out["count_long_short_ratio"] * out["sum_taker_long_short_vol_ratio"]
+    if "mark_ctx_close" in out.columns and "index_ctx_close" in out.columns:
+        out["mark_index_basis_bps"] = safe_divide(out["mark_ctx_close"] - out["index_ctx_close"], out["index_ctx_close"]) * 10000.0
+        out["mark_index_basis_change_12"] = out["mark_index_basis_bps"].diff(12)
+        out["mark_ctx_ret_12"] = out["mark_ctx_close"].pct_change(12)
+        out["index_ctx_ret_12"] = out["index_ctx_close"].pct_change(12)
+    if "mark_ctx_close" in out.columns:
+        out["trade_mark_gap_bps"] = safe_divide(out["price_last"] - out["mark_ctx_close"], out["mark_ctx_close"]) * 10000.0
+        out["trade_mark_gap_change_12"] = out["trade_mark_gap_bps"].diff(12)
+    if "index_ctx_close" in out.columns:
+        out["trade_index_gap_bps"] = safe_divide(out["price_last"] - out["index_ctx_close"], out["index_ctx_close"]) * 10000.0
+        out["trade_index_gap_change_12"] = out["trade_index_gap_bps"].diff(12)
+    if "premium_ctx_close" in out.columns:
+        out["premium_ctx_change_12"] = out["premium_ctx_close"].diff(12)
+        out["premium_ctx_abs"] = out["premium_ctx_close"].abs()
 
     out["future_return"] = out["price_last"].shift(-bucket_horizon) / out["price_last"] - 1.0
     threshold = cost_bps / 10000.0
@@ -758,6 +903,10 @@ def summarise_source_coverage(dataset: pd.DataFrame) -> dict[str, Any]:
             "observed_rate": float(dataset[f"{source_name}_observed"].mean()),
             "age_buckets_mean": float(age_series.mean()) if not age_series.empty else None,
             "age_buckets_p95": float(age_series.quantile(0.95)) if not age_series.empty else None,
+        }
+    if "price_context_observed" in dataset.columns:
+        summary["price_context"] = {
+            "observed_rate": float(dataset["price_context_observed"].mean()),
         }
     return summary
 

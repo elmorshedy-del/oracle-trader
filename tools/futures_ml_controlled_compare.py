@@ -30,6 +30,7 @@ from futures_ml_pipeline import (
     DEFAULT_MAX_METRICS_AGE_BUCKETS,
     DEFAULT_MAX_TRADE_AGE_BUCKETS,
     DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PRICE_CONTEXT_INTERVAL,
     DEFAULT_SYMBOL,
     build_classifier,
     build_feature_dataset,
@@ -71,6 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-depth-age-buckets", type=int, default=DEFAULT_MAX_DEPTH_AGE_BUCKETS, help="Maximum depth staleness in buckets")
     parser.add_argument("--max-metrics-age-buckets", type=int, default=DEFAULT_MAX_METRICS_AGE_BUCKETS, help="Maximum metrics staleness in buckets")
     parser.add_argument("--max-funding-age-buckets", type=int, default=DEFAULT_MAX_FUNDING_AGE_BUCKETS, help="Maximum funding staleness in buckets")
+    parser.add_argument("--price-context-interval", default=DEFAULT_PRICE_CONTEXT_INTERVAL, help="Interval for mark/index/premium price context klines")
     parser.add_argument(
         "--train-thresholds",
         default="0.75,1.0",
@@ -108,7 +110,8 @@ def main() -> None:
     anchor_threshold = args.anchor_threshold if args.anchor_threshold is not None else max(train_thresholds + eval_thresholds)
     train_tags = "-".join(threshold_tag(value) for value in train_thresholds)
     eval_tags = "-".join(threshold_tag(value) for value in eval_thresholds)
-    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_compare_train-{train_tags}_eval-{eval_tags}_v1"
+    date_tag = f"{start_date:%Y%m%d}_{end_date:%Y%m%d}"
+    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_{date_tag}_compare_train-{train_tags}_eval-{eval_tags}_v1"
     run_root = output_root / run_name
     dataset_root = run_root / "dataset"
     model_root = run_root / "models"
@@ -125,6 +128,7 @@ def main() -> None:
             end_date=end_date,
             raw_root=raw_root,
             max_download_workers=args.max_download_workers,
+            price_context_interval=args.price_context_interval,
         )
 
     master_dataset = build_feature_dataset(
@@ -144,6 +148,7 @@ def main() -> None:
         max_depth_age_buckets=args.max_depth_age_buckets,
         max_metrics_age_buckets=args.max_metrics_age_buckets,
         max_funding_age_buckets=args.max_funding_age_buckets,
+        price_context_interval=args.price_context_interval,
     )
     if master_dataset.empty:
         raise SystemExit("Master dataset is empty. Check raw archive coverage.")
@@ -163,6 +168,7 @@ def main() -> None:
         "horizon_seconds": args.horizon_seconds,
         "cost_bps": args.cost_bps,
         "label_mode": args.label_mode,
+        "price_context_interval": args.price_context_interval,
         "train_thresholds": train_thresholds,
         "eval_thresholds": eval_thresholds,
         "anchor_threshold": anchor_threshold,

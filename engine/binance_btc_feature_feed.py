@@ -86,6 +86,7 @@ class BinanceBtcFeatureFeed:
         depth_poll_seconds: int,
         metrics_poll_seconds: int,
         funding_poll_seconds: int,
+        book_ticker_enabled: bool,
         max_trade_age_buckets: int,
         max_depth_age_buckets: int,
         max_metrics_age_buckets: int,
@@ -104,6 +105,7 @@ class BinanceBtcFeatureFeed:
         self.depth_poll_seconds = depth_poll_seconds
         self.metrics_poll_seconds = metrics_poll_seconds
         self.funding_poll_seconds = funding_poll_seconds
+        self.book_ticker_enabled = book_ticker_enabled
         self.max_trade_age_buckets = max_trade_age_buckets
         self.max_depth_age_buckets = max_depth_age_buckets
         self.max_metrics_age_buckets = max_metrics_age_buckets
@@ -114,6 +116,7 @@ class BinanceBtcFeatureFeed:
         self.client = httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "oracle-trader/1.0"})
         self.trade_events: deque[dict[str, Any]] = deque(maxlen=120_000)
         self.depth_snapshots: deque[dict[str, Any]] = deque(maxlen=2_000)
+        self._latest_book_ticker: dict[str, Any] = {}
         self.metrics_snapshots: deque[dict[str, Any]] = deque(maxlen=400)
         self.funding_snapshots: deque[dict[str, Any]] = deque(maxlen=120)
         self._tasks: list[asyncio.Task] = []
@@ -123,6 +126,7 @@ class BinanceBtcFeatureFeed:
         self._stats: dict[str, Any] = {
             "stream_connected": False,
             "depth_stream_connected": False,
+            "book_ticker_connected": False,
             "metrics_supported": True,
             "funding_supported": True,
             "supported_source_count": 4,
@@ -131,16 +135,24 @@ class BinanceBtcFeatureFeed:
             "last_error": "",
             "trade_events": 0,
             "depth_snapshots": 0,
+            "book_ticker_updates": 0,
             "metric_updates": 0,
             "funding_updates": 0,
             "last_trade_at": None,
             "last_depth_at": None,
+            "last_book_ticker_at": None,
             "last_metrics_at": None,
             "last_funding_at": None,
             "last_snapshot_at": None,
             "last_source_fresh_score": 0.0,
             "last_effective_source_fresh_score": 0.0,
             "warmup_ready": False,
+            "fast_lane_ready": False,
+            "last_best_bid": 0.0,
+            "last_best_ask": 0.0,
+            "last_inside_spread_bps": 0.0,
+            "last_inside_imbalance": 0.0,
+            "last_microprice_gap_bps": 0.0,
             "log_entries": 0,
             "last_log_at": None,
         }
@@ -156,6 +168,7 @@ class BinanceBtcFeatureFeed:
         self._tasks = [
             asyncio.create_task(self._agg_trade_loop(), name="btc-agg-trade"),
             asyncio.create_task(self._depth_loop(), name="btc-depth"),
+            *( [asyncio.create_task(self._book_ticker_loop(), name="btc-book-ticker")] if self.book_ticker_enabled else [] ),
             asyncio.create_task(self._poll_snapshots_loop(), name="btc-rest-poller"),
         ]
 
@@ -190,6 +203,12 @@ class BinanceBtcFeatureFeed:
         self._stats["last_effective_source_fresh_score"] = effective_fresh
         self._stats["warmup_ready"] = len(frame) >= self.warmup_buckets
         self._stats["supported_source_count"] = self._supported_source_count()
+        self._stats["fast_lane_ready"] = bool(
+            self._stats.get("stream_connected")
+            and self._stats.get("depth_stream_connected")
+            and (self._stats.get("book_ticker_connected") or not self.book_ticker_enabled)
+            and self._stats.get("warmup_ready")
+        )
 
         feature_row = {key: float(latest[key]) for key in frame.columns if key != "timestamp"}
         return FeedSnapshot(
@@ -301,6 +320,39 @@ class BinanceBtcFeatureFeed:
                 self._stats["reconnects"] += 1
                 self._stats["last_error"] = f"depth:{type(exc).__name__}"
                 logger.warning("[BTC_ML] depth reconnect after error: %s", exc)
+                await asyncio.sleep(2)
+
+    async def _book_ticker_loop(self) -> None:
+        stream = f"{self.symbol.lower()}@bookTicker"
+        url = f"{BINANCE_FUTURES_WS}/{stream}"
+        while not self._stop.is_set():
+            try:
+                async with websockets.connect(url, ping_interval=20, ping_timeout=20, max_queue=10000) as socket:
+                    self._stats["book_ticker_connected"] = True
+                    async for raw_message in socket:
+                        if self._stop.is_set():
+                            break
+                        payload = json.loads(raw_message)
+                        recorded_at = pd.to_datetime(int(payload.get("E") or 0), unit="ms", utc=True)
+                        if pd.isna(recorded_at):
+                            recorded_at = datetime.now(UTC)
+                        snapshot = self._compute_book_ticker_snapshot(payload, recorded_at)
+                        self._latest_book_ticker = snapshot
+                        self._stats["book_ticker_updates"] += 1
+                        self._stats["last_book_ticker_at"] = recorded_at.isoformat()
+                        self._stats["last_best_bid"] = snapshot["best_bid"]
+                        self._stats["last_best_ask"] = snapshot["best_ask"]
+                        self._stats["last_inside_spread_bps"] = snapshot["inside_spread_bps"]
+                        self._stats["last_inside_imbalance"] = snapshot["inside_book_imbalance"]
+                        self._stats["last_microprice_gap_bps"] = snapshot["microprice_gap_bps"]
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._stats["book_ticker_connected"] = False
+                self._stats["feed_errors"] += 1
+                self._stats["reconnects"] += 1
+                self._stats["last_error"] = f"book_ticker:{type(exc).__name__}"
+                logger.warning("[BTC_ML] bookTicker reconnect after error: %s", exc)
                 await asyncio.sleep(2)
 
     async def _fetch_metrics_snapshot(self) -> None:
@@ -419,6 +471,33 @@ class BinanceBtcFeatureFeed:
             except (TypeError, ValueError):
                 continue
         return 0.0
+
+    def _compute_book_ticker_snapshot(self, payload: dict[str, Any], recorded_at: datetime) -> dict[str, Any]:
+        best_bid = float(payload.get("b") or payload.get("bidPrice") or 0.0)
+        best_ask = float(payload.get("a") or payload.get("askPrice") or 0.0)
+        best_bid_qty = float(payload.get("B") or payload.get("bidQty") or 0.0)
+        best_ask_qty = float(payload.get("A") or payload.get("askQty") or 0.0)
+        inside_mid = (best_bid + best_ask) / 2.0 if best_bid > 0.0 and best_ask > 0.0 else max(best_bid, best_ask, self._last_price or 0.0)
+        microprice = inside_mid
+        if best_bid_qty > 0.0 and best_ask_qty > 0.0 and best_bid > 0.0 and best_ask > 0.0:
+            microprice = ((best_ask * best_bid_qty) + (best_bid * best_ask_qty)) / (best_bid_qty + best_ask_qty)
+        inside_spread = max(best_ask - best_bid, 0.0) if best_bid > 0.0 and best_ask > 0.0 else 0.0
+        spread_bps = _safe_scalar_divide(inside_spread, inside_mid) * 10_000.0 if inside_mid > 0.0 else 0.0
+        inside_book_imbalance = _safe_scalar_divide(best_bid_qty - best_ask_qty, best_bid_qty + best_ask_qty)
+        microprice_gap_bps = _safe_scalar_divide(microprice - inside_mid, inside_mid) * 10_000.0 if inside_mid > 0.0 else 0.0
+        return {
+            "timestamp": recorded_at,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "best_bid_qty": best_bid_qty,
+            "best_ask_qty": best_ask_qty,
+            "inside_mid": inside_mid,
+            "inside_spread": inside_spread,
+            "inside_spread_bps": spread_bps,
+            "inside_book_imbalance": inside_book_imbalance,
+            "microprice": microprice,
+            "microprice_gap_bps": microprice_gap_bps,
+        }
 
     def _compute_depth_snapshot(self, payload: dict[str, Any], recorded_at: datetime) -> dict[str, Any]:
         bids = [(float(price), float(size)) for price, size in payload.get("bids", [])]

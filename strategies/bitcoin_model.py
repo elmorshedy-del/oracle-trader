@@ -19,6 +19,8 @@ from typing import Any
 
 from data.models import Event, Market, Signal, SignalAction, SignalSource
 from engine.binance_btc_feature_feed import BinanceBtcFeatureFeed, FeedSnapshot
+from engine.bitcoin_context_feed import BitcoinContextFeed, ContextSnapshot
+from engine.polymarket_btc_market_feed import PolymarketBtcMarketFeed
 from runtime_paths import LOG_DIR
 from strategies.base import BaseStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
@@ -116,6 +118,8 @@ class BitcoinModelStrategy(BaseStrategy):
         self.bundle = BitcoinModelBundle(self.cfg.model_dir)
         self.enabled = bool(self.cfg.enabled and self.bundle.ready)
         self.log_path = LOG_DIR / "bitcoin_model_sleeve.jsonl"
+        self.market_log_path = LOG_DIR / "bitcoin_model_market_feed.jsonl"
+        self.context_log_path = LOG_DIR / "bitcoin_model_context.jsonl"
         self.feed = BinanceBtcFeatureFeed(
             symbol=self.cfg.symbol,
             bucket_seconds=self.cfg.bucket_seconds,
@@ -129,11 +133,35 @@ class BitcoinModelStrategy(BaseStrategy):
             depth_poll_seconds=self.cfg.depth_poll_seconds,
             metrics_poll_seconds=self.cfg.metrics_poll_seconds,
             funding_poll_seconds=self.cfg.funding_poll_seconds,
+            book_ticker_enabled=self.cfg.book_ticker_enabled,
             max_trade_age_buckets=self.cfg.max_trade_age_buckets,
             max_depth_age_buckets=self.cfg.max_depth_age_buckets,
             max_metrics_age_buckets=self.cfg.max_metrics_age_buckets,
             max_funding_age_buckets=self.cfg.max_funding_age_buckets,
             log_path=self.log_path,
+        )
+        self.market_feed = PolymarketBtcMarketFeed(
+            ws_url=self.cfg.polymarket_market_ws_url,
+            ping_seconds=self.cfg.polymarket_ping_seconds,
+            quote_ttl_seconds=self.cfg.polymarket_quote_ttl_seconds,
+            max_watch_assets=self.cfg.polymarket_max_watch_assets,
+            log_path=self.market_log_path,
+        )
+        self.context_feed = BitcoinContextFeed(
+            enabled=self.cfg.context_enabled,
+            query=self.cfg.context_query,
+            shock_window_minutes=self.cfg.context_shock_window_minutes,
+            newsapi_key=self.cfg.newsapi_key,
+            newsapi_poll_seconds=self.cfg.newsapi_poll_seconds,
+            newsapi_page_size=self.cfg.newsapi_page_size,
+            gdelt_enabled=self.cfg.gdelt_enabled,
+            gdelt_poll_seconds=self.cfg.gdelt_poll_seconds,
+            gdelt_max_records=self.cfg.gdelt_max_records,
+            x_bearer_token=self.cfg.x_bearer_token,
+            x_stream_enabled=self.cfg.x_stream_enabled,
+            x_rule_tag=self.cfg.x_rule_tag,
+            x_rule_value=self.cfg.x_rule_value,
+            log_path=self.context_log_path,
         )
         self._stats.update(
             {
@@ -167,9 +195,17 @@ class BitcoinModelStrategy(BaseStrategy):
                 "funding_supported": True,
                 "supported_source_count": 4,
                 "last_signals": 0,
+                "last_live_quote_assets": 0,
+                "last_live_lagged_markets": 0,
+                "last_context_regime": "disabled",
+                "last_context_bias": "neutral",
+                "last_context_intensity": 0.0,
+                "last_context_hold_profile": "normal",
                 "log_entries": 0,
                 "last_log_at": None,
                 "feed_stats": self.feed.stats,
+                "market_feed_stats": self.market_feed.stats,
+                "context_stats": self.context_feed.stats,
             }
         )
 
@@ -184,6 +220,8 @@ class BitcoinModelStrategy(BaseStrategy):
 
     async def close(self) -> None:
         await self.feed.close()
+        await self.market_feed.close()
+        await self.context_feed.close()
 
     async def scan(self, markets: list[Market], events: list[Event]) -> list[Signal]:
         del events
@@ -195,12 +233,17 @@ class BitcoinModelStrategy(BaseStrategy):
         if not self.enabled:
             self._stats["last_signals"] = 0
             self._sync_feed_stats()
-            self._append_scan_log(snapshot=None, scores=None, direction="disabled", signals=[])
+            self._append_scan_log(snapshot=None, scores=None, direction="disabled", signals=[], context_snapshot=None)
             return []
 
         await self.feed.ensure_started()
+        await self.market_feed.ensure_started()
+        await self.context_feed.ensure_started()
+        await self.market_feed.update_watchlist(self._candidate_asset_ids(markets))
         snapshot = await self.feed.snapshot()
         self._apply_snapshot_stats(snapshot)
+        context_snapshot = self.context_feed.snapshot()
+        self._apply_context_stats(context_snapshot)
 
         scores: dict[str, float] | None = None
         direction = "neutral"
@@ -221,6 +264,7 @@ class BitcoinModelStrategy(BaseStrategy):
                         spot_price=float(snapshot.last_price),
                         scores=scores,
                         direction=direction,
+                        context_snapshot=context_snapshot,
                     )
                 if (
                     not signals
@@ -239,6 +283,7 @@ class BitcoinModelStrategy(BaseStrategy):
                             spot_price=float(snapshot.last_price),
                             scores=scores,
                             direction=alternate_direction,
+                            context_snapshot=context_snapshot,
                         )
                         if alternate_signals:
                             direction = alternate_direction
@@ -255,20 +300,18 @@ class BitcoinModelStrategy(BaseStrategy):
                         spot_price=float(snapshot.last_price),
                         scores=scores,
                         direction="bull",
+                        context_snapshot=context_snapshot,
                     )
                     if fallback_signals:
                         direction = "bull"
                         signals = fallback_signals
                         self._stats["last_direction_mode"] = "bull_catchup_fallback"
-                if (
-                    not signals
-                    and snapshot.last_price
-                    and degraded_live_mode
-                ):
+                if not signals and snapshot.last_price and degraded_live_mode:
                     fallback_direction, fallback_signals = self._inventory_direction_fallback(
                         markets=markets,
                         spot_price=float(snapshot.last_price),
                         scores=scores,
+                        context_snapshot=context_snapshot,
                     )
                     if fallback_signals:
                         direction = fallback_direction
@@ -279,7 +322,7 @@ class BitcoinModelStrategy(BaseStrategy):
         self._stats["last_signals"] = len(signals)
         self._stats["signals_generated"] += len(signals)
         self._sync_feed_stats()
-        self._append_scan_log(snapshot=snapshot, scores=scores, direction=direction, signals=signals)
+        self._append_scan_log(snapshot=snapshot, scores=scores, direction=direction, signals=signals, context_snapshot=context_snapshot)
         return signals
 
     def _apply_snapshot_stats(self, snapshot: FeedSnapshot) -> None:
@@ -296,14 +339,25 @@ class BitcoinModelStrategy(BaseStrategy):
         self._stats["last_directional_efficiency_12"] = round(float(row.get("directional_efficiency_12", 0.0) or 0.0), 4)
         self._stats["last_impulse_alignment_12"] = round(float(row.get("impulse_alignment_12", 0.0) or 0.0), 4)
 
+    def _apply_context_stats(self, context_snapshot: ContextSnapshot) -> None:
+        self._stats["last_context_regime"] = context_snapshot.regime
+        self._stats["last_context_bias"] = context_snapshot.bias
+        self._stats["last_context_intensity"] = round(float(context_snapshot.intensity or 0.0), 4)
+        self._stats["last_context_hold_profile"] = context_snapshot.hold_profile
+
     def _sync_feed_stats(self) -> None:
         feed_stats = self.feed.stats
+        market_feed_stats = self.market_feed.stats
+        context_stats = self.context_feed.stats
         self._stats["feed_stats"] = feed_stats
+        self._stats["market_feed_stats"] = market_feed_stats
+        self._stats["context_stats"] = context_stats
         self._stats["log_entries"] = int(feed_stats.get("log_entries") or 0)
         self._stats["last_log_at"] = feed_stats.get("last_log_at")
         self._stats["metrics_supported"] = bool(feed_stats.get("metrics_supported", True))
         self._stats["funding_supported"] = bool(feed_stats.get("funding_supported", True))
         self._stats["supported_source_count"] = int(feed_stats.get("supported_source_count") or 4)
+        self._stats["last_live_quote_assets"] = int(market_feed_stats.get("quoted_assets") or 0)
 
     def _is_degraded_live_mode(self, snapshot: FeedSnapshot) -> bool:
         return (
@@ -453,12 +507,27 @@ class BitcoinModelStrategy(BaseStrategy):
             and (chosen_score - alternate_score) <= MARKET_FALLBACK_MAX_SCORE_GAP
         )
 
+    def _candidate_asset_ids(self, markets: list[Market]) -> list[str]:
+        asset_ids: list[str] = []
+        for market in markets:
+            text = f"{market.question} {market.slug}".lower()
+            if self.crypto_strategy._match_symbol(text) != "BTC":
+                continue
+            match = self.crypto_strategy._match_barrier_market("BTC", market, text)
+            if not match:
+                continue
+            for outcome in market.outcomes[:2]:
+                if outcome.token_id:
+                    asset_ids.append(outcome.token_id)
+        return asset_ids
+
     def _inventory_direction_fallback(
         self,
         *,
         markets: list[Market],
         spot_price: float,
         scores: dict[str, float],
+        context_snapshot: ContextSnapshot,
     ) -> tuple[str, list[Signal]]:
         long_score = float(scores["long"])
         short_score = float(scores["short"])
@@ -467,12 +536,14 @@ class BitcoinModelStrategy(BaseStrategy):
             spot_price=spot_price,
             scores=scores,
             direction="bull",
+            context_snapshot=context_snapshot,
         )
         bear_signals = self._build_signals(
             markets=markets,
             spot_price=spot_price,
             scores=scores,
             direction="bear",
+            context_snapshot=context_snapshot,
         )
         if bull_signals and not bear_signals and long_score >= MARKET_INVENTORY_FALLBACK_SCORE_THRESHOLD:
             return "bull", bull_signals
@@ -487,6 +558,7 @@ class BitcoinModelStrategy(BaseStrategy):
         spot_price: float,
         scores: dict[str, float],
         direction: str,
+        context_snapshot: ContextSnapshot,
     ) -> list[Signal]:
         best_by_group: dict[str, Signal] = {}
         candidate_markets = 0
@@ -512,6 +584,7 @@ class BitcoinModelStrategy(BaseStrategy):
                 match=match,
                 scores=scores,
                 direction=direction,
+                context_snapshot=context_snapshot,
             )
             if not signal:
                 continue
@@ -529,6 +602,8 @@ class BitcoinModelStrategy(BaseStrategy):
         self._stats["candidate_markets"] = candidate_markets
         self._stats["matched_markets"] = matched_markets
         self._stats["scored_markets"] = scored_markets
+        self._stats["last_live_quote_assets"] = int((self.market_feed.stats or {}).get("quoted_assets") or 0)
+        self._stats["last_live_lagged_markets"] = scored_markets
         ranked = sorted(
             best_by_group.values(),
             key=lambda signal: (signal.expected_edge, signal.confidence),
@@ -556,6 +631,56 @@ class BitcoinModelStrategy(BaseStrategy):
             return kind in {"reach", "ath", "dip"}
         return False
 
+    def _resolve_live_quotes(self, *, yes_token_id: str, no_token_id: str) -> dict[str, float | None]:
+        yes_quote = self.market_feed.quote(yes_token_id)
+        no_quote = self.market_feed.quote(no_token_id)
+        return {
+            "yes_mid": None if not yes_quote else yes_quote.midpoint,
+            "yes_bid": None if not yes_quote else yes_quote.best_bid,
+            "yes_ask": None if not yes_quote else yes_quote.best_ask,
+            "yes_spread": None if not yes_quote else yes_quote.spread,
+            "no_mid": None if not no_quote else no_quote.midpoint,
+            "no_bid": None if not no_quote else no_quote.best_bid,
+            "no_ask": None if not no_quote else no_quote.best_ask,
+            "no_spread": None if not no_quote else no_quote.spread,
+        }
+
+    def _context_adjustment(self, *, direction: str, context_snapshot: ContextSnapshot) -> dict[str, Any]:
+        if context_snapshot.regime in {"disabled", "normal_flow", "elevated_news_flow"} or context_snapshot.bias == "neutral":
+            return {
+                "block": False,
+                "size_multiplier": 1.0,
+                "confidence_delta": 0.0,
+                "hold_profile": context_snapshot.hold_profile,
+                "note": context_snapshot.regime,
+            }
+
+        aligned = (
+            (direction == "bull" and context_snapshot.bias == "bull")
+            or (direction == "bear" and context_snapshot.bias == "bear")
+        )
+        if aligned:
+            size_multiplier = 1.0 + ((self.cfg.context_aligned_size_multiplier - 1.0) * context_snapshot.intensity)
+            confidence_delta = self.cfg.context_aligned_confidence_bonus * context_snapshot.intensity
+            return {
+                "block": False,
+                "size_multiplier": size_multiplier,
+                "confidence_delta": confidence_delta,
+                "hold_profile": "extended",
+                "note": f"{context_snapshot.regime}:aligned",
+            }
+
+        block = context_snapshot.intensity >= self.cfg.context_block_intensity and context_snapshot.regime.endswith("news_shock")
+        size_multiplier = max(0.25, self.cfg.context_opposing_size_multiplier)
+        confidence_delta = -self.cfg.context_opposing_confidence_penalty * context_snapshot.intensity
+        return {
+            "block": block,
+            "size_multiplier": size_multiplier,
+            "confidence_delta": confidence_delta,
+            "hold_profile": "shortened",
+            "note": f"{context_snapshot.regime}:opposed",
+        }
+
     def _build_barrier_signal(
         self,
         *,
@@ -563,13 +688,12 @@ class BitcoinModelStrategy(BaseStrategy):
         match: dict[str, Any],
         scores: dict[str, float],
         direction: str,
+        context_snapshot: ContextSnapshot,
     ) -> Signal | None:
         market = match["market"]
         yes_outcome = market.outcomes[match["yes_index"]]
         no_outcome = market.outcomes[match["no_index"]]
-        yes_price = float(yes_outcome.price)
-        no_price = float(no_outcome.price)
-        if yes_price <= 0.0 or no_price <= 0.0:
+        if yes_outcome.price <= 0.0 or no_outcome.price <= 0.0:
             return None
 
         modeled_yes = self.crypto_strategy._estimate_barrier_probability(
@@ -581,36 +705,62 @@ class BitcoinModelStrategy(BaseStrategy):
         if modeled_yes is None:
             return None
 
+        live_quotes = self._resolve_live_quotes(
+            yes_token_id=yes_outcome.token_id,
+            no_token_id=no_outcome.token_id,
+        )
+        live_yes_mid = float(live_quotes["yes_mid"] or yes_outcome.price)
+        live_no_mid = float(live_quotes["no_mid"] or no_outcome.price)
+        fair_no = 1.0 - modeled_yes
+
         action: SignalAction | None = None
         target_outcome = None
+        entry_price = 0.0
         edge = 0.0
+        live_spread = 0.0
         kind = str(match["kind"])
-
         bullish_barrier = kind in {"reach", "ath"}
+
         if direction == "bull":
             if bullish_barrier:
-                edge = modeled_yes - yes_price
-                if edge >= self.cfg.min_barrier_edge and yes_price < self.cfg.max_entry_price:
+                entry_price = float(live_quotes["yes_ask"] or live_yes_mid)
+                live_spread = float(live_quotes["yes_spread"] or 0.0)
+                edge = modeled_yes - entry_price
+                if edge >= self.cfg.min_live_quote_edge and entry_price < self.cfg.max_entry_price:
                     action = SignalAction.BUY_YES
                     target_outcome = yes_outcome
             else:
-                edge = yes_price - modeled_yes
-                if edge >= self.cfg.min_barrier_edge and no_price < self.cfg.max_entry_price:
+                entry_price = float(live_quotes["no_ask"] or live_no_mid)
+                live_spread = float(live_quotes["no_spread"] or 0.0)
+                edge = fair_no - entry_price
+                if edge >= self.cfg.min_live_quote_edge and entry_price < self.cfg.max_entry_price:
                     action = SignalAction.BUY_NO
                     target_outcome = no_outcome
         elif direction == "bear":
             if kind == "dip":
-                edge = modeled_yes - yes_price
-                if edge >= self.cfg.min_barrier_edge and yes_price < self.cfg.max_entry_price:
+                entry_price = float(live_quotes["yes_ask"] or live_yes_mid)
+                live_spread = float(live_quotes["yes_spread"] or 0.0)
+                edge = modeled_yes - entry_price
+                if edge >= self.cfg.min_live_quote_edge and entry_price < self.cfg.max_entry_price:
                     action = SignalAction.BUY_YES
                     target_outcome = yes_outcome
             else:
-                edge = yes_price - modeled_yes
-                if edge >= self.cfg.min_barrier_edge and no_price < self.cfg.max_entry_price:
+                entry_price = float(live_quotes["no_ask"] or live_no_mid)
+                live_spread = float(live_quotes["no_spread"] or 0.0)
+                edge = fair_no - entry_price
+                if edge >= self.cfg.min_live_quote_edge and entry_price < self.cfg.max_entry_price:
                     action = SignalAction.BUY_NO
                     target_outcome = no_outcome
 
         if not action or not target_outcome:
+            return None
+
+        spread_pct = (live_spread / entry_price) if entry_price > 0.0 else 0.0
+        if spread_pct > self.cfg.max_polymarket_quote_spread:
+            return None
+
+        context_adjustment = self._context_adjustment(direction=direction, context_snapshot=context_snapshot)
+        if context_adjustment["block"]:
             return None
 
         direction_score = float(scores["long"] if direction == "bull" else scores["short"])
@@ -621,19 +771,22 @@ class BitcoinModelStrategy(BaseStrategy):
             )
         )
         score_excess = max(direction_score - threshold, 0.0)
-        side_probability = modeled_yes if action == SignalAction.BUY_YES else (1.0 - modeled_yes)
+        side_probability = modeled_yes if action == SignalAction.BUY_YES else fair_no
         confidence = min(
             MAX_SIGNAL_CONFIDENCE,
             max(direction_score, side_probability, BASE_SIGNAL_CONFIDENCE)
-            + min(edge * EDGE_CONFIDENCE_MULTIPLIER, EDGE_CONFIDENCE_BONUS_CAP),
+            + min(edge * EDGE_CONFIDENCE_MULTIPLIER, EDGE_CONFIDENCE_BONUS_CAP)
+            + float(context_adjustment["confidence_delta"]),
         )
         suggested_size_usd = min(
             self.cfg.max_size_usd,
             max(
                 self.cfg.min_size_usd,
-                self.cfg.min_size_usd
-                + (edge * EDGE_SIZE_USD_MULTIPLIER)
-                + (score_excess * SCORE_SIZE_USD_MULTIPLIER),
+                (
+                    self.cfg.min_size_usd
+                    + (edge * EDGE_SIZE_USD_MULTIPLIER)
+                    + (score_excess * SCORE_SIZE_USD_MULTIPLIER)
+                ) * float(context_adjustment["size_multiplier"]),
             ),
         )
 
@@ -649,7 +802,7 @@ class BitcoinModelStrategy(BaseStrategy):
             reasoning=(
                 f"BTC ML CATCH-UP: {direction.upper()} impulse | long={scores['long']:.3f} short={scores['short']:.3f} | "
                 f"spot=${spot_price:,.0f} | {kind} ${float(match['barrier_price']):,.0f} | "
-                f"model YES={modeled_yes:.1%} vs market YES={yes_price:.1%}"
+                f"model YES={modeled_yes:.1%} | entry={entry_price:.1%} | ctx={context_adjustment['note']}"
             ),
             suggested_size_usd=suggested_size_usd,
         )
@@ -673,7 +826,10 @@ class BitcoinModelStrategy(BaseStrategy):
         scores: dict[str, float] | None,
         direction: str,
         signals: list[Signal],
+        context_snapshot: ContextSnapshot | None,
     ) -> None:
+        market_stats = self.market_feed.stats
+        context_stats = self.context_feed.stats
         payload = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "strategy": self.name,
@@ -699,6 +855,13 @@ class BitcoinModelStrategy(BaseStrategy):
             "effective_long_threshold": self._stats.get("effective_long_threshold"),
             "effective_short_threshold": self._stats.get("effective_short_threshold"),
             "effective_direction_margin": self._stats.get("effective_direction_margin"),
+            "fast_lane_ready": bool(self._stats.get("feed_stats", {}).get("fast_lane_ready")),
+            "live_quote_assets": int(market_stats.get("quoted_assets") or 0),
+            "lagged_markets": int(self._stats.get("last_live_lagged_markets") or 0),
+            "context_regime": None if not context_snapshot else context_snapshot.regime,
+            "context_bias": None if not context_snapshot else context_snapshot.bias,
+            "context_intensity": 0.0 if not context_snapshot else round(float(context_snapshot.intensity or 0.0), 4),
+            "context_hold_profile": None if not context_snapshot else context_snapshot.hold_profile,
             "signals": [
                 {
                     "market": signal.market_slug,
@@ -710,5 +873,21 @@ class BitcoinModelStrategy(BaseStrategy):
                 for signal in signals
             ],
             "feed": self.feed.stats,
+            "market_feed": {
+                "connected": bool(market_stats.get("connected")),
+                "watched_assets": int(market_stats.get("watched_assets") or 0),
+                "quoted_assets": int(market_stats.get("quoted_assets") or 0),
+                "quote_updates": int(market_stats.get("quote_updates") or 0),
+                "last_quote_at": market_stats.get("last_quote_at"),
+                "last_error": market_stats.get("last_error"),
+            },
+            "context": {
+                "enabled": bool(context_stats.get("enabled")),
+                "healthy_provider_count": int(context_stats.get("healthy_provider_count") or 0),
+                "provider_count": int(context_stats.get("provider_count") or 0),
+                "recent_items": int(context_stats.get("recent_item_count") or 0),
+                "last_item_at": context_stats.get("last_item_at"),
+                "last_error": context_stats.get("last_error"),
+            },
         }
         self.feed.append_log(payload)

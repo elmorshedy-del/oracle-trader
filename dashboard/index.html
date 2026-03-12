@@ -1194,6 +1194,8 @@ function renderSanity(d) {
 
     if (activeView.key === 'bitcoin_model') {
       const feedStats = runtime.feed_stats || {};
+      const marketFeedStats = runtime.market_feed_stats || {};
+      const contextStats = runtime.context_stats || {};
       const minFresh = runtime.min_source_fresh_score || 0.5;
       const effectiveFresh = runtime.last_effective_source_fresh_score || runtime.last_source_fresh_score || 0;
       checks.splice(2, 0, {
@@ -1204,21 +1206,31 @@ function renderSanity(d) {
           : `${runtime.feature_count || 0} features / ${runtime.bundle_version || 'unknown'}`,
       });
       checks.splice(3, 0, {
-        label: 'Live BTC feed ready',
-        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && effectiveFresh >= minFresh,
-        note: `${feedStats.trade_events || 0} trades / fresh ${(effectiveFresh).toFixed(2)} / ${(minFresh).toFixed(2)}${(runtime.metrics_supported === false || runtime.funding_supported === false) ? ' degraded-live' : ''}`,
+        label: 'Fast lane ready',
+        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && !!feedStats.fast_lane_ready && effectiveFresh >= minFresh,
+        note: `${feedStats.trade_events || 0} trades / ${feedStats.book_ticker_updates || 0} quotes / fresh ${(effectiveFresh).toFixed(2)} / ${(minFresh).toFixed(2)}${(runtime.metrics_supported === false || runtime.funding_supported === false) ? ' degraded-live' : ''}`,
       });
       checks.splice(4, 0, {
+        label: 'Polymarket lag lane',
+        ok: !!marketFeedStats.connected && ((marketFeedStats.quoted_assets || 0) > 0 || (marketFeedStats.watched_assets || 0) > 0),
+        note: `${marketFeedStats.quoted_assets || 0} quoted / ${marketFeedStats.watched_assets || 0} watched / ${runtime.last_live_lagged_markets || 0} lagged`,
+      });
+      checks.splice(5, 0, {
+        label: 'Context lane',
+        ok: !(runtime.context_enabled === false) && ((contextStats.healthy_provider_count || 0) > 0 || (contextStats.recent_item_count || 0) > 0 || (runtime.last_context_regime || 'disabled') !== 'disabled'),
+        note: `${runtime.last_context_regime || 'unknown'} / ${runtime.last_context_bias || 'neutral'} / ${(runtime.last_context_intensity || 0).toFixed(2)} / ${contextStats.healthy_provider_count || 0} healthy`,
+      });
+      checks.splice(6, 0, {
         label: 'Scored BTC markets',
         ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${runtime.scored_markets || 0} scored / ${runtime.matched_markets || 0} matched`,
       });
-      checks.splice(5, 0, {
+      checks.splice(7, 0, {
         label: 'Separate log stream live',
         ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
         note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
       });
-      checks.splice(6, 0, {
+      checks.splice(8, 0, {
         label: 'BTC ML flow',
         ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}${runtime.last_direction_mode ? ` (${runtime.last_direction_mode})` : ''} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,

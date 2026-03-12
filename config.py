@@ -277,6 +277,45 @@ class BitcoinModelConfig:
     max_metrics_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_METRICS_AGE_BUCKETS", "120"))
     max_funding_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_FUNDING_AGE_BUCKETS", "5760"))
 
+    book_ticker_enabled: bool = os.getenv("BITCOIN_MODEL_BOOK_TICKER_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    max_polymarket_quote_spread: float = float(os.getenv("BITCOIN_MODEL_MAX_POLY_SPREAD", "0.18"))
+    min_live_quote_edge: float = float(os.getenv("BITCOIN_MODEL_MIN_LIVE_QUOTE_EDGE", "0.08"))
+    polymarket_market_ws_url: str = os.getenv(
+        "BITCOIN_MODEL_POLYMARKET_MARKET_WS_URL",
+        "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+    )
+    polymarket_ping_seconds: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_PING_SECONDS", "10"))
+    polymarket_quote_ttl_seconds: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_QUOTE_TTL_SECONDS", "25"))
+    polymarket_max_watch_assets: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_MAX_WATCH_ASSETS", "120"))
+
+    context_enabled: bool = os.getenv("BITCOIN_MODEL_CONTEXT_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    context_query: str = os.getenv(
+        "BITCOIN_MODEL_CONTEXT_QUERY",
+        "\"bitcoin\" OR BTC OR \"bitcoin etf\" OR crypto OR sec OR fed OR treasury",
+    )
+    context_shock_window_minutes: int = int(os.getenv("BITCOIN_MODEL_CONTEXT_SHOCK_WINDOW_MINUTES", "45"))
+    context_block_intensity: float = float(os.getenv("BITCOIN_MODEL_CONTEXT_BLOCK_INTENSITY", "0.78"))
+    context_aligned_size_multiplier: float = float(os.getenv("BITCOIN_MODEL_CONTEXT_ALIGNED_SIZE_MULTIPLIER", "1.20"))
+    context_opposing_size_multiplier: float = float(os.getenv("BITCOIN_MODEL_CONTEXT_OPPOSING_SIZE_MULTIPLIER", "0.60"))
+    context_aligned_confidence_bonus: float = float(os.getenv("BITCOIN_MODEL_CONTEXT_ALIGNED_CONFIDENCE_BONUS", "0.04"))
+    context_opposing_confidence_penalty: float = float(os.getenv("BITCOIN_MODEL_CONTEXT_OPPOSING_CONFIDENCE_PENALTY", "0.06"))
+
+    newsapi_key: str = os.getenv("NEWSAPI_KEY", "")
+    newsapi_poll_seconds: int = int(os.getenv("BITCOIN_MODEL_NEWSAPI_POLL_SECONDS", "120"))
+    newsapi_page_size: int = int(os.getenv("BITCOIN_MODEL_NEWSAPI_PAGE_SIZE", "20"))
+
+    gdelt_enabled: bool = os.getenv("BITCOIN_MODEL_GDELT_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    gdelt_poll_seconds: int = int(os.getenv("BITCOIN_MODEL_GDELT_POLL_SECONDS", "180"))
+    gdelt_max_records: int = int(os.getenv("BITCOIN_MODEL_GDELT_MAX_RECORDS", "20"))
+
+    x_bearer_token: str = os.getenv("X_BEARER_TOKEN", "")
+    x_stream_enabled: bool = os.getenv("BITCOIN_MODEL_X_STREAM_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    x_rule_tag: str = os.getenv("BITCOIN_MODEL_X_RULE_TAG", "oracle-btc-context")
+    x_rule_value: str = os.getenv(
+        "BITCOIN_MODEL_X_RULE_VALUE",
+        "(bitcoin OR btc OR #bitcoin OR #btc OR \"bitcoin etf\" OR crypto OR sec OR fed) lang:en -is:retweet",
+    )
+
 
 @dataclass
 class MeanReversionConfig:

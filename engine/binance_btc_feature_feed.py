@@ -455,7 +455,7 @@ class BinanceBtcFeatureFeed:
                 min_trade_z=self.min_trade_z,
                 min_directional_efficiency=self.min_directional_efficiency,
             )
-        combined = combined.replace([np.inf, -np.inf], np.nan).dropna().reset_index(names="timestamp")
+        combined = combined.replace([np.inf, -np.inf], np.nan).fillna(0.0).reset_index(names="timestamp")
         return combined
 
     def _trade_frame(self) -> pd.DataFrame:

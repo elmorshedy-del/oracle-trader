@@ -7,6 +7,7 @@ Every decision is logged with full context for later analysis.
 
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -74,6 +75,7 @@ MONTHS = {
 WEATHER_CITY_GROUP_ALIASES = {
     "nyc": "new-york",
 }
+WEATHER_CAPACITY_RELEASE_ENABLED = os.getenv("WEATHER_CAPACITY_RELEASE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
 WEATHER_POST_EVENT_ROTATION_HOURS = 30.0
 WEATHER_STALE_ROTATION_PNL_PCT = {
     SignalSource.WEATHER: 0.12,
@@ -867,13 +869,17 @@ class PaperTrader:
         max_age = STALE_DIRECTIONAL_ROTATION_HOURS.get(pos.source)
         if max_age is None:
             return None
-        if pos.source in WEATHER_SOURCES:
+        if WEATHER_CAPACITY_RELEASE_ENABLED and pos.source in WEATHER_SOURCES:
             target_date = self._weather_group_target_date(pos)
             if target_date and now >= target_date + timedelta(hours=WEATHER_POST_EVENT_ROTATION_HOURS):
                 return f"STALE_ROTATE: weather post-event {age_hours:.1f}h @ {pnl_pct:+.1%}"
         if pnl_pct <= STALE_DIRECTIONAL_LOSS_CUT_PCT and age_hours >= STALE_DIRECTIONAL_LOSS_CUT_HOURS:
             return f"STALE_STOP: {age_hours:.1f}h @ {pnl_pct:+.1%}"
-        flat_threshold = WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
+        flat_threshold = (
+            WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
+            if WEATHER_CAPACITY_RELEASE_ENABLED
+            else STALE_DIRECTIONAL_FLAT_PNL_PCT
+        )
         if age_hours >= max_age and abs(pnl_pct) <= flat_threshold:
             return f"STALE_ROTATE: {age_hours:.1f}h @ {pnl_pct:+.1%}"
         return None

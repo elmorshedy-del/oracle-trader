@@ -54,6 +54,45 @@ CLIMATOLOGY_NORMALS_F = {
 CITY_ALIASES = {'new york': 'new-york', 'los angeles': 'los-angeles'}
 
 
+def binary_log_loss(y_true, y_pred):
+    y = np.asarray(y_true, dtype=float)
+    p = np.clip(np.asarray(y_pred, dtype=float), 1e-6, 1 - 1e-6)
+    return float(-np.mean((y * np.log(p)) + ((1 - y) * np.log(1 - p))))
+
+
+def binary_brier_score(y_true, y_pred):
+    y = np.asarray(y_true, dtype=float)
+    p = np.asarray(y_pred, dtype=float)
+    return float(np.mean((p - y) ** 2))
+
+
+def binary_roc_auc(y_true, y_score):
+    y = np.asarray(y_true, dtype=float)
+    scores = np.asarray(y_score, dtype=float)
+    positives = y == 1
+    negatives = y == 0
+    n_pos = int(positives.sum())
+    n_neg = int(negatives.sum())
+    if n_pos == 0 or n_neg == 0:
+        return 0.5
+    order = np.argsort(scores)
+    sorted_scores = scores[order]
+    ranks = np.empty(len(scores), dtype=float)
+    i = 0
+    rank = 1.0
+    while i < len(sorted_scores):
+        j = i + 1
+        while j < len(sorted_scores) and sorted_scores[j] == sorted_scores[i]:
+            j += 1
+        avg_rank = (rank + (rank + (j - i) - 1)) / 2.0
+        ranks[order[i:j]] = avg_rank
+        rank += (j - i)
+        i = j
+    pos_ranks = ranks[positives]
+    auc = (pos_ranks.sum() - (n_pos * (n_pos + 1) / 2.0)) / (n_pos * n_neg)
+    return float(auc)
+
+
 def module_available(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
@@ -61,6 +100,12 @@ def module_available(name: str) -> bool:
 def canonical_city(value: str) -> str:
     normalized = str(value or '').strip().lower().replace('_', '-').replace(' ', '-')
     return CITY_ALIASES.get(normalized, normalized)
+
+
+def frame_series(df: pd.DataFrame, column: str, default: float = 0.0) -> pd.Series:
+    if column in df.columns:
+        return df[column]
+    return pd.Series([default] * len(df), index=df.index, dtype=float)
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -120,7 +165,7 @@ def build_dataset(manifest: dict) -> pd.DataFrame:
     base['market_price_change_1h'] = change_1h
     base['market_price_change_3h'] = change_3h
     base['market_price_velocity'] = velocity
-    base['market_volume_signal'] = pd.to_numeric(base.get('volume_clob'), errors='coerce').fillna(0.0)
+    base['market_volume_signal'] = pd.to_numeric(frame_series(base, 'volume_clob'), errors='coerce').fillna(0.0)
 
     base['temp_range_low'] = pd.to_numeric(base['temp_range_low'], errors='coerce').fillna(0.0)
     base['temp_range_high'] = pd.to_numeric(base['temp_range_high'], errors='coerce').fillna(0.0)
@@ -129,12 +174,12 @@ def build_dataset(manifest: dict) -> pd.DataFrame:
     base['target_month'] = pd.to_datetime(base['target_date'], errors='coerce').dt.month.fillna(0).astype(int)
     base['target_day'] = pd.to_datetime(base['target_date'], errors='coerce').dt.day.fillna(0).astype(int)
     base['forecast_available'] = base['forecast_available'].fillna(True).astype(float)
-    base['model_count_available'] = pd.to_numeric(base.get('model_count_available'), errors='coerce').fillna(0.0)
-    base['temp_max_mean'] = pd.to_numeric(base.get('temp_max_mean'), errors='coerce').fillna(pd.to_numeric(base.get('forecast_temp_max'), errors='coerce').fillna(0.0))
-    base['temp_max_spread'] = pd.to_numeric(base.get('temp_max_spread'), errors='coerce').fillna(0.0)
-    base['temp_max_std'] = pd.to_numeric(base.get('temp_max_std'), errors='coerce').fillna(0.0)
-    base['gfs_seamless_temp_max'] = pd.to_numeric(base.get('gfs_seamless_temp_max'), errors='coerce').fillna(base['temp_max_mean'])
-    base['icon_seamless_temp_max'] = pd.to_numeric(base.get('icon_seamless_temp_max'), errors='coerce').fillna(base['temp_max_mean'])
+    base['model_count_available'] = pd.to_numeric(frame_series(base, 'model_count_available'), errors='coerce').fillna(0.0)
+    base['temp_max_mean'] = pd.to_numeric(frame_series(base, 'temp_max_mean'), errors='coerce').fillna(pd.to_numeric(frame_series(base, 'forecast_temp_max'), errors='coerce').fillna(0.0))
+    base['temp_max_spread'] = pd.to_numeric(frame_series(base, 'temp_max_spread'), errors='coerce').fillna(0.0)
+    base['temp_max_std'] = pd.to_numeric(frame_series(base, 'temp_max_std'), errors='coerce').fillna(0.0)
+    base['gfs_seamless_temp_max'] = pd.to_numeric(frame_series(base, 'gfs_seamless_temp_max'), errors='coerce').fillna(base['temp_max_mean'])
+    base['icon_seamless_temp_max'] = pd.to_numeric(frame_series(base, 'icon_seamless_temp_max'), errors='coerce').fillna(base['temp_max_mean'])
     base['temp_max_bucket_gap'] = base['temp_max_mean'] - base['range_center']
     base['temp_max_in_bucket'] = ((base['temp_max_mean'] >= base['temp_range_low']) & (base['temp_max_mean'] <= base['temp_range_high'])).astype(float)
 
@@ -143,7 +188,7 @@ def build_dataset(manifest: dict) -> pd.DataFrame:
     base['climatology_anomaly'] = mean_f - base['climatology_normal']
     base['climatology_anomaly_abs'] = base['climatology_anomaly'].abs()
     base['is_extreme_forecast'] = (base['climatology_anomaly_abs'] > 15).astype(float)
-    base['hours_to_resolution'] = pd.to_numeric(base.get('lead_hours'), errors='coerce').fillna(0.0)
+    base['hours_to_resolution'] = pd.to_numeric(frame_series(base, 'lead_hours'), errors='coerce').fillna(0.0)
     base['is_same_day'] = (base['hours_to_resolution'] <= 24).astype(float)
     base['is_next_day'] = ((base['hours_to_resolution'] > 24) & (base['hours_to_resolution'] <= 48)).astype(float)
     base['season'] = base['target_month'].apply(lambda m: 0 if m in (12, 1, 2) else (1 if m in (3, 4, 5) else (2 if m in (6, 7, 8) else 3)))
@@ -191,10 +236,24 @@ def split_df(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
     )
 
 
+def sanitize_feature_frames(X_train: pd.DataFrame, X_val: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    X_train = X_train.copy()
+    X_val = X_val.copy()
+    for col in CATEGORICAL_FEATURES:
+        if col in X_train.columns:
+            X_train[col] = X_train[col].fillna('unknown').astype(str)
+            X_val[col] = X_val[col].fillna('unknown').astype(str)
+    for col in [feature for feature in ALL_FEATURES if feature not in CATEGORICAL_FEATURES]:
+        if col in X_train.columns:
+            train_numeric = pd.to_numeric(X_train[col], errors='coerce')
+            fill_value = float(train_numeric.median()) if not pd.isna(train_numeric.median()) else 0.0
+            X_train[col] = train_numeric.fillna(fill_value)
+            X_val[col] = pd.to_numeric(X_val[col], errors='coerce').fillna(fill_value)
+    return X_train, X_val
+
+
 def train_catboost(X_train, y_train, X_val, y_val, cat_features):
     import catboost
-    from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
-
     cat_indices = [X_train.columns.tolist().index(col) for col in cat_features if col in X_train.columns]
     model = catboost.CatBoostClassifier(
         iterations=600,
@@ -210,9 +269,9 @@ def train_catboost(X_train, y_train, X_val, y_val, cat_features):
     model.fit(X_train, y_train, eval_set=(X_val, y_val), verbose=False)
     preds = model.predict_proba(X_val)[:, 1]
     return model, {
-        'roc_auc': float(roc_auc_score(y_val, preds)),
-        'log_loss': float(log_loss(y_val, preds)),
-        'brier_score': float(brier_score_loss(y_val, preds)),
+        'roc_auc': float(binary_roc_auc(y_val, preds)),
+        'log_loss': float(binary_log_loss(y_val, preds)),
+        'brier_score': float(binary_brier_score(y_val, preds)),
         'rows': int(len(X_train) + len(X_val)),
         'positive_rate': float(y_train.mean()),
     }
@@ -220,7 +279,6 @@ def train_catboost(X_train, y_train, X_val, y_val, cat_features):
 
 def train_lightgbm(X_train, y_train, X_val, y_val, cat_features):
     import lightgbm as lgb
-    from sklearn.metrics import roc_auc_score
     X_train = X_train.copy()
     X_val = X_val.copy()
     for col in cat_features:
@@ -247,12 +305,11 @@ def train_lightgbm(X_train, y_train, X_val, y_val, cat_features):
         callbacks=[lgb.early_stopping(60), lgb.log_evaluation(0)],
     )
     preds = model.predict(X_val)
-    return model, {'roc_auc': float(roc_auc_score(y_val, preds))}
+    return model, {'roc_auc': float(binary_roc_auc(y_val, preds))}
 
 
 def train_xgboost(X_train, y_train, X_val, y_val):
     import xgboost as xgb
-    from sklearn.metrics import roc_auc_score
     X_train = X_train.select_dtypes(include=[np.number])
     X_val = X_val.select_dtypes(include=[np.number])
     dtrain = xgb.DMatrix(X_train, label=y_train)
@@ -274,7 +331,7 @@ def train_xgboost(X_train, y_train, X_val, y_val):
         verbose_eval=False,
     )
     preds = model.predict(dval)
-    return model, {'roc_auc': float(roc_auc_score(y_val, preds))}
+    return model, {'roc_auc': float(binary_roc_auc(y_val, preds))}
 
 
 def main():
@@ -310,6 +367,7 @@ def main():
             continue
         X_train = kind_train[ALL_FEATURES].copy()
         X_val = kind_val[ALL_FEATURES].copy()
+        X_train, X_val = sanitize_feature_frames(X_train, X_val)
         y_train = kind_train['resolved_yes']
         y_val = kind_val['resolved_yes']
 

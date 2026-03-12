@@ -41,6 +41,7 @@ SCORE_SIZE_USD_MULTIPLIER = 180.0
 SCORED_MARKET_LIMIT = 16
 DEGRADED_SCORE_ONLY_THRESHOLD = 0.60
 DEGRADED_SCORE_ONLY_MARGIN = 0.01
+DEGRADED_BULL_FALLBACK_THRESHOLD = 0.52
 
 
 class BitcoinModelBundle:
@@ -218,6 +219,22 @@ class BitcoinModelStrategy(BaseStrategy):
                         scores=scores,
                         direction=direction,
                     )
+                if (
+                    not signals
+                    and snapshot.last_price
+                    and degraded_live_mode
+                    and self._should_use_bull_catchup_fallback(scores=scores, snapshot=snapshot)
+                ):
+                    fallback_signals = self._build_signals(
+                        markets=markets,
+                        spot_price=float(snapshot.last_price),
+                        scores=scores,
+                        direction="bull",
+                    )
+                    if fallback_signals:
+                        direction = "bull"
+                        signals = fallback_signals
+                        self._stats["last_direction_mode"] = "bull_catchup_fallback"
 
         self._stats["last_direction"] = direction
         self._stats["last_signals"] = len(signals)
@@ -365,6 +382,22 @@ class BitcoinModelStrategy(BaseStrategy):
         return (
             short_score >= DEGRADED_SCORE_ONLY_THRESHOLD
             and (short_score - long_score) >= DEGRADED_SCORE_ONLY_MARGIN
+        )
+
+    def _should_use_bull_catchup_fallback(
+        self,
+        *,
+        scores: dict[str, float],
+        snapshot: FeedSnapshot,
+    ) -> bool:
+        row = snapshot.feature_row or {}
+        long_score = float(scores["long"])
+        directional_efficiency = float(row.get("directional_efficiency_12", 0.0) or 0.0)
+        signed_ratio = float(row.get("signed_ratio_12", 0.0) or 0.0)
+        return (
+            long_score >= DEGRADED_BULL_FALLBACK_THRESHOLD
+            and directional_efficiency >= max(self.cfg.min_directional_efficiency * 2.0, 0.50)
+            and signed_ratio >= -0.10
         )
 
     def _build_signals(

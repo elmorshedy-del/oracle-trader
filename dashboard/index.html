@@ -667,6 +667,7 @@ function stratBadge(source) {
     'news_whale': ['N+W', 'strat-whale'],
     'mean_reversion': ['MEAN', 'strat-mean'],
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
+    'bitcoin_futures_ml': ['BTC ML', 'strat-crypto'],
     'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
     'weather_forecast': ['WX', 'strat-weather'],
@@ -689,6 +690,7 @@ function normalizeStrategyKey(key) {
     news: 'news_latency',
     mean_reversion: 'mean_reversion',
     crypto_arb: 'crypto_temporal_arb',
+    bitcoin_model: 'bitcoin_futures_ml',
     weather: 'weather_forecast',
     weather_sniper: 'weather_sniper',
     weather_latency: 'weather_latency_hunter',
@@ -759,6 +761,7 @@ function renderViewTabs(d) {
     'news',
     'news_whale',
     'bitcoin',
+    'bitcoin_model',
     'bitcoin_whale',
     'arbitrage',
     'bundle_arb',
@@ -871,7 +874,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};
@@ -1104,6 +1107,7 @@ function renderSanity(d) {
       weather_model_signal: 'weather_model',
       news: 'news',
       bitcoin: 'crypto_arb',
+      bitcoin_model: 'bitcoin_model',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',
     };
@@ -1140,7 +1144,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : 10)));
+        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 8 : 10))));
     const checks = [
       {
         label: 'Portfolio funded',
@@ -1185,6 +1189,37 @@ function renderSanity(d) {
         label: 'Market match + price feed',
         ok: (runtime.matched_markets || 0) > 0 && (runtime.last_price_provider_count || 0) > 0,
         note: `${runtime.matched_markets || 0} markets / ${runtime.last_price_provider_count || 0} providers`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin_model') {
+      const feedStats = runtime.feed_stats || {};
+      checks.splice(2, 0, {
+        label: 'Model bundle loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.feature_count || 0) > 0,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error} / ${runtime.bundle_version || 'unknown'}`
+          : `${runtime.feature_count || 0} features / ${runtime.bundle_version || 'unknown'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Live BTC feed ready',
+        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && (runtime.last_source_fresh_score || 0) >= 0.75,
+        note: `${feedStats.trade_events || 0} trades / fresh ${(runtime.last_source_fresh_score || 0).toFixed(2)}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Scored BTC markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.matched_markets || 0} matched`,
+      });
+      checks.splice(5, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
+      });
+      checks.splice(6, 0, {
+        label: 'BTC ML flow',
+        ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}`,
       });
     }
 

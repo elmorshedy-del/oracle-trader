@@ -20,6 +20,7 @@ from strategies.whale import WhaleTrackingStrategy
 from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
+from strategies.bitcoin_model import BitcoinModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_model import WeatherModelStrategy
 from strategies.bundle_arb import BundleArbitrageStrategy
@@ -84,6 +85,12 @@ COMPARISON_VIEW_CONFIG = {
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
     "news_whale": {"label": "News + Whale", "strategy": "news", "source": "news_whale"},
     "bitcoin": {"label": "Bitcoin", "strategy": "crypto_arb", "source": "crypto_temporal_arb"},
+    "bitcoin_model": {
+        "label": "Bitcoin ML",
+        "strategy": "bitcoin_model",
+        "source": SignalSource.BITCOIN_MODEL.value,
+        "signal_sources": (SignalSource.BITCOIN_MODEL.value,),
+    },
     "bitcoin_whale": {
         "label": "Bitcoin + Whale",
         "strategy": "crypto_arb",
@@ -131,6 +138,10 @@ class Pipeline:
             "weather_model": WeatherModelStrategy(
                 self.config,
                 weather_strategy=self.strategies["weather"],
+            ),
+            "bitcoin_model": BitcoinModelStrategy(
+                self.config,
+                crypto_strategy=self.strategies["crypto_arb"],
             ),
         }
 
@@ -217,6 +228,13 @@ class Pipeline:
             trader.save_state()
         weather: WeatherForecastStrategy = self.strategies["weather"]
         weather.save_state()
+        for strategy in self.comparison_only_strategies.values():
+            close = getattr(strategy, "close", None)
+            if close is None:
+                continue
+            result = close()
+            if asyncio.iscoroutine(result):
+                await result
         await self.collector.close()
         logger.info("Pipeline stopped")
 
@@ -302,6 +320,23 @@ class Pipeline:
                 strategy_signals["weather_model_trader"] = []
                 strategy_signals["weather_model_signal"] = []
                 self.health.record_strategy_error("weather_model", str(e))
+
+            bitcoin_model: BitcoinModelStrategy = self.comparison_only_strategies["bitcoin_model"]
+            try:
+                _bitcoin_model_start = _time.time()
+                bitcoin_model_signals = await bitcoin_model.scan(self._markets, self._events)
+                _bitcoin_model_dur = (_time.time() - _bitcoin_model_start) * 1000
+                strategy_signals["bitcoin_model"] = bitcoin_model_signals
+                self.health.record_strategy_run(
+                    "bitcoin_model",
+                    len(bitcoin_model_signals),
+                    _bitcoin_model_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy bitcoin_model error: {e}")
+                bitcoin_model._stats["errors"] += 1
+                strategy_signals["bitcoin_model"] = []
+                self.health.record_strategy_error("bitcoin_model", str(e))
 
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
             # Whale data is still loaded and available for the dashboard
@@ -560,6 +595,8 @@ class Pipeline:
             return self.config.weather_model.trader_budget_usd
         if view_key == "weather_model_signal":
             return self.config.weather_model.signal_budget_usd
+        if view_key == "bitcoin_model":
+            return self.config.bitcoin_model.budget_usd
         return self.config.risk.max_total_exposure_usd
 
     def _write_diagnostic_entry(
@@ -695,6 +732,7 @@ class Pipeline:
             } | {
                 "bundle_arb": self.bundle_arb_strategy.stats,
                 "weather_model": self.comparison_only_strategies["weather_model"].stats,
+                "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
             },
             "whale_wallets": [
                 {
@@ -813,6 +851,7 @@ class Pipeline:
                     "trader": self.config.weather_model.trader_budget_usd,
                     "signal": self.config.weather_model.signal_budget_usd,
                 },
+                "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
             },
             "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),
             "app_log_path": str(LEGACY_APP_LOG_PATH),

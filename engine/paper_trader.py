@@ -37,6 +37,7 @@ STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.NEWS: 18.0,
     SignalSource.CRYPTO_ARB: 18.0,
     SignalSource.CRYPTO_STRUCTURE: 8.0,
+    SignalSource.BITCOIN_MODEL: 8.0,
     SignalSource.WEATHER: 12.0,
     SignalSource.WEATHER_SNIPER: 8.0,
     SignalSource.WEATHER_LATENCY: 6.0,
@@ -99,6 +100,7 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_SWING: 0.10,
     SignalSource.WEATHER_MODEL_TRADER: 1.00,
     SignalSource.WEATHER_MODEL_SIGNAL: 1.00,
+    SignalSource.BITCOIN_MODEL: 1.00,
     SignalSource.WHALE: 0.35,
 }
 SOURCE_POSITION_LIMITS = {
@@ -109,6 +111,7 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WEATHER_SWING: 12,
     SignalSource.WEATHER_MODEL_TRADER: 20,
     SignalSource.WEATHER_MODEL_SIGNAL: 14,
+    SignalSource.BITCOIN_MODEL: 8,
     SignalSource.WHALE: 16,
 }
 SOURCE_SCAN_LIMITS = {
@@ -119,11 +122,13 @@ SOURCE_SCAN_LIMITS = {
     SignalSource.WEATHER_SWING: 4,
     SignalSource.WEATHER_MODEL_TRADER: 8,
     SignalSource.WEATHER_MODEL_SIGNAL: 5,
+    SignalSource.BITCOIN_MODEL: 3,
     SignalSource.WHALE: 6,
 }
 CRYPTO_SOURCES = {
     SignalSource.CRYPTO_ARB,
     SignalSource.CRYPTO_STRUCTURE,
+    SignalSource.BITCOIN_MODEL,
 }
 WEATHER_SOURCES = {
     SignalSource.WEATHER,

@@ -236,6 +236,47 @@ class WeatherModelConfig:
 
 
 @dataclass
+class BitcoinModelConfig:
+    """Standalone BTC futures-impulse sleeve (comparison-book only)."""
+    enabled: bool = os.getenv("BITCOIN_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    model_dir: str = os.getenv(
+        "BITCOIN_MODEL_DIR",
+        "models/bitcoin_ml/impulse_baseline",
+    )
+
+    budget_usd: float = float(os.getenv("BITCOIN_MODEL_BUDGET_USD", "600"))
+    long_threshold: float = float(os.getenv("BITCOIN_MODEL_LONG_THRESHOLD", "0.6552729109"))
+    short_threshold: float = float(os.getenv("BITCOIN_MODEL_SHORT_THRESHOLD", "0.7616295043"))
+    min_direction_margin: float = float(os.getenv("BITCOIN_MODEL_DIRECTION_MARGIN", "0.04"))
+    min_source_fresh_score: float = float(os.getenv("BITCOIN_MODEL_MIN_FRESH_SCORE", "0.75"))
+    min_barrier_edge: float = float(os.getenv("BITCOIN_MODEL_MIN_BARRIER_EDGE", "0.10"))
+    max_entry_price: float = float(os.getenv("BITCOIN_MODEL_MAX_ENTRY_PRICE", "0.82"))
+    max_resolution_days: int = int(os.getenv("BITCOIN_MODEL_MAX_RESOLUTION_DAYS", "365"))
+    max_barrier_distance_pct: float = float(os.getenv("BITCOIN_MODEL_MAX_BARRIER_DISTANCE_PCT", "0.45"))
+    min_size_usd: float = float(os.getenv("BITCOIN_MODEL_MIN_SIZE_USD", "20"))
+    max_size_usd: float = float(os.getenv("BITCOIN_MODEL_MAX_SIZE_USD", "120"))
+    max_signals_per_scan: int = int(os.getenv("BITCOIN_MODEL_MAX_SIGNALS_PER_SCAN", "3"))
+
+    symbol: str = os.getenv("BITCOIN_MODEL_SYMBOL", "BTCUSDT")
+    bucket_seconds: int = int(os.getenv("BITCOIN_MODEL_BUCKET_SECONDS", "5"))
+    horizon_seconds: int = int(os.getenv("BITCOIN_MODEL_HORIZON_SECONDS", "60"))
+    cost_bps: float = float(os.getenv("BITCOIN_MODEL_COST_BPS", "4.0"))
+    min_signed_ratio: float = float(os.getenv("BITCOIN_MODEL_MIN_SIGNED_RATIO", "0.04"))
+    min_depth_imbalance: float = float(os.getenv("BITCOIN_MODEL_MIN_DEPTH_IMBALANCE", "0.01"))
+    min_trade_z: float = float(os.getenv("BITCOIN_MODEL_MIN_TRADE_Z", "0.25"))
+    min_directional_efficiency: float = float(os.getenv("BITCOIN_MODEL_MIN_DIRECTIONAL_EFFICIENCY", "0.15"))
+    warmup_buckets: int = int(os.getenv("BITCOIN_MODEL_WARMUP_BUCKETS", "72"))
+
+    depth_poll_seconds: int = int(os.getenv("BITCOIN_MODEL_DEPTH_POLL_SECONDS", "5"))
+    metrics_poll_seconds: int = int(os.getenv("BITCOIN_MODEL_METRICS_POLL_SECONDS", "60"))
+    funding_poll_seconds: int = int(os.getenv("BITCOIN_MODEL_FUNDING_POLL_SECONDS", "300"))
+    max_trade_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_TRADE_AGE_BUCKETS", "12"))
+    max_depth_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_DEPTH_AGE_BUCKETS", "12"))
+    max_metrics_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_METRICS_AGE_BUCKETS", "120"))
+    max_funding_age_buckets: int = int(os.getenv("BITCOIN_MODEL_MAX_FUNDING_AGE_BUCKETS", "5760"))
+
+
+@dataclass
 class MeanReversionConfig:
     """Mean reversion — competing signal strategy."""
     enabled: bool = True
@@ -268,6 +309,7 @@ class PipelineConfig:
     crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
+    bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     # Pipeline modes

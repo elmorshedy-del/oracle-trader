@@ -36,6 +36,7 @@ class SignalSource(str, Enum):
     WEATHER_SWING = "weather_swing_trader"
     WEATHER_MODEL_TRADER = "weather_model_trader"
     WEATHER_MODEL_SIGNAL = "weather_model_signal"
+    BITCOIN_MODEL = "bitcoin_futures_ml"
 
 
 class TradeStatus(str, Enum):

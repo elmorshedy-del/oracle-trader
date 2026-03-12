@@ -1,0 +1,447 @@
+"""
+Strategy: BTC Futures ML Catch-Up Sleeve
+========================================
+Comparison-book only sleeve that uses the frozen BTC futures impulse bundle as
+the fast-market timing layer, then maps that direction into Polymarket BTC
+barrier contracts that still look underreacted.
+
+This sleeve is isolated from the legacy portfolio and other sleeves. It has its
+own budget, state, and logs.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from data.models import Event, Market, Signal, SignalAction, SignalSource
+from engine.binance_btc_feature_feed import BinanceBtcFeatureFeed, FeedSnapshot
+from runtime_paths import LOG_DIR
+from strategies.base import BaseStrategy
+from strategies.crypto_arb import CryptoTemporalArbStrategy
+
+logger = logging.getLogger(__name__)
+
+try:
+    from catboost import CatBoostClassifier, Pool
+except Exception:  # pragma: no cover - runtime dependency gate
+    CatBoostClassifier = None
+    Pool = None
+
+
+BASE_SIGNAL_CONFIDENCE = 0.58
+MAX_SIGNAL_CONFIDENCE = 0.96
+EDGE_CONFIDENCE_BONUS_CAP = 0.18
+EDGE_CONFIDENCE_MULTIPLIER = 0.75
+EDGE_SIZE_USD_MULTIPLIER = 220.0
+SCORE_SIZE_USD_MULTIPLIER = 180.0
+SCORED_MARKET_LIMIT = 16
+
+
+class BitcoinModelBundle:
+    def __init__(self, model_dir: str | Path):
+        self.model_dir = Path(model_dir)
+        self.metadata: dict[str, Any] = {}
+        self.models: dict[str, CatBoostClassifier] = {}
+        self.feature_names: dict[str, list[str]] = {}
+        self.ready = False
+        self.version = "unloaded"
+        self.load_error: str | None = None
+        self._load()
+
+    def _load(self) -> None:
+        if CatBoostClassifier is None or Pool is None:
+            self.load_error = "catboost_not_installed"
+            logger.warning("[BTC_ML] catboost not installed; BTC ML sleeve disabled")
+            return
+
+        metadata_path = self.model_dir / "metadata.json"
+        if not metadata_path.exists():
+            self.load_error = f"missing_metadata:{metadata_path}"
+            logger.warning("[BTC_ML] Missing metadata at %s", metadata_path)
+            return
+
+        try:
+            self.metadata = json.loads(metadata_path.read_text())
+            for side, filename in (self.metadata.get("models") or {}).items():
+                model_path = self.model_dir / str(filename)
+                if not model_path.exists():
+                    continue
+                model = CatBoostClassifier()
+                model.load_model(str(model_path))
+                self.models[side] = model
+                self.feature_names[side] = list(model.feature_names_ or [])
+            self.ready = "long" in self.models and "short" in self.models
+            self.version = self.metadata.get("bundle_version", "unknown")
+            if not self.ready:
+                self.load_error = "long_or_short_model_missing"
+        except Exception as exc:
+            self.ready = False
+            self.load_error = str(exc)
+            logger.warning("[BTC_ML] Failed to load BTC model bundle: %s", exc)
+
+    def predict_scores(self, row: dict[str, float]) -> dict[str, float] | None:
+        if not self.ready:
+            return None
+
+        scores: dict[str, float] = {}
+        for side in ("long", "short"):
+            model = self.models.get(side)
+            feature_names = self.feature_names.get(side) or []
+            if not model or not feature_names:
+                return None
+            values = [float(row.get(name, 0.0) or 0.0) for name in feature_names]
+            pool = Pool([values], feature_names=feature_names)
+            scores[side] = float(model.predict_proba(pool)[0][1])
+        return scores
+
+
+class BitcoinModelStrategy(BaseStrategy):
+    name = "bitcoin_model"
+    description = "BTC futures impulse catch-up sleeve for Polymarket BTC barrier markets"
+
+    def __init__(self, config, crypto_strategy: CryptoTemporalArbStrategy):
+        super().__init__(config)
+        self.cfg = config.bitcoin_model
+        self.crypto_strategy = crypto_strategy
+        self.bundle = BitcoinModelBundle(self.cfg.model_dir)
+        self.enabled = bool(self.cfg.enabled and self.bundle.ready)
+        self.log_path = LOG_DIR / "bitcoin_model_sleeve.jsonl"
+        self.feed = BinanceBtcFeatureFeed(
+            symbol=self.cfg.symbol,
+            bucket_seconds=self.cfg.bucket_seconds,
+            horizon_seconds=self.cfg.horizon_seconds,
+            cost_bps=self.cfg.cost_bps,
+            min_signed_ratio=self.cfg.min_signed_ratio,
+            min_depth_imbalance=self.cfg.min_depth_imbalance,
+            min_trade_z=self.cfg.min_trade_z,
+            min_directional_efficiency=self.cfg.min_directional_efficiency,
+            warmup_buckets=self.cfg.warmup_buckets,
+            depth_poll_seconds=self.cfg.depth_poll_seconds,
+            metrics_poll_seconds=self.cfg.metrics_poll_seconds,
+            funding_poll_seconds=self.cfg.funding_poll_seconds,
+            max_trade_age_buckets=self.cfg.max_trade_age_buckets,
+            max_depth_age_buckets=self.cfg.max_depth_age_buckets,
+            max_metrics_age_buckets=self.cfg.max_metrics_age_buckets,
+            max_funding_age_buckets=self.cfg.max_funding_age_buckets,
+            log_path=self.log_path,
+        )
+        self._stats.update(
+            {
+                "bundle_ready": self.bundle.ready,
+                "bundle_version": self.bundle.version,
+                "bundle_error": self.bundle.load_error,
+                "model_dir": str(self.bundle.model_dir),
+                "feature_count": len(self.bundle.feature_names.get("long") or []),
+                "candidate_markets": 0,
+                "matched_markets": 0,
+                "scored_markets": 0,
+                "last_scan_at": None,
+                "last_bucket_at": None,
+                "last_price": 0.0,
+                "last_long_score": 0.0,
+                "last_short_score": 0.0,
+                "last_direction": "neutral",
+                "last_source_fresh_score": 0.0,
+                "last_signals": 0,
+                "log_entries": 0,
+                "last_log_at": None,
+                "feed_stats": self.feed.stats,
+            }
+        )
+
+    @property
+    def stats(self) -> dict:
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            **self._stats,
+            "log_path": str(self.log_path.resolve()),
+        }
+
+    async def close(self) -> None:
+        await self.feed.close()
+
+    async def scan(self, markets: list[Market], events: list[Event]) -> list[Signal]:
+        del events
+        self._stats["scans_completed"] += 1
+        self._stats["last_scan_at"] = datetime.now(timezone.utc).isoformat()
+        self._stats["bundle_ready"] = self.bundle.ready
+        self._stats["bundle_error"] = self.bundle.load_error
+
+        if not self.enabled:
+            self._stats["last_signals"] = 0
+            self._sync_feed_stats()
+            self._append_scan_log(snapshot=None, scores=None, direction="disabled", signals=[])
+            return []
+
+        await self.feed.ensure_started()
+        snapshot = await self.feed.snapshot()
+        self._apply_snapshot_stats(snapshot)
+
+        scores: dict[str, float] | None = None
+        direction = "neutral"
+        signals: list[Signal] = []
+
+        if snapshot.ready and snapshot.feature_row and snapshot.source_fresh_score >= self.cfg.min_source_fresh_score:
+            scores = self.bundle.predict_scores(snapshot.feature_row)
+            if scores:
+                self._stats["last_long_score"] = round(scores["long"], 6)
+                self._stats["last_short_score"] = round(scores["short"], 6)
+                direction = self._choose_direction(snapshot, scores)
+                if direction in {"bull", "bear"} and snapshot.last_price:
+                    signals = self._build_signals(
+                        markets=markets,
+                        spot_price=float(snapshot.last_price),
+                        scores=scores,
+                        direction=direction,
+                    )
+
+        self._stats["last_direction"] = direction
+        self._stats["last_signals"] = len(signals)
+        self._stats["signals_generated"] += len(signals)
+        self._sync_feed_stats()
+        self._append_scan_log(snapshot=snapshot, scores=scores, direction=direction, signals=signals)
+        return signals
+
+    def _apply_snapshot_stats(self, snapshot: FeedSnapshot) -> None:
+        self._stats["last_bucket_at"] = snapshot.last_bucket_at
+        self._stats["last_price"] = round(float(snapshot.last_price or 0.0), 2)
+        self._stats["last_source_fresh_score"] = round(float(snapshot.source_fresh_score or 0.0), 4)
+
+    def _sync_feed_stats(self) -> None:
+        feed_stats = self.feed.stats
+        self._stats["feed_stats"] = feed_stats
+        self._stats["log_entries"] = int(feed_stats.get("log_entries") or 0)
+        self._stats["last_log_at"] = feed_stats.get("last_log_at")
+
+    def _choose_direction(self, snapshot: FeedSnapshot, scores: dict[str, float]) -> str:
+        long_score = float(scores["long"])
+        short_score = float(scores["short"])
+        if (
+            snapshot.long_candidate
+            and long_score >= self.cfg.long_threshold
+            and (long_score - short_score) >= self.cfg.min_direction_margin
+        ):
+            return "bull"
+        if (
+            snapshot.short_candidate
+            and short_score >= self.cfg.short_threshold
+            and (short_score - long_score) >= self.cfg.min_direction_margin
+        ):
+            return "bear"
+        return "neutral"
+
+    def _build_signals(
+        self,
+        *,
+        markets: list[Market],
+        spot_price: float,
+        scores: dict[str, float],
+        direction: str,
+    ) -> list[Signal]:
+        best_by_group: dict[str, Signal] = {}
+        candidate_markets = 0
+        matched_markets = 0
+        scored_markets = 0
+
+        for market in markets:
+            text = f"{market.question} {market.slug}".lower()
+            if self.crypto_strategy._match_symbol(text) != "BTC":
+                continue
+
+            candidate_markets += 1
+            match = self.crypto_strategy._match_barrier_market("BTC", market, text)
+            if not match:
+                continue
+            matched_markets += 1
+
+            if not self._market_is_in_scope(match=match, spot_price=spot_price, direction=direction):
+                continue
+
+            signal = self._build_barrier_signal(
+                spot_price=spot_price,
+                match=match,
+                scores=scores,
+                direction=direction,
+            )
+            if not signal:
+                continue
+            scored_markets += 1
+            existing = best_by_group.get(signal.group_key or signal.market_slug)
+            if existing is None or (signal.expected_edge, signal.confidence) > (
+                existing.expected_edge,
+                existing.confidence,
+            ):
+                best_by_group[signal.group_key or signal.market_slug] = signal
+
+            if scored_markets >= SCORED_MARKET_LIMIT:
+                break
+
+        self._stats["candidate_markets"] = candidate_markets
+        self._stats["matched_markets"] = matched_markets
+        self._stats["scored_markets"] = scored_markets
+        ranked = sorted(
+            best_by_group.values(),
+            key=lambda signal: (signal.expected_edge, signal.confidence),
+            reverse=True,
+        )
+        return ranked[: self.cfg.max_signals_per_scan]
+
+    def _market_is_in_scope(self, *, match: dict[str, Any], spot_price: float, direction: str) -> bool:
+        horizon_days = float(match["years_left"]) * 365.25
+        if horizon_days > self.cfg.max_resolution_days:
+            return False
+
+        barrier_price = float(match["barrier_price"])
+        if spot_price <= 0.0 or barrier_price <= 0.0:
+            return False
+
+        barrier_distance_pct = abs(barrier_price - spot_price) / spot_price
+        if barrier_distance_pct > self.cfg.max_barrier_distance_pct:
+            return False
+
+        kind = str(match["kind"])
+        if direction == "bull":
+            return kind in {"reach", "ath", "dip"}
+        if direction == "bear":
+            return kind in {"reach", "ath", "dip"}
+        return False
+
+    def _build_barrier_signal(
+        self,
+        *,
+        spot_price: float,
+        match: dict[str, Any],
+        scores: dict[str, float],
+        direction: str,
+    ) -> Signal | None:
+        market = match["market"]
+        yes_outcome = market.outcomes[match["yes_index"]]
+        no_outcome = market.outcomes[match["no_index"]]
+        yes_price = float(yes_outcome.price)
+        no_price = float(no_outcome.price)
+        if yes_price <= 0.0 or no_price <= 0.0:
+            return None
+
+        modeled_yes = self.crypto_strategy._estimate_barrier_probability(
+            symbol="BTC",
+            spot_price=spot_price,
+            barrier_price=float(match["barrier_price"]),
+            years_left=float(match["years_left"]),
+        )
+        if modeled_yes is None:
+            return None
+
+        action: SignalAction | None = None
+        target_outcome = None
+        edge = 0.0
+        kind = str(match["kind"])
+
+        bullish_barrier = kind in {"reach", "ath"}
+        if direction == "bull":
+            if bullish_barrier:
+                edge = modeled_yes - yes_price
+                if edge >= self.cfg.min_barrier_edge and yes_price < self.cfg.max_entry_price:
+                    action = SignalAction.BUY_YES
+                    target_outcome = yes_outcome
+            else:
+                edge = yes_price - modeled_yes
+                if edge >= self.cfg.min_barrier_edge and no_price < self.cfg.max_entry_price:
+                    action = SignalAction.BUY_NO
+                    target_outcome = no_outcome
+        elif direction == "bear":
+            if kind == "dip":
+                edge = modeled_yes - yes_price
+                if edge >= self.cfg.min_barrier_edge and yes_price < self.cfg.max_entry_price:
+                    action = SignalAction.BUY_YES
+                    target_outcome = yes_outcome
+            else:
+                edge = yes_price - modeled_yes
+                if edge >= self.cfg.min_barrier_edge and no_price < self.cfg.max_entry_price:
+                    action = SignalAction.BUY_NO
+                    target_outcome = no_outcome
+
+        if not action or not target_outcome:
+            return None
+
+        direction_score = float(scores["long"] if direction == "bull" else scores["short"])
+        threshold = float(self.cfg.long_threshold if direction == "bull" else self.cfg.short_threshold)
+        score_excess = max(direction_score - threshold, 0.0)
+        side_probability = modeled_yes if action == SignalAction.BUY_YES else (1.0 - modeled_yes)
+        confidence = min(
+            MAX_SIGNAL_CONFIDENCE,
+            max(direction_score, side_probability, BASE_SIGNAL_CONFIDENCE)
+            + min(edge * EDGE_CONFIDENCE_MULTIPLIER, EDGE_CONFIDENCE_BONUS_CAP),
+        )
+        suggested_size_usd = min(
+            self.cfg.max_size_usd,
+            max(
+                self.cfg.min_size_usd,
+                self.cfg.min_size_usd
+                + (edge * EDGE_SIZE_USD_MULTIPLIER)
+                + (score_excess * SCORE_SIZE_USD_MULTIPLIER),
+            ),
+        )
+
+        return Signal(
+            source=SignalSource.BITCOIN_MODEL,
+            action=action,
+            market_slug=market.slug,
+            condition_id=market.condition_id,
+            token_id=target_outcome.token_id,
+            confidence=confidence,
+            expected_edge=edge * 100.0,
+            group_key=self.crypto_strategy._barrier_group_key("BTC", market, kind, action),
+            reasoning=(
+                f"BTC ML CATCH-UP: {direction.upper()} impulse | long={scores['long']:.3f} short={scores['short']:.3f} | "
+                f"spot=${spot_price:,.0f} | {kind} ${float(match['barrier_price']):,.0f} | "
+                f"model YES={modeled_yes:.1%} vs market YES={yes_price:.1%}"
+            ),
+            suggested_size_usd=suggested_size_usd,
+        )
+
+    def _append_scan_log(
+        self,
+        *,
+        snapshot: FeedSnapshot | None,
+        scores: dict[str, float] | None,
+        direction: str,
+        signals: list[Signal],
+    ) -> None:
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "strategy": self.name,
+            "enabled": self.enabled,
+            "bundle_ready": self.bundle.ready,
+            "bundle_version": self.bundle.version,
+            "bundle_error": self.bundle.load_error,
+            "candidate_markets": self._stats.get("candidate_markets", 0),
+            "matched_markets": self._stats.get("matched_markets", 0),
+            "scored_markets": self._stats.get("scored_markets", 0),
+            "direction": direction,
+            "long_score": None if not scores else round(float(scores["long"]), 6),
+            "short_score": None if not scores else round(float(scores["short"]), 6),
+            "last_price": round(float(snapshot.last_price or 0.0), 2) if snapshot else None,
+            "source_fresh_score": round(float(snapshot.source_fresh_score or 0.0), 4) if snapshot else 0.0,
+            "bucket_ready": bool(snapshot.ready) if snapshot else False,
+            "bucket_at": snapshot.last_bucket_at if snapshot else None,
+            "long_candidate": bool(snapshot.long_candidate) if snapshot else False,
+            "short_candidate": bool(snapshot.short_candidate) if snapshot else False,
+            "signals": [
+                {
+                    "market": signal.market_slug,
+                    "action": signal.action.value,
+                    "confidence": round(signal.confidence, 4),
+                    "edge": round(signal.expected_edge, 3),
+                    "size_usd": round(signal.suggested_size_usd, 2),
+                }
+                for signal in signals
+            ],
+            "feed": self.feed.stats,
+        }
+        self.feed.append_log(payload)
+

@@ -216,7 +216,7 @@ class WeatherModelConfig:
     enabled: bool = True
     model_dir: str = os.getenv(
         "WEATHER_MODEL_DIR",
-        "models/weather_ml/external_only/legacy-weather-ml-v1",
+        "models/weather_ml/external_only/frozen-legacy-weather-ml-v1",
     )
 
     trader_budget_usd: float = float(os.getenv("WEATHER_MODEL_TRADER_BUDGET_USD", "750"))
@@ -233,6 +233,39 @@ class WeatherModelConfig:
     signal_max_token_price: float = 0.72
     signal_min_size_usd: float = 15.0
     signal_max_size_usd: float = 110.0
+
+
+@dataclass
+class WeatherModelV2Config:
+    """Stacked weather ML v2 experiment built on the frozen weather baseline."""
+    enabled: bool = os.getenv("WEATHER_MODEL_V2_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    model_dir: str = os.getenv(
+        "WEATHER_MODEL_V2_DIR",
+        "models/weather_ml/external_only/legacy-weather-ml-v2",
+    )
+    fallback_model_dir: str = os.getenv(
+        "WEATHER_MODEL_V2_FALLBACK_DIR",
+        "models/weather_ml/external_only/frozen-legacy-weather-ml-v1",
+    )
+    history_manifest_path: str = os.getenv(
+        "WEATHER_MODEL_V2_HISTORY_MANIFEST",
+        "models/weather_ml/weather_v2_history_sources.json",
+    )
+
+    trader_budget_usd: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_BUDGET_USD", "750"))
+    signal_budget_usd: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_BUDGET_USD", "600"))
+
+    trader_min_edge: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_MIN_EDGE", "0.03"))
+    trader_min_prob_distance: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_MIN_PROB_DISTANCE", "0.10"))
+    trader_max_token_price: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_MAX_TOKEN_PRICE", "0.80"))
+    trader_min_size_usd: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_MIN_SIZE_USD", "5"))
+    trader_max_size_usd: float = float(os.getenv("WEATHER_MODEL_V2_TRADER_MAX_SIZE_USD", "45"))
+
+    signal_min_edge: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_MIN_EDGE", "0.05"))
+    signal_min_prob_distance: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_MIN_PROB_DISTANCE", "0.15"))
+    signal_max_token_price: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_MAX_TOKEN_PRICE", "0.65"))
+    signal_min_size_usd: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_MIN_SIZE_USD", "5"))
+    signal_max_size_usd: float = float(os.getenv("WEATHER_MODEL_V2_SIGNAL_MAX_SIZE_USD", "35"))
 
 
 @dataclass
@@ -384,6 +417,7 @@ class PipelineConfig:
     crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
+    weather_model_v2: WeatherModelV2Config = field(default_factory=WeatherModelV2Config)
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
     sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)

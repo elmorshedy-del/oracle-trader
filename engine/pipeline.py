@@ -24,6 +24,7 @@ from strategies.bitcoin_model import BitcoinModelStrategy
 from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_model import WeatherModelStrategy
+from strategies.weather_model_v2 import WeatherModelStrategyV2
 from strategies.bundle_arb import BundleArbitrageStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
@@ -82,6 +83,18 @@ COMPARISON_VIEW_CONFIG = {
         "strategy": "weather_model_signal",
         "source": SignalSource.WEATHER_MODEL_SIGNAL.value,
         "signal_sources": (SignalSource.WEATHER_MODEL_SIGNAL.value,),
+    },
+    "weather_model_v2_trader": {
+        "label": "Weather ML V2 Trader",
+        "strategy": "weather_model_v2_trader",
+        "source": SignalSource.WEATHER_MODEL_V2_TRADER.value,
+        "signal_sources": (SignalSource.WEATHER_MODEL_V2_TRADER.value,),
+    },
+    "weather_model_v2_signal": {
+        "label": "Weather ML V2 Signal",
+        "strategy": "weather_model_v2_signal",
+        "source": SignalSource.WEATHER_MODEL_V2_SIGNAL.value,
+        "signal_sources": (SignalSource.WEATHER_MODEL_V2_SIGNAL.value,),
     },
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
     "news_whale": {"label": "News + Whale", "strategy": "news", "source": "news_whale"},
@@ -143,6 +156,10 @@ class Pipeline:
         self.bundle_arb_strategy = BundleArbitrageStrategy(self.config)
         self.comparison_only_strategies = {
             "weather_model": WeatherModelStrategy(
+                self.config,
+                weather_strategy=self.strategies["weather"],
+            ),
+            "weather_model_v2": WeatherModelStrategyV2(
                 self.config,
                 weather_strategy=self.strategies["weather"],
             ),
@@ -328,6 +345,25 @@ class Pipeline:
                 strategy_signals["weather_model_trader"] = []
                 strategy_signals["weather_model_signal"] = []
                 self.health.record_strategy_error("weather_model", str(e))
+
+            weather_model_v2: WeatherModelStrategyV2 = self.comparison_only_strategies["weather_model_v2"]
+            try:
+                _weather_model_v2_start = _time.time()
+                weather_model_v2_outputs = weather_model_v2.scan_variants()
+                _weather_model_v2_dur = (_time.time() - _weather_model_v2_start) * 1000
+                for key, value in weather_model_v2_outputs.items():
+                    strategy_signals[key] = value
+                self.health.record_strategy_run(
+                    "weather_model_v2",
+                    sum(len(value) for value in weather_model_v2_outputs.values()),
+                    _weather_model_v2_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy weather_model_v2 error: {e}")
+                weather_model_v2._stats["errors"] += 1
+                strategy_signals["weather_model_v2_trader"] = []
+                strategy_signals["weather_model_v2_signal"] = []
+                self.health.record_strategy_error("weather_model_v2", str(e))
 
             bitcoin_model: BitcoinModelStrategy = self.comparison_only_strategies["bitcoin_model"]
             try:
@@ -620,6 +656,10 @@ class Pipeline:
             return self.config.weather_model.trader_budget_usd
         if view_key == "weather_model_signal":
             return self.config.weather_model.signal_budget_usd
+        if view_key == "weather_model_v2_trader":
+            return self.config.weather_model_v2.trader_budget_usd
+        if view_key == "weather_model_v2_signal":
+            return self.config.weather_model_v2.signal_budget_usd
         if view_key == "bitcoin_model":
             return self.config.bitcoin_model.budget_usd
         if view_key == "sports":
@@ -759,6 +799,7 @@ class Pipeline:
             } | {
                 "bundle_arb": self.bundle_arb_strategy.stats,
                 "weather_model": self.comparison_only_strategies["weather_model"].stats,
+                "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
             },
@@ -878,6 +919,10 @@ class Pipeline:
                 "weather_model_budgets": {
                     "trader": self.config.weather_model.trader_budget_usd,
                     "signal": self.config.weather_model.signal_budget_usd,
+                },
+                "weather_model_v2_budgets": {
+                    "trader": self.config.weather_model_v2.trader_budget_usd,
+                    "signal": self.config.weather_model_v2.signal_budget_usd,
                 },
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
             },

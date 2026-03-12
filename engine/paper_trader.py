@@ -48,6 +48,8 @@ STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.WEATHER_SWING: 18.0,
     SignalSource.WEATHER_MODEL_TRADER: 12.0,
     SignalSource.WEATHER_MODEL_SIGNAL: 10.0,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 12.0,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 10.0,
     SignalSource.SPORTS_MODEL: 8.0,
     SignalSource.MEAN_REVERSION: 24.0,
 }
@@ -90,6 +92,8 @@ WEATHER_STALE_ROTATION_PNL_PCT = {
     SignalSource.WEATHER_SWING: 0.15,
     SignalSource.WEATHER_MODEL_TRADER: 0.14,
     SignalSource.WEATHER_MODEL_SIGNAL: 0.14,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 0.14,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 0.14,
 }
 STRATEGY_EXPOSURE_CAPS = {
     SignalSource.LIQUIDITY: 0.25,
@@ -105,6 +109,8 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_SWING: 0.10,
     SignalSource.WEATHER_MODEL_TRADER: 1.00,
     SignalSource.WEATHER_MODEL_SIGNAL: 1.00,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 1.00,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 1.00,
     SignalSource.BITCOIN_MODEL: 1.00,
     SignalSource.SPORTS_MODEL: 1.00,
     SignalSource.WHALE: 0.35,
@@ -117,6 +123,8 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WEATHER_SWING: 12,
     SignalSource.WEATHER_MODEL_TRADER: 20,
     SignalSource.WEATHER_MODEL_SIGNAL: 14,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 20,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 14,
     SignalSource.BITCOIN_MODEL: 12,
     SignalSource.SPORTS_MODEL: 16,
     SignalSource.WHALE: 16,
@@ -129,6 +137,8 @@ SOURCE_SCAN_LIMITS = {
     SignalSource.WEATHER_SWING: 4,
     SignalSource.WEATHER_MODEL_TRADER: 8,
     SignalSource.WEATHER_MODEL_SIGNAL: 5,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 8,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 5,
     SignalSource.BITCOIN_MODEL: 4,
     SignalSource.SPORTS_MODEL: 6,
     SignalSource.WHALE: 6,
@@ -145,6 +155,8 @@ WEATHER_SOURCES = {
     SignalSource.WEATHER_SWING,
     SignalSource.WEATHER_MODEL_TRADER,
     SignalSource.WEATHER_MODEL_SIGNAL,
+    SignalSource.WEATHER_MODEL_V2_TRADER,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL,
 }
 
 

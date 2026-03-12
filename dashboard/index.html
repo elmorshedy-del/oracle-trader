@@ -679,6 +679,8 @@ function stratBadge(source) {
     'weather_swing_trader': ['SWING', 'strat-weather'],
     'weather_model_trader': ['ML TR', 'strat-weather'],
     'weather_model_signal': ['ML SIG', 'strat-weather'],
+    'weather_model_v2_trader': ['ML2 TR', 'strat-weather'],
+    'weather_model_v2_signal': ['ML2 SIG', 'strat-weather'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;
@@ -700,6 +702,8 @@ function normalizeStrategyKey(key) {
     weather_swing: 'weather_swing_trader',
     weather_model_trader: 'weather_model_trader',
     weather_model_signal: 'weather_model_signal',
+    weather_model_v2_trader: 'weather_model_v2_trader',
+    weather_model_v2_signal: 'weather_model_v2_signal',
   };
   return aliases[key] || key;
 }
@@ -761,6 +765,8 @@ function renderViewTabs(d) {
     'weather_swing',
     'weather_model_trader',
     'weather_model_signal',
+    'weather_model_v2_trader',
+    'weather_model_v2_signal',
     'news',
     'news_whale',
     'bitcoin',
@@ -878,7 +884,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const sportsIndex = order.indexOf('bitcoin_whale');
   order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
@@ -1111,6 +1117,8 @@ function renderSanity(d) {
       weather_swing: 'weather',
       weather_model_trader: 'weather_model',
       weather_model_signal: 'weather_model',
+      weather_model_v2_trader: 'weather_model_v2',
+      weather_model_v2_signal: 'weather_model_v2',
       news: 'news',
       bitcoin: 'crypto_arb',
       bitcoin_model: 'bitcoin_model',
@@ -1126,6 +1134,8 @@ function renderSanity(d) {
       weather_swing: 'swing',
       weather_model_trader: 'trader',
       weather_model_signal: 'signal',
+      weather_model_v2_trader: 'trader',
+      weather_model_v2_signal: 'signal',
     };
     const weatherVariants = runtime.variants || {};
     const weatherVariant = weatherVariants[weatherVariantKeyMap[activeView.key]] || {};
@@ -1151,7 +1161,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : 10))));
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : 10))));
     const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const checks = [
       {
@@ -1292,13 +1302,16 @@ function renderSanity(d) {
       });
     }
 
-    if (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_signal') {
+    if (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_trader' || activeView.key === 'weather_model_v2_signal') {
+      const loadedModelCount = Array.isArray(runtime.models_loaded)
+        ? runtime.models_loaded.length
+        : Object.keys(runtime.models_loaded || {}).length;
       checks.splice(2, 0, {
         label: 'Model bundle loaded',
-        ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.models_loaded || []).length > 0,
+        ok: !!runtime.enabled && !!runtime.bundle_ready && loadedModelCount > 0,
         note: runtime.bundle_error
           ? `${runtime.bundle_error} / ${runtime.bundle_version || 'unknown'}`
-          : `${(runtime.models_loaded || []).length} models / ${runtime.bundle_version || 'unknown'}`,
+          : `${loadedModelCount} models / ${runtime.bundle_version || 'unknown'}`,
       });
       checks.splice(3, 0, {
         label: 'Scored weather markets',
@@ -1315,6 +1328,13 @@ function renderSanity(d) {
         ok: (weatherVariant.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${weatherVariant.last_signals || 0} live / ${p.total_trades || 0} trades`,
       });
+      if (activeView.key === 'weather_model_v2_trader' || activeView.key === 'weather_model_v2_signal') {
+        checks.splice(4, 0, {
+          label: 'V2 bundle route',
+          ok: !!runtime.active_model_dir,
+          note: `${runtime.using_fallback_bundle ? 'fallback' : 'requested'} / ${runtime.active_model_dir || 'none'}`,
+        });
+      }
     }
 
     if (activeView.key === 'weather_latency') {

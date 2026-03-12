@@ -1,0 +1,15 @@
+{
+  "baseline_bundle_frozen": "/Users/ahmedelmorshedy/Downloads/oracle-trader/models/weather_ml/external_only/frozen-legacy-weather-ml-v1",
+  "v2_bundle_target": "/Users/ahmedelmorshedy/Downloads/oracle-trader/models/weather_ml/external_only/legacy-weather-ml-v2",
+  "source_dataset": "/Users/ahmedelmorshedy/Downloads/polymarket-history-lab/data/structured/weather_calibration/markets.jsonl",
+  "artifacts": {
+    "market_metadata": "/Users/ahmedelmorshedy/Downloads/polymarket-history-lab/artifacts/weather_market_metadata.jsonl",
+    "forecast_features": "/Users/ahmedelmorshedy/Downloads/polymarket-history-lab/artifacts/weather_forecast_features.jsonl",
+    "multimodel_features": "/Users/ahmedelmorshedy/Downloads/polymarket-history-lab/artifacts/weather_multimodel_features.jsonl"
+  },
+  "notes": [
+    "Preserve these historical weather inputs separately from the live runtime bundle.",
+    "Weather v2 retraining should read from these immutable paths and emit a new bundle into v2_bundle_target.",
+    "Do not rewrite the frozen baseline bundle or move the original history artifacts."
+  ]
+}

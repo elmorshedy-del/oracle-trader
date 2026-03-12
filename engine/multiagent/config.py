@@ -8,6 +8,18 @@ from typing import Any
 from runtime_paths import LOG_DIR
 
 
+def _env_enabled(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
+
+
+def _opus_llm_router_enabled() -> bool:
+    return _env_enabled("OPUS_ENABLE_LLM_ROUTER", "0") and bool(os.getenv("FIREWORKS_API_KEY", ""))
+
+
+def _opus_llm_task_enabled(flag_name: str, *, default: str = "0") -> bool:
+    return _opus_llm_router_enabled() and _env_enabled(flag_name, default)
+
+
 @dataclass(frozen=True)
 class StrategyCap:
     max_capital_pct: float = 0.25
@@ -189,21 +201,18 @@ class DecisioningConfig:
 
 @dataclass(frozen=True)
 class LLMConfig:
-    enabled: bool = bool(os.getenv("FIREWORKS_API_KEY", ""))
+    enabled: bool = _opus_llm_router_enabled()
     tasks: dict[str, LLMTaskConfig] = field(
         default_factory=lambda: {
             "news_relevance": LLMTaskConfig(
-                enabled=bool(os.getenv("FIREWORKS_API_KEY", "")),
+                enabled=_opus_llm_task_enabled("OPUS_ENABLE_LLM_NEWS_RELEVANCE", default="0"),
                 fallback_provider="",
                 max_calls_per_cycle=int(os.getenv("OPUS_NEWS_MAX_CALLS_PER_CYCLE", "3")),
             ),
             "relationship_linking": LLMTaskConfig(enabled=False),
             "rule_extraction": LLMTaskConfig(enabled=False),
             "trade_gate": LLMTaskConfig(
-                enabled=bool(
-                    os.getenv("OPUS_ENABLE_LLM_TRADE_GATE", "1").lower() in {"1", "true", "yes", "on"}
-                    and os.getenv("FIREWORKS_API_KEY", "")
-                ),
+                enabled=_opus_llm_task_enabled("OPUS_ENABLE_LLM_TRADE_GATE", default="0"),
                 primary_provider=os.getenv("OPUS_TRADE_GATE_PROVIDER", "fireworks"),
                 primary_model=os.getenv("OPUS_TRADE_GATE_MODEL", "accounts/fireworks/models/glm-5"),
                 fallback_provider="",
@@ -212,10 +221,7 @@ class LLMConfig:
                 timeout_seconds=float(os.getenv("OPUS_TRADE_GATE_TIMEOUT_SECONDS", "25")),
             ),
             "exit_judge": LLMTaskConfig(
-                enabled=bool(
-                    os.getenv("OPUS_ENABLE_LLM_EXIT_JUDGE", "1").lower() in {"1", "true", "yes", "on"}
-                    and os.getenv("FIREWORKS_API_KEY", "")
-                ),
+                enabled=_opus_llm_task_enabled("OPUS_ENABLE_LLM_EXIT_JUDGE", default="0"),
                 primary_provider=os.getenv("OPUS_EXIT_JUDGE_PROVIDER", "fireworks"),
                 primary_model=os.getenv("OPUS_EXIT_JUDGE_MODEL", "accounts/fireworks/models/glm-5"),
                 fallback_provider="",

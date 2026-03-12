@@ -39,6 +39,8 @@ EDGE_CONFIDENCE_MULTIPLIER = 0.75
 EDGE_SIZE_USD_MULTIPLIER = 220.0
 SCORE_SIZE_USD_MULTIPLIER = 180.0
 SCORED_MARKET_LIMIT = 16
+DEGRADED_SCORE_ONLY_THRESHOLD = 0.60
+DEGRADED_SCORE_ONLY_MARGIN = 0.01
 
 
 class BitcoinModelBundle:
@@ -156,6 +158,7 @@ class BitcoinModelStrategy(BaseStrategy):
                 "effective_long_threshold": self.cfg.long_threshold,
                 "effective_short_threshold": self.cfg.short_threshold,
                 "effective_direction_margin": self.cfg.min_direction_margin,
+                "last_direction_mode": "neutral",
                 "metrics_supported": True,
                 "funding_supported": True,
                 "supported_source_count": 4,
@@ -264,35 +267,32 @@ class BitcoinModelStrategy(BaseStrategy):
 
         long_score = float(scores["long"])
         short_score = float(scores["short"])
-        if (
-            (
-                snapshot.long_candidate
-                or (
-                    degraded_live_mode
-                    and (
-                        self._degraded_impulse_alignment(snapshot, "bull")
-                        or self._degraded_score_breakout(snapshot, scores, "bull")
-                    )
-                )
-            )
-            and long_score >= long_threshold
-            and (long_score - short_score) >= direction_margin
-        ):
+        self._stats["last_direction_mode"] = "neutral"
+        bull_mode = None
+        if snapshot.long_candidate:
+            bull_mode = "candidate"
+        elif degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bull"):
+            bull_mode = "degraded_impulse"
+        elif degraded_live_mode and self._degraded_score_breakout(snapshot, scores, "bull"):
+            bull_mode = "degraded_breakout"
+        elif degraded_live_mode and self._degraded_score_only(scores, "bull"):
+            bull_mode = "degraded_score_only"
+        bull_margin = DEGRADED_SCORE_ONLY_MARGIN if bull_mode == "degraded_score_only" else direction_margin
+        if bull_mode and long_score >= long_threshold and (long_score - short_score) >= bull_margin:
+            self._stats["last_direction_mode"] = bull_mode
             return "bull"
-        if (
-            (
-                snapshot.short_candidate
-                or (
-                    degraded_live_mode
-                    and (
-                        self._degraded_impulse_alignment(snapshot, "bear")
-                        or self._degraded_score_breakout(snapshot, scores, "bear")
-                    )
-                )
-            )
-            and short_score >= short_threshold
-            and (short_score - long_score) >= direction_margin
-        ):
+        bear_mode = None
+        if snapshot.short_candidate:
+            bear_mode = "candidate"
+        elif degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bear"):
+            bear_mode = "degraded_impulse"
+        elif degraded_live_mode and self._degraded_score_breakout(snapshot, scores, "bear"):
+            bear_mode = "degraded_breakout"
+        elif degraded_live_mode and self._degraded_score_only(scores, "bear"):
+            bear_mode = "degraded_score_only"
+        bear_margin = DEGRADED_SCORE_ONLY_MARGIN if bear_mode == "degraded_score_only" else direction_margin
+        if bear_mode and short_score >= short_threshold and (short_score - long_score) >= bear_margin:
+            self._stats["last_direction_mode"] = bear_mode
             return "bear"
         return "neutral"
 
@@ -352,6 +352,19 @@ class BitcoinModelStrategy(BaseStrategy):
             and signed_ratio <= -max(self.cfg.min_signed_ratio * 5.0, 0.20)
             and directional_efficiency >= max(self.cfg.min_directional_efficiency * 2.0, 0.50)
             and flow_accel <= 0.15
+        )
+
+    def _degraded_score_only(self, scores: dict[str, float], direction: str) -> bool:
+        long_score = float(scores["long"])
+        short_score = float(scores["short"])
+        if direction == "bull":
+            return (
+                long_score >= DEGRADED_SCORE_ONLY_THRESHOLD
+                and (long_score - short_score) >= DEGRADED_SCORE_ONLY_MARGIN
+            )
+        return (
+            short_score >= DEGRADED_SCORE_ONLY_THRESHOLD
+            and (short_score - long_score) >= DEGRADED_SCORE_ONLY_MARGIN
         )
 
     def _build_signals(
@@ -557,6 +570,7 @@ class BitcoinModelStrategy(BaseStrategy):
             "long_candidate": bool(snapshot.long_candidate) if snapshot else False,
             "short_candidate": bool(snapshot.short_candidate) if snapshot else False,
             "degraded_live_mode": bool(self._stats.get("degraded_live_mode")),
+            "direction_mode": self._stats.get("last_direction_mode"),
             "effective_long_threshold": self._stats.get("effective_long_threshold"),
             "effective_short_threshold": self._stats.get("effective_short_threshold"),
             "effective_direction_margin": self._stats.get("effective_direction_margin"),

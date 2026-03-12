@@ -1221,7 +1221,7 @@ function renderSanity(d) {
       checks.splice(6, 0, {
         label: 'BTC ML flow',
         ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
-        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
+        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}${runtime.last_direction_mode ? ` (${runtime.last_direction_mode})` : ''} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
       });
     }
 

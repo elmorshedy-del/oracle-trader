@@ -747,9 +747,9 @@ class PaperTrader:
                 exits.append((pos, current, reason))
                 queued_positions.add(id(pos))
 
-        # Trim legacy overlapping directional positions that now map to the same
-        # grouped thesis. This lets old weather/crypto ladders clean themselves
-        # up after deploy without requiring a portfolio reset.
+        # Trim overlapping grouped theses, but respect strategy-specific
+        # grouping limits for sleeves like BTC ML that intentionally allow
+        # limited same-thesis scaling.
         grouped_positions: dict[str, list[Position]] = {}
         for pos in self.portfolio.positions:
             if id(pos) in queued_positions:
@@ -761,7 +761,13 @@ class PaperTrader:
             grouped_positions.setdefault(pos.group_key, []).append(pos)
 
         for group_key, positions in grouped_positions.items():
-            if len(positions) <= 1:
+            source = positions[0].source
+            group_limit = (
+                BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+                if source == SignalSource.BITCOIN_MODEL
+                else 1
+            )
+            if len(positions) <= group_limit:
                 continue
             positions.sort(
                 key=lambda pos: (
@@ -771,7 +777,7 @@ class PaperTrader:
                 ),
                 reverse=True,
             )
-            for pos in positions[1:]:
+            for pos in positions[group_limit:]:
                 exit_price = current_prices.get(pos.token_id, pos.current_price)
                 if exit_price <= 0:
                     exit_price = pos.current_price
@@ -780,7 +786,7 @@ class PaperTrader:
             logger.info(
                 "[RISK] Rebalancing grouped thesis %s: trimmed %s overlapping positions",
                 group_key,
-                len(positions) - 1,
+                len(positions) - group_limit,
             )
 
         # Keep liquidity from monopolizing the portfolio. Trim the oldest hedge

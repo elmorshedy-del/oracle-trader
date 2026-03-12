@@ -1194,6 +1194,7 @@ function renderSanity(d) {
 
     if (activeView.key === 'bitcoin_model') {
       const feedStats = runtime.feed_stats || {};
+      const minFresh = runtime.min_source_fresh_score || 0.5;
       checks.splice(2, 0, {
         label: 'Model bundle loaded',
         ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.feature_count || 0) > 0,
@@ -1203,8 +1204,8 @@ function renderSanity(d) {
       });
       checks.splice(3, 0, {
         label: 'Live BTC feed ready',
-        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && (runtime.last_source_fresh_score || 0) >= 0.75,
-        note: `${feedStats.trade_events || 0} trades / fresh ${(runtime.last_source_fresh_score || 0).toFixed(2)}`,
+        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && (runtime.last_source_fresh_score || 0) >= minFresh,
+        note: `${feedStats.trade_events || 0} trades / fresh ${(runtime.last_source_fresh_score || 0).toFixed(2)} / ${(minFresh).toFixed(2)}`,
       });
       checks.splice(4, 0, {
         label: 'Scored BTC markets',

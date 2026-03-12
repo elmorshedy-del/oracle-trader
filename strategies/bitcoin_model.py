@@ -136,6 +136,7 @@ class BitcoinModelStrategy(BaseStrategy):
                 "bundle_error": self.bundle.load_error,
                 "model_dir": str(self.bundle.model_dir),
                 "feature_count": len(self.bundle.feature_names.get("long") or []),
+                "min_source_fresh_score": self.cfg.min_source_fresh_score,
                 "candidate_markets": 0,
                 "matched_markets": 0,
                 "scored_markets": 0,
@@ -444,4 +445,3 @@ class BitcoinModelStrategy(BaseStrategy):
             "feed": self.feed.stats,
         }
         self.feed.append_log(payload)
-

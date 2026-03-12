@@ -157,6 +157,7 @@ class BitcoinModelStrategy(BaseStrategy):
             gdelt_enabled=self.cfg.gdelt_enabled,
             gdelt_poll_seconds=self.cfg.gdelt_poll_seconds,
             gdelt_max_records=self.cfg.gdelt_max_records,
+            rss_feeds=list(getattr(getattr(config, "news", None), "rss_feeds", []) or []),
             x_bearer_token=self.cfg.x_bearer_token,
             x_stream_enabled=self.cfg.x_stream_enabled,
             x_rule_tag=self.cfg.x_rule_tag,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import xml.etree.ElementTree as ET
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,16 @@ X_RULES_URL = "https://api.x.com/2/tweets/search/stream/rules"
 X_STREAM_URL = "https://api.x.com/2/tweets/search/stream"
 MAX_CONTEXT_ITEMS = 500
 MAX_RECENT_SUMMARY_ITEMS = 6
+BTC_RSS_KEYWORDS = (
+    "bitcoin",
+    " btc ",
+    "btc ",
+    " btc",
+    "crypto",
+    "cryptocurrency",
+    "etf",
+    "blockchain",
+)
 
 BTC_BULLISH_TERMS = {
     "approval", "adoption", "accumulate", "inflow", "reserve", "treasury",
@@ -63,6 +74,8 @@ class BitcoinContextFeed:
         gdelt_enabled: bool,
         gdelt_poll_seconds: int,
         gdelt_max_records: int,
+        rss_feeds: list[str] | None = None,
+        rss_poll_seconds: int = 180,
         x_bearer_token: str,
         x_stream_enabled: bool,
         x_rule_tag: str,
@@ -78,6 +91,8 @@ class BitcoinContextFeed:
         self.gdelt_enabled = gdelt_enabled
         self.gdelt_poll_seconds = max(60, int(gdelt_poll_seconds))
         self.gdelt_max_records = max(5, int(gdelt_max_records))
+        self.rss_feeds = tuple(feed.strip() for feed in (rss_feeds or []) if str(feed).strip())
+        self.rss_poll_seconds = max(120, int(rss_poll_seconds))
         self.x_bearer_token = x_bearer_token.strip()
         self.x_stream_enabled = x_stream_enabled
         self.x_rule_tag = x_rule_tag.strip() or "oracle-btc-context"
@@ -96,9 +111,11 @@ class BitcoinContextFeed:
             "enabled": enabled,
             "newsapi_configured": bool(self.newsapi_key),
             "gdelt_enabled": gdelt_enabled,
+            "rss_enabled": bool(self.rss_feeds),
             "x_configured": bool(self.x_bearer_token and self.x_rule_value),
             "newsapi_ok": False,
             "gdelt_ok": False,
+            "rss_ok": False,
             "x_connected": False,
             "recent_items": 0,
             "last_item_at": None,
@@ -106,6 +123,7 @@ class BitcoinContextFeed:
             "feed_errors": 0,
             "newsapi_polls": 0,
             "gdelt_polls": 0,
+            "rss_polls": 0,
             "x_items": 0,
             "log_entries": 0,
             "last_log_at": None,
@@ -143,6 +161,8 @@ class BitcoinContextFeed:
             self._tasks.append(asyncio.create_task(self._newsapi_loop(), name="btc-newsapi-context"))
         if self.gdelt_enabled:
             self._tasks.append(asyncio.create_task(self._gdelt_loop(), name="btc-gdelt-context"))
+        if self.rss_feeds:
+            self._tasks.append(asyncio.create_task(self._rss_loop(), name="btc-rss-context"))
         if self.x_stream_enabled and self.x_bearer_token and self.x_rule_value:
             self._tasks.append(asyncio.create_task(self._x_stream_loop(), name="btc-x-context"))
 
@@ -156,8 +176,18 @@ class BitcoinContextFeed:
         await self.client.aclose()
 
     def snapshot(self) -> ContextSnapshot:
-        provider_count = int(bool(self.newsapi_key)) + int(bool(self.gdelt_enabled)) + int(bool(self.x_bearer_token and self.x_rule_value and self.x_stream_enabled))
-        healthy_provider_count = int(bool(self._stats.get("newsapi_ok"))) + int(bool(self._stats.get("gdelt_ok"))) + int(bool(self._stats.get("x_connected")))
+        provider_count = (
+            int(bool(self.newsapi_key))
+            + int(bool(self.gdelt_enabled))
+            + int(bool(self.rss_feeds))
+            + int(bool(self.x_bearer_token and self.x_rule_value and self.x_stream_enabled))
+        )
+        healthy_provider_count = (
+            int(bool(self._stats.get("newsapi_ok")))
+            + int(bool(self._stats.get("gdelt_ok")))
+            + int(bool(self._stats.get("rss_ok")))
+            + int(bool(self._stats.get("x_connected")))
+        )
         if not self.enabled:
             return ContextSnapshot("disabled", "neutral", 0.0, 0, provider_count, healthy_provider_count, None, "normal", ["context disabled"])
 
@@ -251,6 +281,20 @@ class BitcoinContextFeed:
                 logger.warning("[BTC_ML] GDELT context poll failed: %s", exc)
             await asyncio.sleep(self.gdelt_poll_seconds)
 
+    async def _rss_loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                await self._poll_rss()
+                self._stats["rss_ok"] = True
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._stats["rss_ok"] = False
+                self._stats["feed_errors"] += 1
+                self._stats["last_error"] = f"rss:{type(exc).__name__}"
+                logger.warning("[BTC_ML] RSS context poll failed: %s", exc)
+            await asyncio.sleep(self.rss_poll_seconds)
+
     async def _x_stream_loop(self) -> None:
         headers = {"Authorization": f"Bearer {self.x_bearer_token}"}
         while not self._stop.is_set():
@@ -339,6 +383,27 @@ class BitcoinContextFeed:
             )
         self._stats["gdelt_polls"] += 1
 
+    async def _poll_rss(self) -> None:
+        seen_feed = False
+        for feed_url in self.rss_feeds:
+            response = await self.client.get(feed_url)
+            response.raise_for_status()
+            seen_feed = True
+            for item in _parse_rss_items(response.text):
+                title = item["title"]
+                summary = item.get("summary") or ""
+                if not _looks_like_btc_story(title, summary):
+                    continue
+                self._ingest_item(
+                    item_id=f"rss:{item['url'] or title}",
+                    source=item["source"],
+                    title=title,
+                    url=item["url"],
+                    published_at=item["published_at"],
+                )
+        if seen_feed:
+            self._stats["rss_polls"] += 1
+
     async def _ensure_x_rule(self, headers: dict[str, str]) -> None:
         response = await self.client.get(X_RULES_URL, headers=headers)
         response.raise_for_status()
@@ -412,6 +477,41 @@ def _classify_btc_context(text: str, source: str) -> tuple[str, float]:
     if bear_hits > bull_hits:
         return "bear", magnitude
     return "neutral", 0.18 if impact_hits else 0.0
+
+
+def _looks_like_btc_story(title: str, summary: str) -> bool:
+    text = f" {title.lower()} {summary.lower()} "
+    return any(keyword in text for keyword in BTC_RSS_KEYWORDS)
+
+
+def _parse_rss_items(xml_text: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    root = ET.fromstring(xml_text)
+    for item in root.iter("item"):
+        title_el = item.find("title")
+        link_el = item.find("link")
+        desc_el = item.find("description")
+        pub_el = item.find("pubDate")
+        title = (title_el.text or "").strip() if title_el is not None and title_el.text else ""
+        if not title:
+            continue
+        url = (link_el.text or "").strip() if link_el is not None and link_el.text else ""
+        summary = (desc_el.text or "").strip() if desc_el is not None and desc_el.text else ""
+        published_at = _parse_datetime(pub_el.text if pub_el is not None else None)
+        source = "rss"
+        if url:
+            try:
+                source = url.split("/")[2]
+            except IndexError:
+                source = "rss"
+        items.append({
+            "title": title,
+            "url": url,
+            "summary": summary,
+            "published_at": published_at,
+            "source": source,
+        })
+    return items
 
 
 def _parse_datetime(raw: Any) -> datetime:

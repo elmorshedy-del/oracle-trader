@@ -48,6 +48,7 @@ STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.WEATHER_SWING: 18.0,
     SignalSource.WEATHER_MODEL_TRADER: 12.0,
     SignalSource.WEATHER_MODEL_SIGNAL: 10.0,
+    SignalSource.SPORTS_MODEL: 8.0,
     SignalSource.MEAN_REVERSION: 24.0,
 }
 STALE_DIRECTIONAL_FLAT_PNL_PCT = 0.08
@@ -105,6 +106,7 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_MODEL_TRADER: 1.00,
     SignalSource.WEATHER_MODEL_SIGNAL: 1.00,
     SignalSource.BITCOIN_MODEL: 1.00,
+    SignalSource.SPORTS_MODEL: 1.00,
     SignalSource.WHALE: 0.35,
 }
 SOURCE_POSITION_LIMITS = {
@@ -116,6 +118,7 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WEATHER_MODEL_TRADER: 20,
     SignalSource.WEATHER_MODEL_SIGNAL: 14,
     SignalSource.BITCOIN_MODEL: 12,
+    SignalSource.SPORTS_MODEL: 16,
     SignalSource.WHALE: 16,
 }
 SOURCE_SCAN_LIMITS = {
@@ -127,6 +130,7 @@ SOURCE_SCAN_LIMITS = {
     SignalSource.WEATHER_MODEL_TRADER: 8,
     SignalSource.WEATHER_MODEL_SIGNAL: 5,
     SignalSource.BITCOIN_MODEL: 4,
+    SignalSource.SPORTS_MODEL: 6,
     SignalSource.WHALE: 6,
 }
 CRYPTO_SOURCES = {

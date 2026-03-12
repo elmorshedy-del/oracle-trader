@@ -21,6 +21,7 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.bitcoin_model import BitcoinModelStrategy
+from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_model import WeatherModelStrategy
 from strategies.bundle_arb import BundleArbitrageStrategy
@@ -91,6 +92,12 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.BITCOIN_MODEL.value,
         "signal_sources": (SignalSource.BITCOIN_MODEL.value,),
     },
+    "sports": {
+        "label": "Sports",
+        "strategy": "sports_model",
+        "source": SignalSource.SPORTS_MODEL.value,
+        "signal_sources": (SignalSource.SPORTS_MODEL.value,),
+    },
     "bitcoin_whale": {
         "label": "Bitcoin + Whale",
         "strategy": "crypto_arb",
@@ -143,6 +150,7 @@ class Pipeline:
                 self.config,
                 crypto_strategy=self.strategies["crypto_arb"],
             ),
+            "sports_model": SportsModelStrategy(self.config),
         }
 
         # Engine
@@ -337,6 +345,23 @@ class Pipeline:
                 bitcoin_model._stats["errors"] += 1
                 strategy_signals["bitcoin_model"] = []
                 self.health.record_strategy_error("bitcoin_model", str(e))
+
+            sports_model: SportsModelStrategy = self.comparison_only_strategies["sports_model"]
+            try:
+                _sports_model_start = _time.time()
+                sports_model_signals = await sports_model.scan(self._markets, self._events)
+                _sports_model_dur = (_time.time() - _sports_model_start) * 1000
+                strategy_signals["sports_model"] = sports_model_signals
+                self.health.record_strategy_run(
+                    "sports_model",
+                    len(sports_model_signals),
+                    _sports_model_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy sports_model error: {e}")
+                sports_model._stats["errors"] += 1
+                strategy_signals["sports_model"] = []
+                self.health.record_strategy_error("sports_model", str(e))
 
             # Skip per-signal whale confirmation (was making 600+ API calls per scan)
             # Whale data is still loaded and available for the dashboard
@@ -597,6 +622,8 @@ class Pipeline:
             return self.config.weather_model.signal_budget_usd
         if view_key == "bitcoin_model":
             return self.config.bitcoin_model.budget_usd
+        if view_key == "sports":
+            return self.config.sports_model.budget_usd
         return self.config.risk.max_total_exposure_usd
 
     def _write_diagnostic_entry(
@@ -733,6 +760,7 @@ class Pipeline:
                 "bundle_arb": self.bundle_arb_strategy.stats,
                 "weather_model": self.comparison_only_strategies["weather_model"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
+                "sports_model": self.comparison_only_strategies["sports_model"].stats,
             },
             "whale_wallets": [
                 {

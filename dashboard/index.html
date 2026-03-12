@@ -198,6 +198,7 @@
   .strat-mean { background: var(--red-dim); color: var(--red); }
   .strat-crypto { background: #1de9b622; color: #1de9b6; }
   .strat-weather { background: #ffab4022; color: #ffab40; }
+  .strat-sports { background: #40c4ff22; color: #40c4ff; }
 
   /* Confidence bar */
   .conf-bar {
@@ -668,6 +669,7 @@ function stratBadge(source) {
     'mean_reversion': ['MEAN', 'strat-mean'],
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
     'bitcoin_futures_ml': ['BTC ML', 'strat-crypto'],
+    'sports_nba_model': ['SPORTS', 'strat-sports'],
     'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
     'weather_forecast': ['WX', 'strat-weather'],
@@ -691,6 +693,7 @@ function normalizeStrategyKey(key) {
     mean_reversion: 'mean_reversion',
     crypto_arb: 'crypto_temporal_arb',
     bitcoin_model: 'bitcoin_futures_ml',
+    sports_model: 'sports_nba_model',
     weather: 'weather_forecast',
     weather_sniper: 'weather_sniper',
     weather_latency: 'weather_latency_hunter',
@@ -762,6 +765,7 @@ function renderViewTabs(d) {
     'news_whale',
     'bitcoin',
     'bitcoin_model',
+    'sports',
     'bitcoin_whale',
     'arbitrage',
     'bundle_arb',
@@ -875,6 +879,8 @@ function render(d) {
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
   const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const sportsIndex = order.indexOf('bitcoin_whale');
+  order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
     const view = comparisonViews[key];
     const perfStats = view.performance || {};
@@ -1108,6 +1114,7 @@ function renderSanity(d) {
       news: 'news',
       bitcoin: 'crypto_arb',
       bitcoin_model: 'bitcoin_model',
+      sports: 'sports_model',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',
     };
@@ -1145,6 +1152,7 @@ function renderSanity(d) {
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
         : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : 10))));
+    const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const checks = [
       {
         label: 'Portfolio funded',
@@ -1165,8 +1173,8 @@ function renderSanity(d) {
       },
       {
         label: 'Capacity available',
-        ok: (p.cash || 0) > 25 || positions.length < openCap,
-        note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${openCap})`,
+        ok: (p.cash || 0) > 25 || positions.length < resolvedOpenCap,
+        note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
       },
     ];
 
@@ -1234,6 +1242,30 @@ function renderSanity(d) {
         label: 'BTC ML flow',
         ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}${runtime.last_direction_mode ? ` (${runtime.last_direction_mode})` : ''} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
+      });
+    }
+
+    if (activeView.key === 'sports') {
+      const feedStats = runtime.feed_stats || {};
+      checks.splice(2, 0, {
+        label: 'NBA feed ready',
+        ok: (runtime.games_loaded || 0) > 0 && !feedStats.last_error,
+        note: `${runtime.games_loaded || 0} games / ${feedStats.line_move_candidates || 0} movers`,
+      });
+      checks.splice(3, 0, {
+        label: 'Matched sports markets',
+        ok: (runtime.matched_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.matched_markets || 0} matched / ${runtime.candidate_markets || 0} candidates`,
+      });
+      checks.splice(4, 0, {
+        label: 'Scored markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.last_signals || 0} live`,
+      });
+      checks.splice(5, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
       });
     }
 

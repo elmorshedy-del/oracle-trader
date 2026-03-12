@@ -321,6 +321,37 @@ class BitcoinModelConfig:
 
 
 @dataclass
+class SportsModelConfig:
+    """Standalone NBA sportsbook-anchor sleeve (comparison-book only)."""
+    enabled: bool = os.getenv("SPORTS_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    budget_usd: float = float(os.getenv("SPORTS_MODEL_BUDGET_USD", "800"))
+    league: str = os.getenv("SPORTS_MODEL_LEAGUE", "nba")
+    scoreboard_url: str = os.getenv(
+        "SPORTS_MODEL_SCOREBOARD_URL",
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+    )
+    refresh_seconds: int = int(os.getenv("SPORTS_MODEL_REFRESH_SECONDS", "90"))
+    market_horizon_hours: float = float(os.getenv("SPORTS_MODEL_MARKET_HORIZON_HOURS", "30"))
+    min_hours_to_tip: float = float(os.getenv("SPORTS_MODEL_MIN_HOURS_TO_TIP", "0.35"))
+    max_hours_to_tip: float = float(os.getenv("SPORTS_MODEL_MAX_HOURS_TO_TIP", "30"))
+    min_edge: float = float(os.getenv("SPORTS_MODEL_MIN_EDGE", "0.08"))
+    max_entry_price: float = float(os.getenv("SPORTS_MODEL_MAX_ENTRY_PRICE", "0.84"))
+    min_size_usd: float = float(os.getenv("SPORTS_MODEL_MIN_SIZE_USD", "25"))
+    max_size_usd: float = float(os.getenv("SPORTS_MODEL_MAX_SIZE_USD", "140"))
+    max_signals_per_scan: int = int(os.getenv("SPORTS_MODEL_MAX_SIGNALS_PER_SCAN", "8"))
+    min_market_liquidity_usd: float = float(os.getenv("SPORTS_MODEL_MIN_MARKET_LIQUIDITY_USD", "2000"))
+    min_market_volume_usd: float = float(os.getenv("SPORTS_MODEL_MIN_MARKET_VOLUME_USD", "1000"))
+    line_move_points_threshold: float = float(os.getenv("SPORTS_MODEL_LINE_MOVE_POINTS_THRESHOLD", "1.0"))
+    spread_points_scale: float = float(os.getenv("SPORTS_MODEL_SPREAD_POINTS_SCALE", "5.5"))
+    total_points_scale: float = float(os.getenv("SPORTS_MODEL_TOTAL_POINTS_SCALE", "9.0"))
+    max_spread_line_gap: float = float(os.getenv("SPORTS_MODEL_MAX_SPREAD_LINE_GAP", "4.0"))
+    max_total_line_gap: float = float(os.getenv("SPORTS_MODEL_MAX_TOTAL_LINE_GAP", "12.0"))
+    win_prob_edge_floor: float = float(os.getenv("SPORTS_MODEL_WIN_PROB_EDGE_FLOOR", "0.06"))
+    total_prob_edge_floor: float = float(os.getenv("SPORTS_MODEL_TOTAL_PROB_EDGE_FLOOR", "0.08"))
+    spread_prob_edge_floor: float = float(os.getenv("SPORTS_MODEL_SPREAD_PROB_EDGE_FLOOR", "0.08"))
+
+
+@dataclass
 class MeanReversionConfig:
     """Mean reversion — competing signal strategy."""
     enabled: bool = True
@@ -354,6 +385,7 @@ class PipelineConfig:
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
+    sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     # Pipeline modes

@@ -74,6 +74,15 @@ MONTHS = {
 WEATHER_CITY_GROUP_ALIASES = {
     "nyc": "new-york",
 }
+WEATHER_POST_EVENT_ROTATION_HOURS = 30.0
+WEATHER_STALE_ROTATION_PNL_PCT = {
+    SignalSource.WEATHER: 0.12,
+    SignalSource.WEATHER_SNIPER: 0.20,
+    SignalSource.WEATHER_LATENCY: 0.18,
+    SignalSource.WEATHER_SWING: 0.15,
+    SignalSource.WEATHER_MODEL_TRADER: 0.14,
+    SignalSource.WEATHER_MODEL_SIGNAL: 0.14,
+}
 STRATEGY_EXPOSURE_CAPS = {
     SignalSource.LIQUIDITY: 0.25,
     SignalSource.ARBITRAGE: 0.20,
@@ -670,7 +679,7 @@ class PaperTrader:
                 reason = f"CONVERGED: {pos.side} at ${current:.3f}"
 
             else:
-                stale_reason = self._stale_directional_reason(pos, age_hours, pnl_pct)
+                stale_reason = self._stale_directional_reason(pos, age_hours, pnl_pct, now)
                 if stale_reason:
                     reason = stale_reason
 
@@ -852,15 +861,32 @@ class PaperTrader:
         pos: Position,
         age_hours: float,
         pnl_pct: float,
+        now: datetime | None = None,
     ) -> str | None:
+        now = now or datetime.now(timezone.utc)
         max_age = STALE_DIRECTIONAL_ROTATION_HOURS.get(pos.source)
         if max_age is None:
             return None
+        if pos.source in WEATHER_SOURCES:
+            target_date = self._weather_group_target_date(pos)
+            if target_date and now >= target_date + timedelta(hours=WEATHER_POST_EVENT_ROTATION_HOURS):
+                return f"STALE_ROTATE: weather post-event {age_hours:.1f}h @ {pnl_pct:+.1%}"
         if pnl_pct <= STALE_DIRECTIONAL_LOSS_CUT_PCT and age_hours >= STALE_DIRECTIONAL_LOSS_CUT_HOURS:
             return f"STALE_STOP: {age_hours:.1f}h @ {pnl_pct:+.1%}"
-        if age_hours >= max_age and abs(pnl_pct) <= STALE_DIRECTIONAL_FLAT_PNL_PCT:
+        flat_threshold = WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
+        if age_hours >= max_age and abs(pnl_pct) <= flat_threshold:
             return f"STALE_ROTATE: {age_hours:.1f}h @ {pnl_pct:+.1%}"
         return None
+
+    def _weather_group_target_date(self, pos: Position) -> datetime | None:
+        group_key = pos.group_key or self._infer_group_key(pos)
+        if not group_key or not group_key.startswith("weather:"):
+            return None
+        _, _, date_text = group_key.split(":", 2)
+        try:
+            return datetime.strptime(date_text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""

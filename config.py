@@ -257,7 +257,7 @@ class BitcoinModelConfig:
     max_barrier_distance_pct: float = float(os.getenv("BITCOIN_MODEL_MAX_BARRIER_DISTANCE_PCT", "1.00"))
     min_size_usd: float = float(os.getenv("BITCOIN_MODEL_MIN_SIZE_USD", "20"))
     max_size_usd: float = float(os.getenv("BITCOIN_MODEL_MAX_SIZE_USD", "120"))
-    max_signals_per_scan: int = int(os.getenv("BITCOIN_MODEL_MAX_SIGNALS_PER_SCAN", "3"))
+    max_signals_per_scan: int = int(os.getenv("BITCOIN_MODEL_MAX_SIGNALS_PER_SCAN", "6"))
 
     symbol: str = os.getenv("BITCOIN_MODEL_SYMBOL", "BTCUSDT")
     bucket_seconds: int = int(os.getenv("BITCOIN_MODEL_BUCKET_SECONDS", "5"))
@@ -286,6 +286,9 @@ class BitcoinModelConfig:
     )
     polymarket_ping_seconds: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_PING_SECONDS", "10"))
     polymarket_quote_ttl_seconds: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_QUOTE_TTL_SECONDS", "60"))
+    polymarket_recent_quote_grace_seconds: int = int(
+        os.getenv("BITCOIN_MODEL_POLYMARKET_RECENT_QUOTE_GRACE_SECONDS", "180")
+    )
     polymarket_max_watch_assets: int = int(os.getenv("BITCOIN_MODEL_POLYMARKET_MAX_WATCH_ASSETS", "120"))
 
     context_enabled: bool = os.getenv("BITCOIN_MODEL_CONTEXT_ENABLED", "1").lower() not in {"0", "false", "no", "off"}

@@ -144,6 +144,7 @@ class BitcoinModelStrategy(BaseStrategy):
             ws_url=self.cfg.polymarket_market_ws_url,
             ping_seconds=self.cfg.polymarket_ping_seconds,
             quote_ttl_seconds=self.cfg.polymarket_quote_ttl_seconds,
+            recent_quote_grace_seconds=self.cfg.polymarket_recent_quote_grace_seconds,
             max_watch_assets=self.cfg.polymarket_max_watch_assets,
             log_path=self.market_log_path,
         )
@@ -197,6 +198,7 @@ class BitcoinModelStrategy(BaseStrategy):
                 "supported_source_count": 4,
                 "last_signals": 0,
                 "last_live_quote_assets": 0,
+                "last_recent_quote_assets": 0,
                 "last_live_lagged_markets": 0,
                 "last_context_regime": "disabled",
                 "last_context_bias": "neutral",
@@ -359,6 +361,7 @@ class BitcoinModelStrategy(BaseStrategy):
         self._stats["funding_supported"] = bool(feed_stats.get("funding_supported", True))
         self._stats["supported_source_count"] = int(feed_stats.get("supported_source_count") or 4)
         self._stats["last_live_quote_assets"] = int(market_feed_stats.get("quoted_assets") or 0)
+        self._stats["last_recent_quote_assets"] = int(market_feed_stats.get("recent_quoted_assets") or 0)
 
     def _is_degraded_live_mode(self, snapshot: FeedSnapshot) -> bool:
         return (
@@ -633,8 +636,8 @@ class BitcoinModelStrategy(BaseStrategy):
         return False
 
     def _resolve_live_quotes(self, *, yes_token_id: str, no_token_id: str) -> dict[str, float | None]:
-        yes_quote = self.market_feed.quote(yes_token_id)
-        no_quote = self.market_feed.quote(no_token_id)
+        yes_quote = self.market_feed.quote(yes_token_id, allow_recent_stale=True)
+        no_quote = self.market_feed.quote(no_token_id, allow_recent_stale=True)
         return {
             "yes_mid": None if not yes_quote else yes_quote.midpoint,
             "yes_bid": None if not yes_quote else yes_quote.best_bid,
@@ -858,6 +861,7 @@ class BitcoinModelStrategy(BaseStrategy):
             "effective_direction_margin": self._stats.get("effective_direction_margin"),
             "fast_lane_ready": bool(self._stats.get("feed_stats", {}).get("fast_lane_ready")),
             "live_quote_assets": int(market_stats.get("quoted_assets") or 0),
+            "recent_quote_assets": int(market_stats.get("recent_quoted_assets") or 0),
             "lagged_markets": int(self._stats.get("last_live_lagged_markets") or 0),
             "context_regime": None if not context_snapshot else context_snapshot.regime,
             "context_bias": None if not context_snapshot else context_snapshot.bias,
@@ -878,6 +882,7 @@ class BitcoinModelStrategy(BaseStrategy):
                 "connected": bool(market_stats.get("connected")),
                 "watched_assets": int(market_stats.get("watched_assets") or 0),
                 "quoted_assets": int(market_stats.get("quoted_assets") or 0),
+                "recent_quoted_assets": int(market_stats.get("recent_quoted_assets") or 0),
                 "quote_updates": int(market_stats.get("quote_updates") or 0),
                 "last_quote_at": market_stats.get("last_quote_at"),
                 "last_error": market_stats.get("last_error"),

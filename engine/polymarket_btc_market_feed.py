@@ -34,12 +34,16 @@ class PolymarketBtcMarketFeed:
         ws_url: str = DEFAULT_POLYMARKET_MARKET_WS_URL,
         ping_seconds: int = 10,
         quote_ttl_seconds: int = 25,
+        recent_quote_grace_seconds: int = 180,
         max_watch_assets: int = 120,
         log_path: Path | None = None,
     ):
         self.ws_url = ws_url
         self.ping_seconds = max(5, int(ping_seconds))
         self.quote_ttl = timedelta(seconds=max(5, int(quote_ttl_seconds)))
+        self.recent_quote_grace = timedelta(
+            seconds=max(int(recent_quote_grace_seconds), int(quote_ttl_seconds), 5)
+        )
         self.max_watch_assets = max(8, int(max_watch_assets))
         self.log_path = Path(log_path) if log_path else None
         if self.log_path:
@@ -59,6 +63,7 @@ class PolymarketBtcMarketFeed:
             "last_error": "",
             "watched_assets": 0,
             "quoted_assets": 0,
+            "recent_quoted_assets": 0,
             "last_watch_update_at": None,
             "last_message_at": None,
             "last_quote_at": None,
@@ -76,6 +81,7 @@ class PolymarketBtcMarketFeed:
         stats = dict(self._stats)
         stats["watched_assets"] = len(self._watched_assets)
         stats["quoted_assets"] = len(self._fresh_quotes())
+        stats["recent_quoted_assets"] = len(self._recent_quotes())
         return stats
 
     async def ensure_started(self) -> None:
@@ -110,11 +116,12 @@ class PolymarketBtcMarketFeed:
                 self._stats["last_error"] = f"watchlist:{type(exc).__name__}"
                 logger.warning("[BTC_ML] Polymarket watchlist refresh failed: %s", exc)
 
-    def quote(self, asset_id: str) -> PolymarketAssetQuote | None:
+    def quote(self, asset_id: str, *, allow_recent_stale: bool = False) -> PolymarketAssetQuote | None:
         quote = self._quotes.get(asset_id)
         if not quote:
             return None
-        if datetime.now(UTC) - _parse_iso(quote.updated_at) > self.quote_ttl:
+        max_age = self.recent_quote_grace if allow_recent_stale else self.quote_ttl
+        if datetime.now(UTC) - _parse_iso(quote.updated_at) > max_age:
             return None
         return quote
 
@@ -216,7 +223,7 @@ class PolymarketBtcMarketFeed:
         fresh_ids = {
             asset_id
             for asset_id, quote in self._quotes.items()
-            if datetime.now(UTC) - _parse_iso(quote.updated_at) <= self.quote_ttl
+            if datetime.now(UTC) - _parse_iso(quote.updated_at) <= self.recent_quote_grace
         }
         if len(fresh_ids) == len(self._quotes):
             return
@@ -232,6 +239,14 @@ class PolymarketBtcMarketFeed:
             asset_id: quote
             for asset_id, quote in self._quotes.items()
             if now - _parse_iso(quote.updated_at) <= self.quote_ttl
+        }
+
+    def _recent_quotes(self) -> dict[str, PolymarketAssetQuote]:
+        now = datetime.now(UTC)
+        return {
+            asset_id: quote
+            for asset_id, quote in self._quotes.items()
+            if now - _parse_iso(quote.updated_at) <= self.recent_quote_grace
         }
 
 

@@ -1144,7 +1144,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 8 : 10))));
+        : (activeView.key === 'weather_model_trader' ? 20 : (activeView.key === 'weather_model_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : 10))));
     const checks = [
       {
         label: 'Portfolio funded',
@@ -1212,8 +1212,8 @@ function renderSanity(d) {
       });
       checks.splice(4, 0, {
         label: 'Polymarket lag lane',
-        ok: !!marketFeedStats.connected && ((marketFeedStats.quoted_assets || 0) > 0 || (marketFeedStats.watched_assets || 0) > 0),
-        note: `${marketFeedStats.quoted_assets || 0} quoted / ${marketFeedStats.watched_assets || 0} watched / ${runtime.last_live_lagged_markets || 0} lagged`,
+        ok: !!marketFeedStats.connected && (((marketFeedStats.quoted_assets || 0) > 0) || ((marketFeedStats.recent_quoted_assets || 0) > 0) || (marketFeedStats.watched_assets || 0) > 0),
+        note: `${marketFeedStats.quoted_assets || 0} fresh / ${marketFeedStats.recent_quoted_assets || 0} recent / ${marketFeedStats.watched_assets || 0} watched / ${runtime.last_live_lagged_markets || 0} lagged`,
       });
       checks.splice(5, 0, {
         label: 'Context lane',

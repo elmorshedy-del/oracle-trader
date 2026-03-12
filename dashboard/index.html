@@ -1195,6 +1195,7 @@ function renderSanity(d) {
     if (activeView.key === 'bitcoin_model') {
       const feedStats = runtime.feed_stats || {};
       const minFresh = runtime.min_source_fresh_score || 0.5;
+      const effectiveFresh = runtime.last_effective_source_fresh_score || runtime.last_source_fresh_score || 0;
       checks.splice(2, 0, {
         label: 'Model bundle loaded',
         ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.feature_count || 0) > 0,
@@ -1204,8 +1205,8 @@ function renderSanity(d) {
       });
       checks.splice(3, 0, {
         label: 'Live BTC feed ready',
-        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && (runtime.last_source_fresh_score || 0) >= minFresh,
-        note: `${feedStats.trade_events || 0} trades / fresh ${(runtime.last_source_fresh_score || 0).toFixed(2)} / ${(minFresh).toFixed(2)}`,
+        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && effectiveFresh >= minFresh,
+        note: `${feedStats.trade_events || 0} trades / fresh ${(effectiveFresh).toFixed(2)} / ${(minFresh).toFixed(2)}${(runtime.metrics_supported === false || runtime.funding_supported === false) ? ' degraded-live' : ''}`,
       });
       checks.splice(4, 0, {
         label: 'Scored BTC markets',
@@ -1220,7 +1221,7 @@ function renderSanity(d) {
       checks.splice(6, 0, {
         label: 'BTC ML flow',
         ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
-        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}`,
+        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
       });
     }
 

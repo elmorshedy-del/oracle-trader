@@ -64,6 +64,7 @@ class FeedSnapshot:
     last_price: float | None
     last_bucket_at: str | None
     source_fresh_score: float
+    effective_source_fresh_score: float
     long_candidate: bool
     short_candidate: bool
     diagnostics: dict[str, Any]
@@ -122,6 +123,9 @@ class BinanceBtcFeatureFeed:
         self._stats: dict[str, Any] = {
             "stream_connected": False,
             "depth_stream_connected": False,
+            "metrics_supported": True,
+            "funding_supported": True,
+            "supported_source_count": 4,
             "reconnects": 0,
             "feed_errors": 0,
             "last_error": "",
@@ -135,6 +139,7 @@ class BinanceBtcFeatureFeed:
             "last_funding_at": None,
             "last_snapshot_at": None,
             "last_source_fresh_score": 0.0,
+            "last_effective_source_fresh_score": 0.0,
             "warmup_ready": False,
             "log_entries": 0,
             "last_log_at": None,
@@ -172,15 +177,19 @@ class BinanceBtcFeatureFeed:
                 last_price=self._last_price,
                 last_bucket_at=None,
                 source_fresh_score=0.0,
+                effective_source_fresh_score=0.0,
                 long_candidate=False,
                 short_candidate=False,
                 diagnostics=self.stats,
             )
 
         latest = frame.iloc[-1]
+        effective_fresh = self._effective_source_fresh_score(latest)
         self._stats["last_snapshot_at"] = datetime.now(UTC).isoformat()
         self._stats["last_source_fresh_score"] = float(latest.get("source_fresh_score", 0.0))
+        self._stats["last_effective_source_fresh_score"] = effective_fresh
         self._stats["warmup_ready"] = len(frame) >= self.warmup_buckets
+        self._stats["supported_source_count"] = self._supported_source_count()
 
         feature_row = {key: float(latest[key]) for key in frame.columns if key != "timestamp"}
         return FeedSnapshot(
@@ -189,6 +198,7 @@ class BinanceBtcFeatureFeed:
             last_price=float(latest["price_last"]) if pd.notna(latest["price_last"]) else self._last_price,
             last_bucket_at=str(latest["timestamp"]),
             source_fresh_score=float(latest.get("source_fresh_score", 0.0)),
+            effective_source_fresh_score=effective_fresh,
             long_candidate=bool(latest.get("long_impulse_candidate", 0.0) >= 1.0),
             short_candidate=bool(latest.get("short_impulse_candidate", 0.0) >= 1.0),
             diagnostics=self.stats,
@@ -307,13 +317,20 @@ class BinanceBtcFeatureFeed:
             {} if isinstance(result, Exception) else result
             for result in results
         ]
-        if any(isinstance(result, Exception) for result in results):
-            failures = [
+        failures = [result for result in results if isinstance(result, Exception)]
+        if failures:
+            failure_names = [
                 type(result).__name__
                 for result in results
                 if isinstance(result, Exception)
             ]
-            self._stats["last_error"] = f"metrics_partial:{'/'.join(failures[:3])}"
+            self._stats["last_error"] = f"metrics_partial:{'/'.join(failure_names[:3])}"
+            if (
+                len(failures) == len(results)
+                and all(self._is_restricted_location_error(result) for result in failures)
+            ):
+                self._stats["metrics_supported"] = False
+                self._stats["last_error"] = "metrics_restricted"
         record = {
             "timestamp": recorded_at,
             "sum_open_interest": self._last_float(open_interest_hist, "sumOpenInterest", "sum_open_interest"),
@@ -335,7 +352,11 @@ class BinanceBtcFeatureFeed:
             funding = await self._get_json("/fapi/v1/fundingRate", {"symbol": self.symbol, "limit": 1})
         except Exception as exc:
             funding = []
-            self._stats["last_error"] = f"funding_partial:{type(exc).__name__}"
+            if self._is_restricted_location_error(exc):
+                self._stats["funding_supported"] = False
+                self._stats["last_error"] = "funding_restricted"
+            else:
+                self._stats["last_error"] = f"funding_partial:{type(exc).__name__}"
         latest = funding[-1] if isinstance(funding, list) and funding else {}
         record = {
             "timestamp": recorded_at,
@@ -347,6 +368,36 @@ class BinanceBtcFeatureFeed:
         self._stats["funding_updates"] += 1
         self._stats["last_funding_at"] = recorded_at.isoformat()
         self._trim_old_buffers()
+
+    @staticmethod
+    def _is_restricted_location_error(exc: Exception) -> bool:
+        if not isinstance(exc, httpx.HTTPStatusError):
+            return False
+        return exc.response is not None and exc.response.status_code == 451
+
+    def _supported_source_count(self) -> int:
+        return sum(
+            1
+            for supported in (
+                True,
+                True,
+                bool(self._stats.get("metrics_supported", True)),
+                bool(self._stats.get("funding_supported", True)),
+            )
+            if supported
+        )
+
+    def _effective_source_fresh_score(self, latest: pd.Series) -> float:
+        source_states = {
+            "trade": (True, float(latest.get("trade_fresh", 0.0) or 0.0)),
+            "depth": (True, float(latest.get("depth_fresh", 0.0) or 0.0)),
+            "metrics": (bool(self._stats.get("metrics_supported", True)), float(latest.get("metrics_fresh", 0.0) or 0.0)),
+            "funding": (bool(self._stats.get("funding_supported", True)), float(latest.get("funding_fresh", 0.0) or 0.0)),
+        }
+        active_scores = [fresh for supported, fresh in source_states.values() if supported]
+        if not active_scores:
+            return 0.0
+        return float(sum(active_scores) / len(active_scores))
 
     async def _get_json(self, path: str, params: dict[str, Any]) -> Any:
         response = await self.client.get(f"{BINANCE_FUTURES_REST}{path}", params=params)

@@ -137,6 +137,8 @@ class BitcoinModelStrategy(BaseStrategy):
                 "model_dir": str(self.bundle.model_dir),
                 "feature_count": len(self.bundle.feature_names.get("long") or []),
                 "min_source_fresh_score": self.cfg.min_source_fresh_score,
+                "degraded_threshold": self.cfg.degraded_threshold,
+                "degraded_direction_margin": self.cfg.degraded_direction_margin,
                 "candidate_markets": 0,
                 "matched_markets": 0,
                 "scored_markets": 0,
@@ -147,6 +149,16 @@ class BitcoinModelStrategy(BaseStrategy):
                 "last_short_score": 0.0,
                 "last_direction": "neutral",
                 "last_source_fresh_score": 0.0,
+                "last_effective_source_fresh_score": 0.0,
+                "last_long_candidate": False,
+                "last_short_candidate": False,
+                "degraded_live_mode": False,
+                "effective_long_threshold": self.cfg.long_threshold,
+                "effective_short_threshold": self.cfg.short_threshold,
+                "effective_direction_margin": self.cfg.min_direction_margin,
+                "metrics_supported": True,
+                "funding_supported": True,
+                "supported_source_count": 4,
                 "last_signals": 0,
                 "log_entries": 0,
                 "last_log_at": None,
@@ -186,8 +198,11 @@ class BitcoinModelStrategy(BaseStrategy):
         scores: dict[str, float] | None = None
         direction = "neutral"
         signals: list[Signal] = []
+        effective_fresh = snapshot.effective_source_fresh_score or snapshot.source_fresh_score
+        degraded_live_mode = self._is_degraded_live_mode(snapshot)
+        self._stats["degraded_live_mode"] = degraded_live_mode
 
-        if snapshot.ready and snapshot.feature_row and snapshot.source_fresh_score >= self.cfg.min_source_fresh_score:
+        if snapshot.ready and snapshot.feature_row and effective_fresh >= self.cfg.min_source_fresh_score:
             scores = self.bundle.predict_scores(snapshot.feature_row)
             if scores:
                 self._stats["last_long_score"] = round(scores["long"], 6)
@@ -212,29 +227,85 @@ class BitcoinModelStrategy(BaseStrategy):
         self._stats["last_bucket_at"] = snapshot.last_bucket_at
         self._stats["last_price"] = round(float(snapshot.last_price or 0.0), 2)
         self._stats["last_source_fresh_score"] = round(float(snapshot.source_fresh_score or 0.0), 4)
+        self._stats["last_effective_source_fresh_score"] = round(float(snapshot.effective_source_fresh_score or 0.0), 4)
+        self._stats["last_long_candidate"] = bool(snapshot.long_candidate)
+        self._stats["last_short_candidate"] = bool(snapshot.short_candidate)
+        row = snapshot.feature_row or {}
+        self._stats["last_signed_ratio_12"] = round(float(row.get("signed_ratio_12", 0.0) or 0.0), 4)
+        self._stats["last_depth_imbalance_1pct"] = round(float(row.get("depth_imbalance_1pct", 0.0) or 0.0), 4)
+        self._stats["last_trade_count_z_12"] = round(float(row.get("trade_count_z_12", 0.0) or 0.0), 4)
+        self._stats["last_directional_efficiency_12"] = round(float(row.get("directional_efficiency_12", 0.0) or 0.0), 4)
+        self._stats["last_impulse_alignment_12"] = round(float(row.get("impulse_alignment_12", 0.0) or 0.0), 4)
 
     def _sync_feed_stats(self) -> None:
         feed_stats = self.feed.stats
         self._stats["feed_stats"] = feed_stats
         self._stats["log_entries"] = int(feed_stats.get("log_entries") or 0)
         self._stats["last_log_at"] = feed_stats.get("last_log_at")
+        self._stats["metrics_supported"] = bool(feed_stats.get("metrics_supported", True))
+        self._stats["funding_supported"] = bool(feed_stats.get("funding_supported", True))
+        self._stats["supported_source_count"] = int(feed_stats.get("supported_source_count") or 4)
+
+    def _is_degraded_live_mode(self, snapshot: FeedSnapshot) -> bool:
+        return (
+            snapshot.effective_source_fresh_score > snapshot.source_fresh_score
+            or snapshot.source_fresh_score < 0.75
+            or int(self.feed.stats.get("supported_source_count") or 4) < 4
+        )
 
     def _choose_direction(self, snapshot: FeedSnapshot, scores: dict[str, float]) -> str:
+        degraded_live_mode = self._is_degraded_live_mode(snapshot)
+        long_threshold = self.cfg.degraded_threshold if degraded_live_mode else self.cfg.long_threshold
+        short_threshold = self.cfg.degraded_threshold if degraded_live_mode else self.cfg.short_threshold
+        direction_margin = self.cfg.degraded_direction_margin if degraded_live_mode else self.cfg.min_direction_margin
+        self._stats["effective_long_threshold"] = long_threshold
+        self._stats["effective_short_threshold"] = short_threshold
+        self._stats["effective_direction_margin"] = direction_margin
+
         long_score = float(scores["long"])
         short_score = float(scores["short"])
         if (
-            snapshot.long_candidate
-            and long_score >= self.cfg.long_threshold
-            and (long_score - short_score) >= self.cfg.min_direction_margin
+            (snapshot.long_candidate or (degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bull")))
+            and long_score >= long_threshold
+            and (long_score - short_score) >= direction_margin
         ):
             return "bull"
         if (
-            snapshot.short_candidate
-            and short_score >= self.cfg.short_threshold
-            and (short_score - long_score) >= self.cfg.min_direction_margin
+            (snapshot.short_candidate or (degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bear")))
+            and short_score >= short_threshold
+            and (short_score - long_score) >= direction_margin
         ):
             return "bear"
         return "neutral"
+
+    def _degraded_impulse_alignment(self, snapshot: FeedSnapshot, direction: str) -> bool:
+        row = snapshot.feature_row or {}
+        signed_ratio = float(row.get("signed_ratio_12", 0.0) or 0.0)
+        depth_imbalance = float(row.get("depth_imbalance_1pct", 0.0) or 0.0)
+        trade_z = float(row.get("trade_count_z_12", 0.0) or 0.0)
+        directional_efficiency = float(row.get("directional_efficiency_12", 0.0) or 0.0)
+        flow_accel = float(row.get("flow_accel_3v12", 0.0) or 0.0)
+        impulse_alignment = float(row.get("impulse_alignment_12", 0.0) or 0.0)
+        signed_threshold = self.cfg.min_signed_ratio * 0.5
+        depth_threshold = self.cfg.min_depth_imbalance * 0.5
+        efficiency_threshold = self.cfg.min_directional_efficiency * 0.5
+        if direction == "bull":
+            return (
+                signed_ratio >= signed_threshold
+                and depth_imbalance >= depth_threshold
+                and trade_z >= 0.0
+                and directional_efficiency >= efficiency_threshold
+                and flow_accel >= -0.10
+                and impulse_alignment >= 0.0
+            )
+        return (
+            signed_ratio <= -signed_threshold
+            and depth_imbalance <= -depth_threshold
+            and trade_z >= 0.0
+            and directional_efficiency >= efficiency_threshold
+            and flow_accel <= 0.10
+            and impulse_alignment >= 0.0
+        )
 
     def _build_signals(
         self,
@@ -370,7 +441,12 @@ class BitcoinModelStrategy(BaseStrategy):
             return None
 
         direction_score = float(scores["long"] if direction == "bull" else scores["short"])
-        threshold = float(self.cfg.long_threshold if direction == "bull" else self.cfg.short_threshold)
+        degraded_live_mode = bool(self._stats.get("degraded_live_mode"))
+        threshold = float(
+            self.cfg.degraded_threshold if degraded_live_mode else (
+                self.cfg.long_threshold if direction == "bull" else self.cfg.short_threshold
+            )
+        )
         score_excess = max(direction_score - threshold, 0.0)
         side_probability = modeled_yes if action == SignalAction.BUY_YES else (1.0 - modeled_yes)
         confidence = min(
@@ -428,10 +504,15 @@ class BitcoinModelStrategy(BaseStrategy):
             "short_score": None if not scores else round(float(scores["short"]), 6),
             "last_price": round(float(snapshot.last_price or 0.0), 2) if snapshot else None,
             "source_fresh_score": round(float(snapshot.source_fresh_score or 0.0), 4) if snapshot else 0.0,
+            "effective_source_fresh_score": round(float(snapshot.effective_source_fresh_score or 0.0), 4) if snapshot else 0.0,
             "bucket_ready": bool(snapshot.ready) if snapshot else False,
             "bucket_at": snapshot.last_bucket_at if snapshot else None,
             "long_candidate": bool(snapshot.long_candidate) if snapshot else False,
             "short_candidate": bool(snapshot.short_candidate) if snapshot else False,
+            "degraded_live_mode": bool(self._stats.get("degraded_live_mode")),
+            "effective_long_threshold": self._stats.get("effective_long_threshold"),
+            "effective_short_threshold": self._stats.get("effective_short_threshold"),
+            "effective_direction_margin": self._stats.get("effective_direction_margin"),
             "signals": [
                 {
                     "market": signal.market_slug,

@@ -265,13 +265,31 @@ class BitcoinModelStrategy(BaseStrategy):
         long_score = float(scores["long"])
         short_score = float(scores["short"])
         if (
-            (snapshot.long_candidate or (degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bull")))
+            (
+                snapshot.long_candidate
+                or (
+                    degraded_live_mode
+                    and (
+                        self._degraded_impulse_alignment(snapshot, "bull")
+                        or self._degraded_score_breakout(snapshot, scores, "bull")
+                    )
+                )
+            )
             and long_score >= long_threshold
             and (long_score - short_score) >= direction_margin
         ):
             return "bull"
         if (
-            (snapshot.short_candidate or (degraded_live_mode and self._degraded_impulse_alignment(snapshot, "bear")))
+            (
+                snapshot.short_candidate
+                or (
+                    degraded_live_mode
+                    and (
+                        self._degraded_impulse_alignment(snapshot, "bear")
+                        or self._degraded_score_breakout(snapshot, scores, "bear")
+                    )
+                )
+            )
             and short_score >= short_threshold
             and (short_score - long_score) >= direction_margin
         ):
@@ -305,6 +323,35 @@ class BitcoinModelStrategy(BaseStrategy):
             and directional_efficiency >= efficiency_threshold
             and flow_accel <= 0.10
             and impulse_alignment >= 0.0
+        )
+
+    def _degraded_score_breakout(
+        self,
+        snapshot: FeedSnapshot,
+        scores: dict[str, float],
+        direction: str,
+    ) -> bool:
+        row = snapshot.feature_row or {}
+        signed_ratio = float(row.get("signed_ratio_12", 0.0) or 0.0)
+        directional_efficiency = float(row.get("directional_efficiency_12", 0.0) or 0.0)
+        flow_accel = float(row.get("flow_accel_3v12", 0.0) or 0.0)
+        long_score = float(scores["long"])
+        short_score = float(scores["short"])
+        breakout_gap = max(self.cfg.degraded_direction_margin, 0.03)
+        if direction == "bull":
+            return (
+                long_score >= self.cfg.degraded_threshold
+                and (long_score - short_score) >= breakout_gap
+                and signed_ratio >= max(self.cfg.min_signed_ratio * 5.0, 0.20)
+                and directional_efficiency >= max(self.cfg.min_directional_efficiency * 2.0, 0.50)
+                and flow_accel >= -0.15
+            )
+        return (
+            short_score >= self.cfg.degraded_threshold
+            and (short_score - long_score) >= breakout_gap
+            and signed_ratio <= -max(self.cfg.min_signed_ratio * 5.0, 0.20)
+            and directional_efficiency >= max(self.cfg.min_directional_efficiency * 2.0, 0.50)
+            and flow_accel <= 0.15
         )
 
     def _build_signals(

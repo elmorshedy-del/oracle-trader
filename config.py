@@ -247,7 +247,7 @@ class BitcoinModelConfig:
     budget_usd: float = float(os.getenv("BITCOIN_MODEL_BUDGET_USD", "600"))
     long_threshold: float = float(os.getenv("BITCOIN_MODEL_LONG_THRESHOLD", "0.6552729109"))
     short_threshold: float = float(os.getenv("BITCOIN_MODEL_SHORT_THRESHOLD", "0.7616295043"))
-    degraded_threshold: float = float(os.getenv("BITCOIN_MODEL_DEGRADED_THRESHOLD", "0.45"))
+    degraded_threshold: float = float(os.getenv("BITCOIN_MODEL_DEGRADED_THRESHOLD", "0.40"))
     min_direction_margin: float = float(os.getenv("BITCOIN_MODEL_DIRECTION_MARGIN", "0.04"))
     degraded_direction_margin: float = float(os.getenv("BITCOIN_MODEL_DEGRADED_DIRECTION_MARGIN", "0.015"))
     min_source_fresh_score: float = float(os.getenv("BITCOIN_MODEL_MIN_FRESH_SCORE", "0.50"))

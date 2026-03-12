@@ -42,8 +42,9 @@ SCORED_MARKET_LIMIT = 16
 DEGRADED_SCORE_ONLY_THRESHOLD = 0.60
 DEGRADED_SCORE_ONLY_MARGIN = 0.01
 DEGRADED_BULL_FALLBACK_THRESHOLD = 0.52
-MARKET_FALLBACK_SCORE_THRESHOLD = 0.52
+MARKET_FALLBACK_SCORE_THRESHOLD = 0.36
 MARKET_FALLBACK_MAX_SCORE_GAP = 0.10
+MARKET_INVENTORY_FALLBACK_SCORE_THRESHOLD = 0.36
 
 
 class BitcoinModelBundle:
@@ -259,6 +260,20 @@ class BitcoinModelStrategy(BaseStrategy):
                         direction = "bull"
                         signals = fallback_signals
                         self._stats["last_direction_mode"] = "bull_catchup_fallback"
+                if (
+                    not signals
+                    and snapshot.last_price
+                    and degraded_live_mode
+                ):
+                    fallback_direction, fallback_signals = self._inventory_direction_fallback(
+                        markets=markets,
+                        spot_price=float(snapshot.last_price),
+                        scores=scores,
+                    )
+                    if fallback_signals:
+                        direction = fallback_direction
+                        signals = fallback_signals
+                        self._stats["last_direction_mode"] = "market_inventory_fallback"
 
         self._stats["last_direction"] = direction
         self._stats["last_signals"] = len(signals)
@@ -437,6 +452,33 @@ class BitcoinModelStrategy(BaseStrategy):
             alternate_score >= MARKET_FALLBACK_SCORE_THRESHOLD
             and (chosen_score - alternate_score) <= MARKET_FALLBACK_MAX_SCORE_GAP
         )
+
+    def _inventory_direction_fallback(
+        self,
+        *,
+        markets: list[Market],
+        spot_price: float,
+        scores: dict[str, float],
+    ) -> tuple[str, list[Signal]]:
+        long_score = float(scores["long"])
+        short_score = float(scores["short"])
+        bull_signals = self._build_signals(
+            markets=markets,
+            spot_price=spot_price,
+            scores=scores,
+            direction="bull",
+        )
+        bear_signals = self._build_signals(
+            markets=markets,
+            spot_price=spot_price,
+            scores=scores,
+            direction="bear",
+        )
+        if bull_signals and not bear_signals and long_score >= MARKET_INVENTORY_FALLBACK_SCORE_THRESHOLD:
+            return "bull", bull_signals
+        if bear_signals and not bull_signals and short_score >= MARKET_INVENTORY_FALLBACK_SCORE_THRESHOLD:
+            return "bear", bear_signals
+        return "neutral", []
 
     def _build_signals(
         self,

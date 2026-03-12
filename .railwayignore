@@ -22,3 +22,4 @@ tools/__pycache__/
 state*.json
 weather_state.json
 TRADE_BLOCKERS_REVIEW.md
+.pydeps_weather_v2/

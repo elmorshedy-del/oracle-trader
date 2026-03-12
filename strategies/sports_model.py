@@ -81,6 +81,17 @@ NBA_TEAM_ALIASES = {
     "utah jazz": {"utah jazz", "jazz", "utah", "uta"},
     "washington wizards": {"washington wizards", "wizards", "washington", "was"},
 }
+AMBIGUOUS_TEAM_ALIASES = {
+    "heat",
+    "magic",
+    "jazz",
+    "kings",
+    "spurs",
+    "nets",
+    "suns",
+    "bulls",
+    "wolves",
+}
 
 
 def _normalize_text(value: str) -> str:
@@ -160,21 +171,25 @@ class SportsModelStrategy(BaseStrategy):
         candidate_markets = self._candidate_markets(markets)
         self._stats["candidate_markets"] = len(candidate_markets)
 
+        eligible_games = [
+            game
+            for game in games
+            if self.cfg.min_hours_to_tip <= game.hours_to_tip <= self.cfg.max_hours_to_tip
+        ]
+
         signals: list[Signal] = []
         matched_markets = 0
         scored_markets = 0
-        for game in games:
-            if game.hours_to_tip < self.cfg.min_hours_to_tip or game.hours_to_tip > self.cfg.max_hours_to_tip:
+        for market in candidate_markets:
+            game = self._best_game_match(market, eligible_games)
+            if game is None:
                 continue
-            for market in candidate_markets:
-                if not self._market_matches_game(market, game):
-                    continue
-                matched_markets += 1
-                signal = self._score_market(game, market)
-                if signal is None:
-                    continue
-                scored_markets += 1
-                signals.append(signal)
+            matched_markets += 1
+            signal = self._score_market(game, market)
+            if signal is None:
+                continue
+            scored_markets += 1
+            signals.append(signal)
 
         signals.sort(key=lambda item: (item.expected_edge, item.confidence), reverse=True)
         signals = signals[: self.cfg.max_signals_per_scan]
@@ -227,13 +242,35 @@ class SportsModelStrategy(BaseStrategy):
             )
         )
 
-    def _market_matches_game(self, market: Market, game: SportsGameSnapshot) -> bool:
+    def _market_match_profile(self, market: Market, game: SportsGameSnapshot) -> tuple[int, int]:
         text = self._market_text(market)
         home_aliases = self._aliases_for_team(game.home_team, game.home_abbrev)
         away_aliases = self._aliases_for_team(game.away_team, game.away_abbrev)
-        return any(_alias_in_text(text, alias) for alias in home_aliases) and any(
-            _alias_in_text(text, alias) for alias in away_aliases
-        )
+        home_hits = sum(1 for alias in home_aliases if _alias_in_text(text, alias))
+        away_hits = sum(1 for alias in away_aliases if _alias_in_text(text, alias))
+        return home_hits, away_hits
+
+    def _best_game_match(self, market: Market, games: list[SportsGameSnapshot]) -> SportsGameSnapshot | None:
+        ranked: list[tuple[int, int, SportsGameSnapshot]] = []
+        for game in games:
+            home_hits, away_hits = self._market_match_profile(market, game)
+            team_sides = int(home_hits > 0) + int(away_hits > 0)
+            score = home_hits + away_hits
+            if team_sides == 0 or score == 0:
+                continue
+            ranked.append((team_sides, score, game))
+
+        if not ranked:
+            return None
+
+        ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        best_sides, best_score, best_game = ranked[0]
+        second_score = ranked[1][1] if len(ranked) > 1 else 0
+        if best_sides >= 2:
+            return best_game
+        if best_score >= 1 and second_score == 0:
+            return best_game
+        return None
 
     def _score_market(self, game: SportsGameSnapshot, market: Market) -> Signal | None:
         text = self._market_text(market)
@@ -417,7 +454,7 @@ class SportsModelStrategy(BaseStrategy):
         aliases = set(NBA_TEAM_ALIASES.get(normalized_name, {normalized_name}))
         if abbrev and len(abbrev.strip()) >= 4:
             aliases.add(_normalize_text(abbrev))
-        return {alias for alias in aliases if alias and len(alias) >= 4}
+        return {alias for alias in aliases if alias and len(alias) >= 4 and alias not in AMBIGUOUS_TEAM_ALIASES}
 
     @staticmethod
     def _fee_buffer(price: float) -> float:

@@ -42,6 +42,8 @@ SCORED_MARKET_LIMIT = 16
 DEGRADED_SCORE_ONLY_THRESHOLD = 0.60
 DEGRADED_SCORE_ONLY_MARGIN = 0.01
 DEGRADED_BULL_FALLBACK_THRESHOLD = 0.52
+MARKET_FALLBACK_SCORE_THRESHOLD = 0.52
+MARKET_FALLBACK_MAX_SCORE_GAP = 0.05
 
 
 class BitcoinModelBundle:
@@ -223,6 +225,28 @@ class BitcoinModelStrategy(BaseStrategy):
                     not signals
                     and snapshot.last_price
                     and degraded_live_mode
+                    and direction in {"bull", "bear"}
+                ):
+                    alternate_direction = "bear" if direction == "bull" else "bull"
+                    if self._should_use_market_direction_fallback(
+                        scores=scores,
+                        chosen_direction=direction,
+                        alternate_direction=alternate_direction,
+                    ):
+                        alternate_signals = self._build_signals(
+                            markets=markets,
+                            spot_price=float(snapshot.last_price),
+                            scores=scores,
+                            direction=alternate_direction,
+                        )
+                        if alternate_signals:
+                            direction = alternate_direction
+                            signals = alternate_signals
+                            self._stats["last_direction_mode"] = f"{alternate_direction}_market_fallback"
+                if (
+                    not signals
+                    and snapshot.last_price
+                    and degraded_live_mode
                     and self._should_use_bull_catchup_fallback(scores=scores, snapshot=snapshot)
                 ):
                     fallback_signals = self._build_signals(
@@ -398,6 +422,20 @@ class BitcoinModelStrategy(BaseStrategy):
             long_score >= DEGRADED_BULL_FALLBACK_THRESHOLD
             and directional_efficiency >= max(self.cfg.min_directional_efficiency * 2.0, 0.50)
             and signed_ratio >= -0.10
+        )
+
+    def _should_use_market_direction_fallback(
+        self,
+        *,
+        scores: dict[str, float],
+        chosen_direction: str,
+        alternate_direction: str,
+    ) -> bool:
+        chosen_score = float(scores["long"] if chosen_direction == "bull" else scores["short"])
+        alternate_score = float(scores["long"] if alternate_direction == "bull" else scores["short"])
+        return (
+            alternate_score >= MARKET_FALLBACK_SCORE_THRESHOLD
+            and (chosen_score - alternate_score) <= MARKET_FALLBACK_MAX_SCORE_GAP
         )
 
     def _build_signals(

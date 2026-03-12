@@ -1,6 +1,9 @@
 .git
 .venv311/
 .venv/
+.venv311_xgb/
+.venv_apple_xgb/
+.venv*/
 .playwright-cli/
 __pycache__/
 *.pyc

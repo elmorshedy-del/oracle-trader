@@ -254,7 +254,7 @@ class BitcoinModelConfig:
     min_barrier_edge: float = float(os.getenv("BITCOIN_MODEL_MIN_BARRIER_EDGE", "0.10"))
     max_entry_price: float = float(os.getenv("BITCOIN_MODEL_MAX_ENTRY_PRICE", "0.82"))
     max_resolution_days: int = int(os.getenv("BITCOIN_MODEL_MAX_RESOLUTION_DAYS", "365"))
-    max_barrier_distance_pct: float = float(os.getenv("BITCOIN_MODEL_MAX_BARRIER_DISTANCE_PCT", "0.45"))
+    max_barrier_distance_pct: float = float(os.getenv("BITCOIN_MODEL_MAX_BARRIER_DISTANCE_PCT", "1.00"))
     min_size_usd: float = float(os.getenv("BITCOIN_MODEL_MIN_SIZE_USD", "20"))
     max_size_usd: float = float(os.getenv("BITCOIN_MODEL_MAX_SIZE_USD", "120"))
     max_signals_per_scan: int = int(os.getenv("BITCOIN_MODEL_MAX_SIGNALS_PER_SCAN", "3"))

@@ -42,7 +42,7 @@ SCORED_MARKET_LIMIT = 16
 DEGRADED_SCORE_ONLY_THRESHOLD = 0.60
 DEGRADED_SCORE_ONLY_MARGIN = 0.01
 DEGRADED_BULL_FALLBACK_THRESHOLD = 0.52
-MARKET_FALLBACK_SCORE_THRESHOLD = 0.55
+MARKET_FALLBACK_SCORE_THRESHOLD = 0.52
 MARKET_FALLBACK_MAX_SCORE_GAP = 0.10
 
 
@@ -603,7 +603,7 @@ class BitcoinModelStrategy(BaseStrategy):
             token_id=target_outcome.token_id,
             confidence=confidence,
             expected_edge=edge * 100.0,
-            group_key=self.crypto_strategy._barrier_group_key("BTC", market, kind, action),
+            group_key=self._barrier_group_key(match=match, action=action),
             reasoning=(
                 f"BTC ML CATCH-UP: {direction.upper()} impulse | long={scores['long']:.3f} short={scores['short']:.3f} | "
                 f"spot=${spot_price:,.0f} | {kind} ${float(match['barrier_price']):,.0f} | "
@@ -611,6 +611,18 @@ class BitcoinModelStrategy(BaseStrategy):
             ),
             suggested_size_usd=suggested_size_usd,
         )
+
+    def _barrier_group_key(self, *, match: dict[str, Any], action: SignalAction) -> str:
+        market = match["market"]
+        expiry_bucket = (market.end_date or "unknown")[:10]
+        barrier_bucket = int(round(float(match["barrier_price"])))
+        kind = str(match["kind"])
+        bullish = (
+            (kind in {"reach", "ath"} and action == SignalAction.BUY_YES)
+            or (kind == "dip" and action == SignalAction.BUY_NO)
+        )
+        thesis = "bull" if bullish else "bear"
+        return f"btcml:BTC:{kind}:{thesis}:{expiry_bucket}:{barrier_bucket}"
 
     def _append_scan_log(
         self,

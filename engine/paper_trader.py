@@ -33,11 +33,15 @@ ARB_ROTATION_HOURS = 4.0
 ARB_EARLY_RELEASE_MIN_HOURS = 1.0
 ARB_REENTRY_COOLDOWN_HOURS = 4.0
 STALE_ROTATION_REENTRY_COOLDOWN_HOURS = 6.0
+BITCOIN_MODEL_STALE_ROTATION_HOURS = float(os.getenv("BITCOIN_MODEL_STALE_ROTATION_HOURS", "4.0"))
+BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS = float(os.getenv("BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS", "2.0"))
+BITCOIN_MODEL_STALE_FLAT_PNL_PCT = float(os.getenv("BITCOIN_MODEL_STALE_FLAT_PNL_PCT", "0.18"))
+BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS = int(os.getenv("BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS", "2"))
 STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.NEWS: 18.0,
     SignalSource.CRYPTO_ARB: 18.0,
     SignalSource.CRYPTO_STRUCTURE: 8.0,
-    SignalSource.BITCOIN_MODEL: 8.0,
+    SignalSource.BITCOIN_MODEL: BITCOIN_MODEL_STALE_ROTATION_HOURS,
     SignalSource.WEATHER: 12.0,
     SignalSource.WEATHER_SNIPER: 8.0,
     SignalSource.WEATHER_LATENCY: 6.0,
@@ -313,6 +317,31 @@ class PaperTrader:
     def _position_value(self, pos: Position) -> float:
         return pos.shares * pos.current_price
 
+    def _signal_side(self, signal: Signal) -> str | None:
+        if signal.action == SignalAction.BUY_YES:
+            return "YES"
+        if signal.action == SignalAction.BUY_NO:
+            return "NO"
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return "HEDGE"
+        if signal.action == SignalAction.ARB_ALL:
+            return "ARB"
+        return None
+
+    def _position_matches_signal(self, pos: Position, signal: Signal) -> bool:
+        desired_side = self._signal_side(signal)
+        return desired_side is not None and pos.side == desired_side
+
+    def _max_same_market_positions(self, signal: Signal) -> int:
+        if signal.source == SignalSource.BITCOIN_MODEL and signal.action in (SignalAction.BUY_YES, SignalAction.BUY_NO):
+            return BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+        return 1
+
+    def _max_same_group_positions(self, signal: Signal) -> int:
+        if signal.source == SignalSource.BITCOIN_MODEL and signal.action in (SignalAction.BUY_YES, SignalAction.BUY_NO):
+            return BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+        return 1
+
     def _strategy_exposure(self, source: SignalSource) -> float:
         return sum(
             self._position_value(pos)
@@ -334,10 +363,8 @@ class PaperTrader:
             "source_position_cap": 0,
             "source_exposure_cap": 0,
         }
-        held_conditions = {p.condition_id for p in self.portfolio.positions}
-        held_groups = {p.group_key for p in self.portfolio.positions if p.group_key}
-        seen_conditions: set[str] = set()
-        seen_groups: set[str] = set()
+        seen_market_counts: dict[tuple[str, str, str], int] = {}
+        seen_group_counts: dict[tuple[str, str, str], int] = {}
         source_counts: dict = {}
         source_exposure: dict = {}
         selected_per_source: dict = {}
@@ -349,16 +376,42 @@ class PaperTrader:
             )
 
         for signal in signals:
-            if signal.condition_id in held_conditions:
+            signal_side = self._signal_side(signal) or "UNKNOWN"
+            same_market_positions = [
+                pos for pos in self.portfolio.positions
+                if pos.condition_id == signal.condition_id
+            ]
+            if any(not self._position_matches_signal(pos, signal) for pos in same_market_positions):
                 filtered["held_market"] += 1
                 continue
-            if signal.group_key and signal.group_key in held_groups:
-                filtered["held_group"] += 1
+            same_market_existing = sum(
+                1 for pos in same_market_positions if self._position_matches_signal(pos, signal)
+            )
+            market_key = (signal.source.value, signal.condition_id, signal_side)
+            market_limit = self._max_same_market_positions(signal)
+            if same_market_existing >= market_limit:
+                filtered["held_market"] += 1
                 continue
-            if signal.condition_id in seen_conditions:
+            if same_market_existing + seen_market_counts.get(market_key, 0) >= market_limit:
                 filtered["duplicate_market"] += 1
                 continue
-            if signal.group_key and signal.group_key in seen_groups:
+
+            same_group_positions = [
+                pos for pos in self.portfolio.positions
+                if signal.group_key and pos.group_key == signal.group_key
+            ]
+            if signal.group_key and any(not self._position_matches_signal(pos, signal) for pos in same_group_positions):
+                filtered["held_group"] += 1
+                continue
+            group_key = (signal.source.value, signal.group_key or "", signal_side)
+            same_group_existing = sum(
+                1 for pos in same_group_positions if self._position_matches_signal(pos, signal)
+            )
+            group_limit = self._max_same_group_positions(signal)
+            if signal.group_key and same_group_existing >= group_limit:
+                filtered["held_group"] += 1
+                continue
+            if signal.group_key and same_group_existing + seen_group_counts.get(group_key, 0) >= group_limit:
                 filtered["duplicate_group"] += 1
                 continue
             if signal.group_key and signal.group_key in self._group_cooldowns:
@@ -383,9 +436,9 @@ class PaperTrader:
                 continue
 
             selected.append(signal)
-            seen_conditions.add(signal.condition_id)
+            seen_market_counts[market_key] = seen_market_counts.get(market_key, 0) + 1
             if signal.group_key:
-                seen_groups.add(signal.group_key)
+                seen_group_counts[group_key] = seen_group_counts.get(group_key, 0) + 1
             selected_per_source[signal.source] = selected_per_source.get(signal.source, 0) + 1
             source_counts[signal.source] = source_counts.get(signal.source, 0) + 1
             source_exposure[signal.source] = projected_exposure
@@ -852,9 +905,14 @@ class PaperTrader:
             if pos.side == "ARB":
                 self._set_group_cooldown(pos.group_key or pos.market_slug, ARB_REENTRY_COOLDOWN_HOURS)
             elif reason.startswith("STALE_ROTATE") or reason.startswith("STALE_STOP"):
+                cooldown_hours = (
+                    BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS
+                    if pos.source == SignalSource.BITCOIN_MODEL
+                    else STALE_ROTATION_REENTRY_COOLDOWN_HOURS
+                )
                 self._set_group_cooldown(
                     pos.group_key or pos.market_slug,
-                    STALE_ROTATION_REENTRY_COOLDOWN_HOURS,
+                    cooldown_hours,
                 )
             logger.info(
                 f"[EXIT] {pos.market_slug} | {pos.side} | {reason} | "
@@ -880,11 +938,14 @@ class PaperTrader:
                 return f"STALE_ROTATE: weather post-event {age_hours:.1f}h @ {pnl_pct:+.1%}"
         if pnl_pct <= STALE_DIRECTIONAL_LOSS_CUT_PCT and age_hours >= STALE_DIRECTIONAL_LOSS_CUT_HOURS:
             return f"STALE_STOP: {age_hours:.1f}h @ {pnl_pct:+.1%}"
-        flat_threshold = (
-            WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
-            if WEATHER_CAPACITY_RELEASE_ENABLED
-            else STALE_DIRECTIONAL_FLAT_PNL_PCT
-        )
+        if pos.source == SignalSource.BITCOIN_MODEL:
+            flat_threshold = BITCOIN_MODEL_STALE_FLAT_PNL_PCT
+        else:
+            flat_threshold = (
+                WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
+                if WEATHER_CAPACITY_RELEASE_ENABLED
+                else STALE_DIRECTIONAL_FLAT_PNL_PCT
+            )
         if age_hours >= max_age and abs(pnl_pct) <= flat_threshold:
             return f"STALE_ROTATE: {age_hours:.1f}h @ {pnl_pct:+.1%}"
         return None
@@ -1033,14 +1094,22 @@ class PaperTrader:
 
         # No duplicate positions on same market
         existing = [p for p in self.portfolio.positions if p.condition_id == signal.condition_id]
-        if existing:
+        if any(not self._position_matches_signal(pos, signal) for pos in existing):
             logger.debug(f"[RISK] Already have position on {signal.market_slug}")
+            return False
+        same_market_positions = [p for p in existing if self._position_matches_signal(p, signal)]
+        if len(same_market_positions) >= self._max_same_market_positions(signal):
+            logger.debug(f"[RISK] Market position cap reached on {signal.market_slug}")
             return False
 
         if signal.group_key:
             same_group = [p for p in self.portfolio.positions if p.group_key == signal.group_key]
-            if same_group:
+            if any(not self._position_matches_signal(pos, signal) for pos in same_group):
                 logger.debug(f"[RISK] Already have grouped thesis on {signal.group_key}")
+                return False
+            same_group_positions = [p for p in same_group if self._position_matches_signal(p, signal)]
+            if len(same_group_positions) >= self._max_same_group_positions(signal):
+                logger.debug(f"[RISK] Group position cap reached on {signal.group_key}")
                 return False
             if signal.group_key in self._group_cooldowns:
                 logger.debug(f"[RISK] Group cooldown active on {signal.group_key}")

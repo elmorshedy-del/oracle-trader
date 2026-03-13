@@ -114,3 +114,26 @@ Initial read:
 - this is enough to verify the aligned multivenue feature pipeline
 - this is not enough to train a serious new BTC model yet
 - continue capture first, then train fresh continuation and mean-reversion baselines on the same immutable track
+
+## 2026-03-13 - Auto-trained multivenue CatBoost baselines
+
+- Capture session: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260313_144242_multivenue_v1_live`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- Training run: `btc_multivenue_catboost_20260313T203335_v1`
+- Checkpoint: `btc-multivenue-catboost-20260313T203338`
+- continuation_long_30s: status `trained`, test AUC `0.3501516628750948`
+- continuation_short_30s: status `trained`, test AUC `0.6693014545771274`
+- meanrev_after_upshock_30s: status `skipped`, test AUC `None`
+- meanrev_after_downshock_30s: status `skipped`, test AUC `None`
+
+## 2026-03-13 - Impulse-conditioned multivenue CatBoost baselines
+
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- Training run: `btc_multivenue_catboost_impulse_20260313T210101_v1`
+- Checkpoint: `btc-multivenue-catboost-impulse-20260313T210104`
+- Impulse definition: `past 5s absolute move >= 5 bps`, future horizon `30s`, profit/revert threshold `8 bps`
+- impulse_continuation_after_upshock_30s: test AUC `0.4697`
+- impulse_continuation_after_downshock_30s: test AUC `0.1500`
+- meanrev_after_upshock_30s: test AUC `0.3492`
+- meanrev_after_downshock_30s: test AUC `0.6305`
+- Read: filtering to impulse rows made the models event-specific, but this sample is still small and unstable; only downshock mean-reversion has a non-terrible first test read.

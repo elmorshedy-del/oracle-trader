@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Train first-pass BTC multivenue CatBoost baselines.
+Train impulse-conditioned BTC multivenue CatBoost baselines.
 
 Models:
-- continuation_long_30s
-- continuation_short_30s
+- impulse_continuation_after_upshock_30s
+- impulse_continuation_after_downshock_30s
 - meanrev_after_upshock_30s
 - meanrev_after_downshock_30s
 
@@ -29,7 +29,7 @@ DEFAULT_OUTPUT_ROOT = Path("output/btc_multivenue_models")
 DEFAULT_CONTINUATION_HORIZON_SECONDS = 30
 DEFAULT_PROFIT_BPS = 8.0
 DEFAULT_MEANREV_SHOCK_WINDOW_SECONDS = 5
-DEFAULT_MEANREV_SHOCK_BPS = 10.0
+DEFAULT_MEANREV_SHOCK_BPS = 5.0
 DEFAULT_MEANREV_REVERT_BPS = 8.0
 DEFAULT_MIN_ROWS = 200
 UTC = timezone.utc
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--continuation-horizon-seconds", type=int, default=DEFAULT_CONTINUATION_HORIZON_SECONDS, help="Future horizon for continuation labels")
     parser.add_argument("--profit-bps", type=float, default=DEFAULT_PROFIT_BPS, help="Positive continuation threshold in bps")
     parser.add_argument("--meanrev-shock-window-seconds", type=int, default=DEFAULT_MEANREV_SHOCK_WINDOW_SECONDS, help="Past return window used to define an overextension")
-    parser.add_argument("--meanrev-shock-bps", type=float, default=DEFAULT_MEANREV_SHOCK_BPS, help="Minimum past impulse magnitude for a mean-reversion candidate")
+    parser.add_argument("--meanrev-shock-bps", type=float, default=DEFAULT_MEANREV_SHOCK_BPS, help="Minimum past impulse magnitude in bps required to classify a row as an impulse event")
     parser.add_argument("--meanrev-revert-bps", type=float, default=DEFAULT_MEANREV_REVERT_BPS, help="Required snapback magnitude in the future horizon")
     parser.add_argument("--min-rows", type=int, default=DEFAULT_MIN_ROWS, help="Minimum candidate rows required before a model is trained")
     return parser.parse_args()
@@ -90,15 +90,15 @@ def main() -> None:
     past_return_bps = pd.to_numeric(df[past_window_column], errors="coerce") * 10000.0
 
     labels = {
-        "continuation_long_30s": {
-            "mask": continuation_target.notna(),
+        "impulse_continuation_after_upshock_30s": {
+            "mask": continuation_target.notna() & (past_return_bps >= args.meanrev_shock_bps),
             "y": (continuation_target >= args.profit_bps).astype(int),
-            "notes": f"Future {args.continuation_horizon_seconds}s return >= {args.profit_bps} bps",
+            "notes": f"Past {args.meanrev_shock_window_seconds}s impulse >= {args.meanrev_shock_bps} bps then future {args.continuation_horizon_seconds}s return >= {args.profit_bps} bps",
         },
-        "continuation_short_30s": {
-            "mask": continuation_target.notna(),
+        "impulse_continuation_after_downshock_30s": {
+            "mask": continuation_target.notna() & (past_return_bps <= -args.meanrev_shock_bps),
             "y": (continuation_target <= -args.profit_bps).astype(int),
-            "notes": f"Future {args.continuation_horizon_seconds}s return <= -{args.profit_bps} bps",
+            "notes": f"Past {args.meanrev_shock_window_seconds}s impulse <= -{args.meanrev_shock_bps} bps then future {args.continuation_horizon_seconds}s return <= -{args.profit_bps} bps",
         },
         "meanrev_after_upshock_30s": {
             "mask": continuation_target.notna() & (past_return_bps >= args.meanrev_shock_bps),
@@ -113,7 +113,7 @@ def main() -> None:
     }
 
     started_at = datetime.now(UTC)
-    run_name = f"btc_multivenue_catboost_{started_at.strftime('%Y%m%dT%H%M%S')}_v1"
+    run_name = f"btc_multivenue_catboost_impulse_{started_at.strftime('%Y%m%dT%H%M%S')}_v1"
     run_root = Path(args.output_root).resolve() / run_name
     model_root = run_root / "models"
     report_root = run_root / "reports"
@@ -144,6 +144,14 @@ def main() -> None:
         "row_count": int(len(df)),
         "feature_count": int(len(feature_columns)),
         "feature_columns": feature_columns,
+        "mode": "impulse_conditioned",
+        "impulse_definition": {
+            "past_window_seconds": args.meanrev_shock_window_seconds,
+            "minimum_abs_shock_bps": args.meanrev_shock_bps,
+            "future_horizon_seconds": args.continuation_horizon_seconds,
+            "profit_bps": args.profit_bps,
+            "meanrev_revert_bps": args.meanrev_revert_bps,
+        },
         "models": [asdict(summary) for summary in summaries],
     }
     report_metadata_path = report_root / "metadata.json"
@@ -287,11 +295,12 @@ def precision_at_top_quantile(y_true: np.ndarray, y_score: np.ndarray, quantile:
 
 def render_report(report: dict[str, object]) -> str:
     lines = [
-        "# BTC Multivenue CatBoost Baselines",
+        "# BTC Multivenue CatBoost Impulse Baselines",
         "",
         f"- Dataset: `{report['dataset_path']}`",
         f"- Rows: `{report['row_count']}`",
         f"- Features: `{report['feature_count']}`",
+        f"- Mode: `{report['mode']}`",
         "",
     ]
     for model in report["models"]:

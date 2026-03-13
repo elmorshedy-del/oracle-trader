@@ -1,0 +1,36 @@
+{
+  "strategy_id": "btc-meanrev-downshock30-v1",
+  "status": "frozen_validation_protocol",
+  "discovery_checkpoint_id": "btc-meanrev-hybrid-search-20260313T224152",
+  "training_checkpoint_id": "btc-multivenue-catboost-meanrev-downshock30-v2-20260313T222431",
+  "model_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1/models/meanrev_after_downshock_30s.cbm",
+  "dataset_family": "btc_multivenue_1s",
+  "signal_definition": {
+    "description": "BTC downshock mean reversion after a 5-second selloff",
+    "shock_window_seconds": 5,
+    "shock_bps": 5.0,
+    "score_threshold": 0.35
+  },
+  "execution_definition": {
+    "take_profit_bps": 8.0,
+    "stop_loss_bps": 10.0,
+    "max_hold_seconds": 30,
+    "cooldown_seconds": 3,
+    "fee_bps_per_side": 1.0,
+    "entry_slippage_bps": 0.5,
+    "exit_slippage_bps": 0.5
+  },
+  "validation_policy": {
+    "do_not_retune_on_validation_data": true,
+    "evaluate_by_day": true,
+    "minimum_new_days_for_promotion": 5,
+    "minimum_total_trades_for_promotion": 50,
+    "minimum_positive_day_share": 0.55,
+    "minimum_total_net_bps": 0.0,
+    "minimum_bootstrap_p05_total_net_bps": 0.0
+  },
+  "notes": [
+    "This is the frozen winner protocol. Any threshold change creates a new version.",
+    "Discovery day remains discovery only; future validation should use new days or explicitly separate session roots."
+  ]
+}

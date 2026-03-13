@@ -1,0 +1,22 @@
+{
+  "checkpoint_id": "btc-meanrev-downshock30-validation-protocol-v1",
+  "created_at": "2026-03-13T23:08:42.356027+00:00",
+  "status": "protocol_registered",
+  "category": "mean_reversion_validation",
+  "summary": "Frozen out-of-sample validation protocol for BTC 30s downshock mean reversion; future days must use this unchanged spec.",
+  "artifacts": {
+    "spec_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+    "validation_runner": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/run_btc_meanrev_frozen_validation.py",
+    "dataset_builder": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/build_btc_multivenue_dataset.py"
+  },
+  "metrics": {
+    "score_threshold": 0.35,
+    "take_profit_bps": 8,
+    "stop_loss_bps": 10,
+    "max_hold_seconds": 30,
+    "cooldown_seconds": 3,
+    "fee_bps_per_side": 1.0,
+    "minimum_new_days_for_promotion": 5,
+    "minimum_total_trades_for_promotion": 50
+  }
+}

@@ -36,6 +36,12 @@ UTC = timezone.utc
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build an aligned BTC multivenue dataset from captured sessions.")
     parser.add_argument("--capture-root", default=str(DEFAULT_CAPTURE_ROOT), help="Root containing multivenue capture sessions")
+    parser.add_argument(
+        "--session-dir",
+        action="append",
+        default=[],
+        help="Specific session directory to include. Can be passed multiple times. If omitted, all sessions under capture-root are used.",
+    )
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Destination root for built datasets")
     parser.add_argument("--symbol", default=DEFAULT_SYMBOL, help="Binance symbol, default BTCUSDT")
     parser.add_argument("--product-id", default=DEFAULT_PRODUCT_ID, help="Coinbase product id, default BTC-USD")
@@ -48,7 +54,7 @@ def main() -> None:
     args = parse_args()
     capture_root = Path(args.capture_root).resolve()
     output_root = Path(args.output_root).resolve()
-    session_dirs = sorted(path for path in capture_root.iterdir() if path.is_dir())
+    session_dirs = resolve_session_dirs(capture_root=capture_root, session_args=args.session_dir)
     if not session_dirs:
         raise SystemExit(f"No capture sessions found under {capture_root}")
 
@@ -136,6 +142,21 @@ def main() -> None:
     }
     (dataset_root / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(json.dumps(metadata, indent=2))
+
+
+def resolve_session_dirs(*, capture_root: Path, session_args: list[str]) -> list[Path]:
+    if session_args:
+        session_dirs: list[Path] = []
+        for raw in session_args:
+            path = Path(raw).expanduser()
+            if not path.is_absolute():
+                path = capture_root / path
+            path = path.resolve()
+            if not path.exists() or not path.is_dir():
+                raise SystemExit(f"Missing session directory: {path}")
+            session_dirs.append(path)
+        return sorted(session_dirs)
+    return sorted(path for path in capture_root.iterdir() if path.is_dir())
 
 
 def collect_paths(session_dirs: list[Path], venue: str, symbol: str, file_name: str) -> list[Path]:

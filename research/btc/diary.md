@@ -160,3 +160,32 @@ Initial read:
 - Best stressed result: mean total net `91.63 bps`, p05 total net `49.46 bps`, positive total share `1.000`
 - Bootstrap on best stressed trade list: mean total net `147.23 bps`, p05 total net `110.55 bps`, positive total share `1.000`
 - Read: this is the first BTC replay checkpoint that looks economically promising under the tested fee/slippage/cooldown ranges. It is still a small-window result and should be treated as a replay candidate, not a production claim.
+
+## 2026-03-13 - Frozen validation protocol registered
+
+- Project spec: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json`
+- Validation runner: `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/run_btc_meanrev_frozen_validation.py`
+- Builder update: `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/build_btc_multivenue_dataset.py` now supports `--session-dir` so future out-of-sample datasets can be built from new session roots only.
+- Protocol checkpoint: `btc-meanrev-downshock30-validation-protocol-v1`
+- Locked validation setup:
+  - signal: `past 5s <= -5 bps`
+  - model score threshold: `0.35`
+  - take-profit: `8 bps`
+  - stop-loss: `10 bps`
+  - max hold: `30s`
+  - cooldown: `3s`
+  - fees: `1.0 bps/side`
+  - slippage: `0.5 bps` entry and exit
+- Promotion policy:
+  - minimum new days: `5`
+  - minimum total trades: `50`
+  - positive-day-share target: `>= 0.55`
+  - total net bps: `> 0`
+  - bootstrap p05 total net bps: `> 0`
+- Reference run on the discovery-day dataset:
+  - validation run: `btc_meanrev_validation_20260313T230821_v1`
+  - trades: `27`
+  - win rate: `88.9%`
+  - total net: `98.04 bps`
+  - day count: `1`
+- Read: this reference run is only a protocol sanity check because it uses the same discovery-day dataset. Future days must be evaluated unchanged through the frozen spec before this strategy can be promoted.

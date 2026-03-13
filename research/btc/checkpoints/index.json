@@ -1,0 +1,83 @@
+[
+  {
+    "checkpoint_id": "btc-impulse-catboost-90d-v1",
+    "created_at": "2026-03-13T00:00:00+00:00",
+    "status": "champion",
+    "category": "continuation",
+    "summary": "Frozen 5-second CatBoost BTC futures impulse baseline on the 90-day window.",
+    "artifacts": {
+      "report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_impulse_compare/binance_btcusdt_5s_impulse_60s_tp8_sl6_sig004_dep001_tz025_eff015_ctxcore_20251211_20260310_compare_train-c075-c100_eval-c075-c100_v1/reports/comparison_report.md",
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_impulse_compare/binance_btcusdt_5s_impulse_60s_tp8_sl6_sig004_dep001_tz025_eff015_ctxcore_20251211_20260310_compare_train-c075-c100_eval-c075-c100_v1"
+    },
+    "metrics": {
+      "long_auc": 0.7412,
+      "short_auc": 0.7282,
+      "bucket_seconds": 5,
+      "profit_bps": 8.0,
+      "stop_bps": 6.0
+    }
+  },
+  {
+    "checkpoint_id": "btc-impulse-xgboost-90d-v1",
+    "created_at": "2026-03-13T00:00:00+00:00",
+    "status": "challenger_failed",
+    "category": "continuation",
+    "summary": "XGBoost challenger on the same 90-day impulse continuation setup.",
+    "artifacts": {
+      "report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_xgboost_compare/binance_btcusdt_5s_impulse_xgboost_20251211_20260310_tp8_sl6_sig004_dep001_tz025_eff015_src100_v1/reports/comparison_report.md",
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_xgboost_compare/binance_btcusdt_5s_impulse_xgboost_20251211_20260310_tp8_sl6_sig004_dep001_tz025_eff015_src100_v1"
+    },
+    "metrics": {
+      "long_auc": 0.7371,
+      "short_auc": 0.6989
+    }
+  },
+  {
+    "checkpoint_id": "btc-impulse-replay-14d-v1",
+    "created_at": "2026-03-13T00:00:00+00:00",
+    "status": "execution_failed",
+    "category": "replay",
+    "summary": "Post-cost replay for the impulse baseline proved raw signal did not survive realistic costs.",
+    "artifacts": {
+      "report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_replay/binance_btcusdt_5s_replay_20260224_20260309_tp8_sl6_sig004_dep001_tz025_eff015_src100_v1/reports/replay_report.md",
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml_replay/binance_btcusdt_5s_replay_20260224_20260309_tp8_sl6_sig004_dep001_tz025_eff015_src100_v1"
+    },
+    "metrics": {
+      "trades": 57,
+      "net_pnl_usd": -15.09,
+      "win_rate": 0.439,
+      "profit_factor": 0.3954
+    }
+  },
+  {
+    "checkpoint_id": "btc-lob-deeplob-smoke-v1",
+    "created_at": "2026-03-13T00:00:00+00:00",
+    "status": "early_l2_smoke",
+    "category": "lob",
+    "summary": "First proper Binance futures L2 smoke comparison between XGBoost and DeepLOB-style sequence model.",
+    "artifacts": {
+      "report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_lob_compare_cpu_smoke/lob_compare_btcusdt_2026-03-11_lvl20_seq030_ev020_t10s_v1/reports/comparison_report.md",
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_lob_compare_cpu_smoke/lob_compare_btcusdt_2026-03-11_lvl20_seq030_ev020_t10s_v1",
+      "lob_dataset": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_lob_dataset/BTCUSDT/2026-03-11/lob_20lvl_1000ms.npz"
+    },
+    "metrics": {
+      "rows": 35150,
+      "xgb_event_auc": 0.7104,
+      "deeplob_event_auc": 0.6020,
+      "xgb_event_net_bps": -163.707,
+      "deeplob_event_net_bps": -166.1949
+    }
+  },
+  {
+    "checkpoint_id": "btc-multivenue-v1",
+    "created_at": "2026-03-13T00:00:00+00:00",
+    "status": "collecting",
+    "category": "next_track",
+    "summary": "New append-only multi-venue BTC research track using Binance futures, Binance spot, and Coinbase level2.",
+    "artifacts": {
+      "project_plan": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-multivenue-v1/plan.md",
+      "capture_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture"
+    },
+    "metrics": {}
+  }
+]

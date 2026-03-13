@@ -89,3 +89,28 @@ Freeze policy for this project:
   `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260313_130748_multivenue_v1_live`
 - Reusable shared capture Python:
   `/Users/ahmedelmorshedy/.local/bin/oracle-btc-python`
+
+### First multivenue base dataset built
+
+- Builder:
+  `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/build_btc_multivenue_dataset.py`
+- Output:
+  `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T131709_3sessions_v1/dataset/features.csv.gz`
+- Metadata:
+  `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T131709_3sessions_v1/dataset/metadata.json`
+
+Initial dataset stats:
+
+- rows: `593`
+- columns: `67`
+- span: `2026-03-13T13:04:13+00:00` to `2026-03-13T13:17:09+00:00`
+- venues included:
+  - Binance futures BTCUSDT
+  - Binance spot BTCUSDT
+  - Coinbase BTC-USD
+
+Initial read:
+
+- this is enough to verify the aligned multivenue feature pipeline
+- this is not enough to train a serious new BTC model yet
+- continue capture first, then train fresh continuation and mean-reversion baselines on the same immutable track

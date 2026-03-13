@@ -54,3 +54,20 @@ Reusable shared capture env:
 
 - Python: `/Users/ahmedelmorshedy/.local/bin/oracle-btc-python`
 - Pip: `/Users/ahmedelmorshedy/.local/bin/oracle-btc-pip`
+
+First aligned dataset:
+
+- `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T131709_3sessions_v1/dataset/features.csv.gz`
+
+Current base-table contents:
+
+- futures book/tape/depth
+- spot book/tape/depth
+- Coinbase level2 + ticker
+- cross-venue gaps
+- future BTC return targets for `5s`, `10s`, `30s`, `60s`, `90s`
+
+Current constraint:
+
+- sample is still too short for a serious model promotion
+- keep capture running, then train from this same versioned track

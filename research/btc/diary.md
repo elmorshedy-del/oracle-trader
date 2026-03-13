@@ -137,3 +137,26 @@ Initial read:
 - meanrev_after_upshock_30s: test AUC `0.3492`
 - meanrev_after_downshock_30s: test AUC `0.6305`
 - Read: filtering to impulse rows made the models event-specific, but this sample is still small and unstable; only downshock mean-reversion has a non-terrible first test read.
+
+## 2026-03-13 - Tuned downshock mean reversion
+
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- Training run: `btc_multivenue_catboost_impulse_20260313T222428_v1`
+- Checkpoint: `btc-multivenue-catboost-meanrev-downshock30-v2-20260313T222431`
+- Tuning change: kept the impulse definition at `past 5s <= -5 bps`, but relaxed the required rebound from `+8 bps` to `+4 bps` over `30s`.
+- meanrev_after_downshock_30s: valid AUC `0.7565`, test AUC `0.7703`, test precision@top-decile `0.6667`.
+- Read: this is the first BTC multivenue result that looks strong enough to deserve dedicated replay instead of more generic retraining first.
+
+## 2026-03-13 - Hybrid replay search for tuned downshock mean reversion
+
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- Model: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1/models/meanrev_after_downshock_30s.cbm`
+- Search run: `btc_meanrev_hybrid_search_20260313T224152_v1`
+- Checkpoint: `btc-meanrev-hybrid-search-20260313T224152`
+- Search method: exhaustive grid over `900` core entry/exit combinations, then execution-only Monte Carlo stress on the top `20` cores, then bootstrap on the best stressed configuration.
+- Candidate events: `265`
+- Best core config: threshold `0.35`, take-profit `8 bps`, stop-loss `8-10 bps`, max hold `30s`
+- Best core replay: `27` trades, `88.9%` win rate, total net `98.04 bps`
+- Best stressed result: mean total net `91.63 bps`, p05 total net `49.46 bps`, positive total share `1.000`
+- Bootstrap on best stressed trade list: mean total net `147.23 bps`, p05 total net `110.55 bps`, positive total share `1.000`
+- Read: this is the first BTC replay checkpoint that looks economically promising under the tested fee/slippage/cooldown ranges. It is still a small-window result and should be treated as a replay candidate, not a production claim.

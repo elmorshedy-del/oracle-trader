@@ -143,5 +143,27 @@
       "revert_threshold_bps": 4,
       "horizon_seconds": 30
     }
+  },
+  {
+    "checkpoint_id": "btc-meanrev-hybrid-search-20260313T224152",
+    "created_at": "2026-03-13T22:42:34.412142+00:00",
+    "status": "replay_candidate",
+    "category": "mean_reversion",
+    "summary": "Hybrid grid + execution Monte Carlo on tuned 30s BTC downshock mean reversion shows robust positive replay under tested assumptions.",
+    "artifacts": {
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_search/btc_meanrev_hybrid_search_20260313T224152_v1/reports/report.md",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_search/btc_meanrev_hybrid_search_20260313T224152_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "candidate_events": 265,
+      "best_core_threshold": 0.35,
+      "best_core_tp_bps": 8,
+      "best_core_sl_bps": 8,
+      "best_core_hold_seconds": 30,
+      "best_core_total_net_bps": 98.04396077158398,
+      "best_stressed_mean_total_net_bps": 91.6300633015726,
+      "best_stressed_p05_total_net_bps": 49.4577339089129,
+      "bootstrap_positive_total_share": 1.0
+    }
   }
 ]

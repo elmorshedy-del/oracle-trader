@@ -1,0 +1,48 @@
+[
+  {
+    "checkpoint_id": "btc-meanrev-downshock30-validation-oos-20260314T015231",
+    "captured_at": "2026-03-14T01:52:31.160638+00:00",
+    "session_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260314_002124_meanrev_validation_v1",
+    "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260314T002125_20260314T012124_1sessions_v1/dataset/features.csv.gz",
+    "validation_run": "btc_meanrev_validation_20260314T015230_v1",
+    "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation/btc_meanrev_validation_20260314T015230_v1/reports/metadata.json",
+    "overall_result": {
+      "trades": 2,
+      "wins": 1,
+      "win_rate": 0.5,
+      "total_net_bps": -7.232742120291565,
+      "avg_net_bps": -3.6163710601457826,
+      "median_net_bps": -3.6163710601457826,
+      "profit_factor": 0.12843203676086382,
+      "take_profit_exits": 0,
+      "stop_loss_exits": 0,
+      "timeout_exits": 2,
+      "no_path_skips": 0
+    },
+    "day_rows": [
+      {
+        "day": "2026-03-14",
+        "trades": 2,
+        "wins": 1,
+        "win_rate": 0.5,
+        "total_net_bps": -7.232742120291565,
+        "avg_net_bps": -3.6163710601457826,
+        "median_net_bps": -3.6163710601457826,
+        "profit_factor": 0.12843203676086382
+      }
+    ],
+    "positive_day_share": 0.0,
+    "day_bootstrap": {
+      "samples": 5000,
+      "day_count": 1,
+      "mean_total_net_bps": -7.232742120291563,
+      "median_total_net_bps": -7.232742120291565,
+      "p05_total_net_bps": -7.232742120291565,
+      "p25_total_net_bps": -7.232742120291565,
+      "p75_total_net_bps": -7.232742120291565,
+      "p95_total_net_bps": -7.232742120291565,
+      "mean_positive_day_share": 0.0,
+      "p05_positive_day_share": 0.0
+    }
+  }
+]

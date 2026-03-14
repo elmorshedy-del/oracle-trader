@@ -28,7 +28,7 @@ import numpy as np
 UTC = timezone.utc
 DEFAULT_CAPTURE_DURATION_SECONDS = 3600
 DEFAULT_CAPTURE_PYTHON = Path("/Users/ahmedelmorshedy/.local/bin/oracle-btc-python")
-DEFAULT_ANALYSIS_PYTHON = Path(sys.executable)
+DEFAULT_ANALYSIS_PYTHON = Path("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14")
 DEFAULT_SPEC_PATH = Path("research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json")
 DEFAULT_CAPTURE_ROOT = Path("output/btc_multivenue_capture")
 DEFAULT_DATASET_ROOT = Path("output/btc_multivenue_dataset")
@@ -54,6 +54,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-label", default="meanrev_validation_v1", help="Capture session label")
     parser.add_argument("--bootstrap-samples", type=int, default=5000, help="Bootstrap samples for frozen validation")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--existing-session-dir", default=None, help="Use an already-finished session directory instead of starting a new capture")
+    parser.add_argument("--existing-dataset-path", default=None, help="Use an already-built dataset path instead of rebuilding from the session")
     return parser.parse_args()
 
 
@@ -73,35 +75,45 @@ def main() -> None:
     if args.delay_seconds > 0:
         time.sleep(args.delay_seconds)
 
-    capture_report = run_json_command(
-        [
-            str(capture_python),
-            str(repo_root / "tools" / "start_btc_multivenue_capture.py"),
-            "--duration-seconds",
-            str(args.capture_duration_seconds),
-            "--run-label",
-            args.run_label,
-            "--output-root",
-            str(capture_root),
-        ],
-        cwd=repo_root,
-    )
-    session_root = Path(capture_report["session_root"]).resolve()
+    if args.existing_session_dir:
+        session_root = Path(args.existing_session_dir).resolve()
+        if not session_root.exists():
+            raise SystemExit(f"Missing existing session dir: {session_root}")
+    else:
+        capture_report = run_json_command(
+            [
+                str(capture_python),
+                str(repo_root / "tools" / "start_btc_multivenue_capture.py"),
+                "--duration-seconds",
+                str(args.capture_duration_seconds),
+                "--run-label",
+                args.run_label,
+                "--output-root",
+                str(capture_root),
+            ],
+            cwd=repo_root,
+        )
+        session_root = Path(capture_report["session_root"]).resolve()
 
-    build_report = run_json_command(
-        [
-            str(analysis_python),
-            str(repo_root / "tools" / "build_btc_multivenue_dataset.py"),
-            "--capture-root",
-            str(capture_root / "sessions"),
-            "--session-dir",
-            str(session_root),
-            "--output-root",
-            str(dataset_root),
-        ],
-        cwd=repo_root,
-    )
-    dataset_path = Path(build_report["output_path"]).resolve()
+    if args.existing_dataset_path:
+        dataset_path = Path(args.existing_dataset_path).resolve()
+        if not dataset_path.exists():
+            raise SystemExit(f"Missing existing dataset path: {dataset_path}")
+    else:
+        build_report = run_json_command(
+            [
+                str(analysis_python),
+                str(repo_root / "tools" / "build_btc_multivenue_dataset.py"),
+                "--capture-root",
+                str(capture_root / "sessions"),
+                "--session-dir",
+                str(session_root),
+                "--output-root",
+                str(dataset_root),
+            ],
+            cwd=repo_root,
+        )
+        dataset_path = Path(build_report["output_path"]).resolve()
 
     validation_report = run_json_command(
         [

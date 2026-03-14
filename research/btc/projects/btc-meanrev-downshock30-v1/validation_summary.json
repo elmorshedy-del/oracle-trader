@@ -1,0 +1,25 @@
+{
+  "validation_run_count": 1,
+  "validation_checkpoints": [
+    "btc-meanrev-downshock30-validation-oos-20260314T015231"
+  ],
+  "unique_day_count": 1,
+  "unique_days": [
+    "2026-03-14"
+  ],
+  "total_trades": 2,
+  "total_net_bps": -7.232742120291565,
+  "positive_day_share": 0.0,
+  "day_bootstrap": {
+    "samples": 5000,
+    "day_count": 1,
+    "mean_total_net_bps": -7.232742120291563,
+    "median_total_net_bps": -7.232742120291565,
+    "p05_total_net_bps": -7.232742120291565,
+    "p25_total_net_bps": -7.232742120291565,
+    "p75_total_net_bps": -7.232742120291565,
+    "p95_total_net_bps": -7.232742120291565,
+    "mean_positive_day_share": 0.0,
+    "p05_positive_day_share": 0.0
+  }
+}

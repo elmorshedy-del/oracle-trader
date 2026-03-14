@@ -189,3 +189,16 @@ Initial read:
   - total net: `98.04 bps`
   - day count: `1`
 - Read: this reference run is only a protocol sanity check because it uses the same discovery-day dataset. Future days must be evaluated unchanged through the frozen spec before this strategy can be promoted.
+
+## 2026-03-14 - Frozen mean-reversion out-of-sample validation
+
+- Checkpoint: `btc-meanrev-downshock30-validation-oos-20260314T015231`
+- Capture session: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260314_002124_meanrev_validation_v1`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260314T002125_20260314T012124_1sessions_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T015230_v1`
+- Trades: `2`
+- Win rate: `0.5`
+- Total net bps: `-7.232742120291565`
+- Aggregate validation day count: `1`
+- Aggregate positive-day share: `0.0`
+- Aggregate bootstrap p05 total net bps: `-7.232742120291565`

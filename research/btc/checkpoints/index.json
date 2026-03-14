@@ -187,5 +187,25 @@
       "minimum_new_days_for_promotion": 5,
       "minimum_total_trades_for_promotion": 50
     }
+  },
+  {
+    "checkpoint_id": "btc-meanrev-downshock30-validation-oos-20260314T015231",
+    "created_at": "2026-03-14T01:52:31.142700+00:00",
+    "status": "validation_oos",
+    "category": "mean_reversion_validation",
+    "summary": "Official out-of-sample validation run for the frozen BTC 30s downshock mean-reversion candidate.",
+    "artifacts": {
+      "spec_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "session_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260314_002124_meanrev_validation_v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260314T002125_20260314T012124_1sessions_v1/dataset/features.csv.gz",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation/btc_meanrev_validation_20260314T015230_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "trades": 2,
+      "win_rate": 0.5,
+      "total_net_bps": -7.232742120291565,
+      "positive_day_share": 0.0,
+      "bootstrap_p05_total_net_bps": -7.232742120291565
+    }
   }
 ]

@@ -290,3 +290,38 @@ Results:
   - the real March 14 runtime shadow archive did contain enough multivenue data to reconstruct a same-day dataset
   - the frozen downshock mean-reversion winner barely triggered in this runtime window
   - this is useful same-day exploratory evidence, but it is not a clean independent multi-day confirmation because it uses the same March 14 live regime
+
+## 2026-03-14 - March 14 runtime multivenue full-day same-day validation
+
+- Source runtime session imports:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_052204_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_060539_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_062530_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_063113_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_064201_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_065010_runtime_meanrev_shadow_v1`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_065637_runtime_meanrev_shadow_v1`
+- Dataset:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_runtime_shadow_all_v1/btc_multivenue_1s_20260314T052318_20260314T121119_7sessions_v1/dataset/features.csv.gz`
+- Frozen validation report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation_runtime_shadow_all_v1/btc_meanrev_validation_20260314T131447_v1/reports/report.md`
+- Hybrid search report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_runtime_shadow_all_v1/btc_meanrev_hybrid_search_20260314T131419_v1/reports/report.md`
+- Dataset stats:
+  - rows: `10,655`
+  - columns: `67`
+  - span: `2026-03-14 05:23:18 UTC` to `2026-03-14 12:11:19 UTC`
+- Frozen full-day validation read:
+  - score-qualified candidate events: `4`
+  - trades: `2`
+  - win rate: `0.0%`
+  - total net: `-3.17 bps`
+  - both exits: `timeout`
+- Exact March 13-style hybrid search read:
+  - raw downshock candidates: `19`
+  - strict hybrid grid with `min_trades=15`: `0` surviving configs
+  - exploratory sparse-day rerun with `min_trades=3`: `0` surviving configs
+- Read:
+  - using the full March 14 runtime day still did not reproduce the March 13 monster behavior
+  - the main issue was not just trade-count filtering; under the frozen `0.35+` score floor the day simply did not produce enough qualifying trades
+  - this full-day same-day result is stronger evidence than the single-block slice, but it is still same-day runtime evidence rather than a clean future independent validation day

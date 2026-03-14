@@ -270,5 +270,42 @@
       "total_net_bps": -0.5763056128429405,
       "win_rate": 0.0
     }
+  },
+  {
+    "checkpoint_id": "btc-meanrev-runtime-shadow-fullday-20260314T131447",
+    "created_at": "2026-03-14T13:15:38.350258+00:00",
+    "status": "runtime_shadow_same_day_negative",
+    "category": "mean_reversion_validation_runtime",
+    "summary": "Frozen BTC 30s downshock mean-reversion validation on the full March 14 runtime shadow multivenue day.",
+    "artifacts": {
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_runtime_shadow_all_v1/btc_multivenue_1s_20260314T052318_20260314T121119_7sessions_v1/dataset/features.csv.gz",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation_runtime_shadow_all_v1/btc_meanrev_validation_20260314T131447_v1/reports/metadata.json",
+      "spec_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json"
+    },
+    "metrics": {
+      "row_count": 10655,
+      "candidate_events": 4,
+      "trades": 2,
+      "total_net_bps": -3.165994668308688,
+      "win_rate": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "btc-meanrev-runtime-shadow-hybrid-20260314T131419",
+    "created_at": "2026-03-14T13:15:38.355564+00:00",
+    "status": "runtime_shadow_hybrid_no_survivors",
+    "category": "mean_reversion_hybrid_runtime",
+    "summary": "Exact March 13-style hybrid search on the full March 14 runtime shadow day produced no surviving configs.",
+    "artifacts": {
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_runtime_shadow_all_v1/btc_multivenue_1s_20260314T052318_20260314T121119_7sessions_v1/dataset/features.csv.gz",
+      "hybrid_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_runtime_shadow_all_v1/btc_meanrev_hybrid_search_20260314T131419_v1/reports/metadata.json",
+      "sparse_hybrid_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_runtime_shadow_all_v1_sparse/btc_meanrev_hybrid_search_20260314T131433_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 10655,
+      "raw_downshock_candidates": 19,
+      "surviving_core_configs": 0,
+      "sparse_surviving_core_configs": 0
+    }
   }
 ]

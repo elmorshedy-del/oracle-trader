@@ -219,6 +219,58 @@ Results:
   - stressed p05 total net: `49.46 bps`
   - positive total share: `1.000`
 
+## 2026-03-14 - March 13 OI context side-by-side
+
+- Source frozen dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- OI-enriched dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_oi_experiment/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_oi_v1_manual/features.csv.gz`
+- Historical OI source: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml/binance_btcusdt_raw/metrics/BTCUSDT-metrics-2026-03-13.zip`
+- Training run: `btc_multivenue_catboost_impulse_20260314T170628_v1`
+- Hybrid replay run: `btc_meanrev_hybrid_search_20260314T170714_v1`
+- Checkpoint: `btc-meanrev-downshock30-oi-context-20260314T170854`
+
+What changed:
+
+- Added Binance futures 5-minute open-interest/crowding context to the March 13 dataset without mutating the frozen baseline.
+- Added columns:
+  - `fut_sum_open_interest`
+  - `fut_sum_open_interest_value`
+  - `fut_sum_open_interest_delta_5m`
+  - `fut_sum_open_interest_delta_5m_bps`
+  - corresponding value and crowding-ratio fields
+  - two simple shock-alignment interaction fields
+
+Important limitation:
+
+- This is not exact `5-second` OI delta during the shock window.
+- Historical Binance metrics for March 13 only gave `5-minute` snapshots, so this experiment tests OI context, not true liquidation-time OI flow.
+
+Result versus the frozen March 13 baseline:
+
+- Downshock mean-reversion valid AUC:
+  - baseline `0.7565`
+  - OI context `0.7908`
+- Downshock mean-reversion test AUC:
+  - baseline `0.7703`
+  - OI context `0.7273`
+- Test precision@top-decile:
+  - baseline `0.6667`
+  - OI context `0.5000`
+- Best core replay total net:
+  - baseline `98.04 bps`
+  - OI context `93.67 bps`
+- Best stressed replay mean total net:
+  - baseline `91.63 bps`
+  - OI context `88.26 bps`
+- Best stressed replay p05 total net:
+  - baseline `49.46 bps`
+  - OI context `46.88 bps`
+
+Read:
+
+- The model did use the new OI features; `fut_sum_open_interest` ranked inside the top 20 importances and several OI/crowding fields were non-trivial.
+- But on this exact March 13 apples-to-apples rerun, OI context did not beat the frozen baseline.
+- So this idea is still promising, but the correct next version would need higher-frequency OI/liquidation state than the coarse 5-minute historical snapshot.
+
 - `downshock -> short continuation`
   - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/down_cont_short/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md`
   - candidate events: `265`

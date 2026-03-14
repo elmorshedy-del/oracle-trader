@@ -1,0 +1,35 @@
+{
+  "checkpoint_id": "btc-meanrev-downshock30-oi-context-20260314T170854",
+  "created_at": "2026-03-14T17:08:54+00:00",
+  "status": "oi_context_side_by_side",
+  "category": "multivenue_mean_reversion",
+  "summary": "Side-by-side March 13 rerun with Binance futures 5-minute open-interest context added to the frozen multivenue downshock mean-reversion dataset.",
+  "artifacts": {
+    "source_dataset": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz",
+    "oi_dataset": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_oi_experiment/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_oi_v1_manual/features.csv.gz",
+    "metrics_zip": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/futures_ml/binance_btcusdt_raw/metrics/BTCUSDT-metrics-2026-03-13.zip",
+    "training_run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models_oi_experiment/btc_multivenue_catboost_impulse_20260314T170628_v1",
+    "training_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models_oi_experiment/btc_multivenue_catboost_impulse_20260314T170628_v1/reports/metadata.json",
+    "hybrid_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_search_oi_experiment/btc_meanrev_hybrid_search_20260314T170714_v1/reports/metadata.json"
+  },
+  "metrics": {
+    "baseline_feature_count": 62,
+    "oi_feature_count": 74,
+    "baseline_valid_auc": 0.7565359477124183,
+    "oi_valid_auc": 0.7908496732026143,
+    "baseline_test_auc": 0.7703349282296651,
+    "oi_test_auc": 0.7272727272727273,
+    "baseline_test_precision_top_decile": 0.6666666666666666,
+    "oi_test_precision_top_decile": 0.5,
+    "baseline_best_core_total_net_bps": 98.04396077158398,
+    "oi_best_core_total_net_bps": 93.67070329642107,
+    "baseline_best_stressed_mean_total_net_bps": 91.6300633015726,
+    "oi_best_stressed_mean_total_net_bps": 88.26430057431963,
+    "baseline_best_stressed_p05_total_net_bps": 49.4577339089129,
+    "oi_best_stressed_p05_total_net_bps": 46.87583702147256
+  },
+  "notes": [
+    "This did not add exact 5-second shock-window OI delta. Historical Binance metrics only provided 5-minute OI snapshots for March 13.",
+    "The model did use the new OI context fields, but the exact March 13 test AUC and replay edge both came in slightly below the frozen baseline."
+  ]
+}

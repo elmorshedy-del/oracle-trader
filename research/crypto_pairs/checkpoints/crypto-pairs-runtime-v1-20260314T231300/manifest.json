@@ -1,0 +1,21 @@
+{
+  "checkpoint_id": "crypto-pairs-runtime-v1-20260314T231300",
+  "created_at": "2026-03-14T23:13:32.866369+00:00",
+  "status": "runtime_scaffold",
+  "category": "runtime_v1",
+  "summary": "Implemented the rule-based crypto pairs runtime scaffold, first backtester, and live streamer fallback after Phase 1 discovery.",
+  "artifacts": {
+    "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1",
+    "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json",
+    "backtest_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260314T223158_v1/report.json",
+    "live_smoke_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260314T231223_v1/summary.json"
+  },
+  "metrics": {
+    "active_pairs": 3,
+    "backtest_trades": 44,
+    "backtest_win_rate": 0.7045454545454546,
+    "backtest_total_pnl_bps": 233.7625,
+    "live_messages": 17,
+    "live_bars": 6
+  }
+}

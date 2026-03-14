@@ -6,9 +6,11 @@ Runs the algo pipeline in background tasks.
 """
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
+import threading
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,7 +19,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 import io
 from fastapi.staticfiles import StaticFiles
 
@@ -50,6 +52,10 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 # Global pipeline instance
 pipeline: Pipeline | None = None
 multiagent_runtime: MultiagentRuntime | None = None
+runtime_loop: asyncio.AbstractEventLoop | None = None
+runtime_thread: threading.Thread | None = None
+pipeline_future = None
+multiagent_future = None
 
 
 class MultiagentConsultRequest(BaseModel):
@@ -138,29 +144,77 @@ def _build_legacy_export_response():
     )
 
 
+def _run_runtime_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Own a separate event loop for long-running trading runtimes."""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+
+def _log_runtime_future(name: str, future) -> None:
+    try:
+        future.result()
+        logger.info("%s background task exited cleanly", name)
+    except (asyncio.CancelledError, concurrent.futures.CancelledError):
+        logger.info("%s background task cancelled", name)
+    except Exception:
+        logger.exception("%s background task crashed", name)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start pipeline on startup, stop on shutdown."""
-    global pipeline, multiagent_runtime
+    global pipeline, multiagent_runtime, runtime_loop, runtime_thread, pipeline_future, multiagent_future
     config = PipelineConfig()
     pipeline = Pipeline(config)
     multiagent_runtime = MultiagentRuntime(pipeline_config=config)
 
-    # Start pipeline in background
-    task = asyncio.create_task(pipeline.start())
-    multiagent_task = asyncio.create_task(multiagent_runtime.start())
-    logger.info("Pipeline background task started")
-    logger.info("Multi-agent runtime background task started")
+    runtime_loop = asyncio.new_event_loop()
+    runtime_thread = threading.Thread(
+        target=_run_runtime_loop,
+        args=(runtime_loop,),
+        name="oracle-runtime-loop",
+        daemon=True,
+    )
+    runtime_thread.start()
+
+    pipeline_future = asyncio.run_coroutine_threadsafe(pipeline.start(), runtime_loop)
+    multiagent_future = asyncio.run_coroutine_threadsafe(multiagent_runtime.start(), runtime_loop)
+    pipeline_future.add_done_callback(lambda future: _log_runtime_future("Pipeline", future))
+    multiagent_future.add_done_callback(lambda future: _log_runtime_future("Multi-agent runtime", future))
+    logger.info("Pipeline background task started on dedicated runtime loop")
+    logger.info("Multi-agent runtime background task started on dedicated runtime loop")
 
     yield
 
     # Shutdown
-    if pipeline:
-        await pipeline.stop()
-    if multiagent_runtime:
-        await multiagent_runtime.stop()
-    task.cancel()
-    multiagent_task.cancel()
+    stop_futures = []
+    if pipeline and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(pipeline.stop(), runtime_loop))
+    if multiagent_runtime and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(multiagent_runtime.stop(), runtime_loop))
+
+    for future in stop_futures:
+        try:
+            future.result(timeout=15)
+        except Exception:
+            logger.exception("Runtime shutdown future failed")
+
+    if pipeline_future:
+        pipeline_future.cancel()
+    if multiagent_future:
+        multiagent_future.cancel()
+
+    if runtime_loop:
+        runtime_loop.call_soon_threadsafe(runtime_loop.stop)
+    if runtime_thread:
+        runtime_thread.join(timeout=10)
+    if runtime_loop:
+        runtime_loop.close()
+
+    pipeline_future = None
+    multiagent_future = None
+    runtime_loop = None
+    runtime_thread = None
 
 
 app = FastAPI(
@@ -188,7 +242,7 @@ async def get_state():
     if pipeline is None:
         return {"mode":"paper","uptime_human":"starting...","scan_count":0,"active_markets":0,"portfolio":{"total_value":0,"cash":0,"positions_value":0,"total_pnl":0,"total_pnl_pct":0,"total_trades":0,"win_rate":0,"max_drawdown":0,"total_fees":0,"positions":[]},"signals":[],"trades":[],"strategies":{},"whale_wallets":[],"recent_news":[],"performance":{"by_strategy":{}},"errors":["Initializing..."],"markets_sample":[]}
     try:
-        return pipeline.get_state()
+        return Response(content=pipeline.get_state_json(), media_type="application/json")
     except Exception as e:
         return {"mode":"paper","uptime_human":"error","scan_count":0,"active_markets":0,"portfolio":{"total_value":0,"cash":0,"positions_value":0,"total_pnl":0,"total_pnl_pct":0,"total_trades":0,"win_rate":0,"max_drawdown":0,"total_fees":0,"positions":[]},"signals":[],"trades":[],"strategies":{},"whale_wallets":[],"recent_news":[],"performance":{"by_strategy":{}},"errors":[str(e)],"markets_sample":[]}
 

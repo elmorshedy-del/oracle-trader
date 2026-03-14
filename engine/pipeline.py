@@ -229,6 +229,7 @@ class Pipeline:
         self._scan_count = 0
         self._latest_diagnostics: dict = {}
         self._cached_state: dict | None = None
+        self._cached_state_json: bytes | None = None
 
     async def start(self):
         """Start the main loop."""
@@ -505,7 +506,7 @@ class Pipeline:
             )
             weather: WeatherForecastStrategy = self.strategies["weather"]
             weather.save_state()
-            self._cached_state = self._build_state()
+            self._refresh_cached_state()
 
     async def reset_state(self):
         """Reset portfolio and per-strategy transient state without deleting persisted logs."""
@@ -550,7 +551,7 @@ class Pipeline:
             self.health = HealthMonitor(log_dir=str(LOG_DIR))
             await self._refresh_data()
             self.trader.save_state()
-            self._cached_state = self._build_state()
+            self._refresh_cached_state()
             logger.info("[PIPELINE] Reset live paper trading state")
 
     def _filter_comparison_signals(self, *, view_key: str, signals: list[Signal]) -> list[Signal]:
@@ -798,7 +799,28 @@ class Pipeline:
         if self._cached_state is not None:
             return self._cached_state
 
-        return self._build_state()
+        state = self._build_state()
+        self._set_cached_state(state)
+        return state
+
+    def get_state_json(self) -> bytes:
+        """Get the cached dashboard state as serialized JSON bytes."""
+        if self._cached_state_json is not None:
+            return self._cached_state_json
+
+        state = self.get_state()
+        return self._cached_state_json or json.dumps(state, separators=(",", ":"), default=str).encode("utf-8")
+
+    def _set_cached_state(self, state: dict) -> None:
+        """Store both dict and serialized forms of the dashboard state."""
+        self._cached_state = state
+        self._cached_state_json = json.dumps(state, separators=(",", ":"), default=str).encode("utf-8")
+
+    def _refresh_cached_state(self) -> dict:
+        """Rebuild the dashboard state cache and return the latest dict snapshot."""
+        state = self._build_state()
+        self._set_cached_state(state)
+        return state
 
     def _build_state(self) -> dict:
         """Build the full dashboard state payload."""

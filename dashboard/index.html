@@ -658,6 +658,7 @@ const STATE_POLL_INTERVAL_MS = 8000;
 const STATE_HIDDEN_POLL_INTERVAL_MS = 20000;
 const STATE_FETCH_TIMEOUT_MS = 7000;
 let lastState = null;
+let lastStateSuccessAt = null;
 let selectedView = 'all';
 let legacyConsultLoading = false;
 let legacyConsultResponse = null;
@@ -834,12 +835,19 @@ async function fetchState() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     lastState = data;
+    lastStateSuccessAt = new Date().toISOString();
     render(data);
     document.getElementById('last-update').textContent = 'Live';
     document.getElementById('last-update').className = '';
   } catch (err) {
-    document.getElementById('last-update').textContent = 'Disconnected';
-    document.getElementById('last-update').className = 'dot-pulse';
+    const lastUpdateEl = document.getElementById('last-update');
+    if (lastState && lastStateSuccessAt) {
+      lastUpdateEl.textContent = `Stale ${timeAgo(lastStateSuccessAt)}`;
+      lastUpdateEl.className = '';
+    } else {
+      lastUpdateEl.textContent = 'Disconnected';
+      lastUpdateEl.className = 'dot-pulse';
+    }
     console.error('Fetch error:', err);
   } finally {
     clearTimeout(timeoutId);

@@ -3,7 +3,7 @@
   "status": "frozen_validation_protocol",
   "discovery_checkpoint_id": "btc-meanrev-hybrid-search-20260313T224152",
   "training_checkpoint_id": "btc-multivenue-catboost-meanrev-downshock30-v2-20260313T222431",
-  "model_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1/models/meanrev_after_downshock_30s.cbm",
+  "model_path": "models/bitcoin_ml/meanrev_downshock30_v1/meanrev_after_downshock_30s.cbm",
   "dataset_family": "btc_multivenue_1s",
   "signal_definition": {
     "description": "BTC downshock mean reversion after a 5-second selloff",

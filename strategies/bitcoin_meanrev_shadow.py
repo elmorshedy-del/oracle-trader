@@ -92,7 +92,7 @@ class FrozenMeanRevBundle:
             self.entry_slippage_bps = float(execution.get("entry_slippage_bps") or 0.0)
             self.exit_slippage_bps = float(execution.get("exit_slippage_bps") or 0.0)
             self.past_window_column = f"fut_ret_{self.shock_window_seconds}s"
-            self.model_path = Path(self.spec["model_path"]).resolve()
+            self.model_path = self._resolve_repo_path(self.spec["model_path"])
             if not self.model_path.exists():
                 self.load_error = f"missing_model:{self.model_path}"
                 return
@@ -105,6 +105,23 @@ class FrozenMeanRevBundle:
         except Exception as exc:
             self.load_error = str(exc)
             self.ready = False
+
+    def _resolve_repo_path(self, raw_path: str | Path) -> Path:
+        path = Path(raw_path)
+        if path.is_absolute():
+            if path.exists():
+                return path
+            marker = "oracle-trader/"
+            as_posix = path.as_posix()
+            if marker in as_posix:
+                suffix = as_posix.split(marker, 1)[1]
+                repo_candidate = Path(__file__).resolve().parents[1] / suffix
+                return repo_candidate.resolve()
+            return path
+        spec_relative = (self.spec_path.parent / path).resolve()
+        if spec_relative.exists():
+            return spec_relative
+        return (Path(__file__).resolve().parents[1] / path).resolve()
 
     def predict_score(self, feature_row: dict[str, float]) -> float | None:
         if not self.ready or self.model is None or Pool is None:

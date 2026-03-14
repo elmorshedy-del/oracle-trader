@@ -242,3 +242,28 @@ Results:
   - the March 13 monster was real, but it was concentrated in the `downshock -> long mean reversion` quadrant
   - `downshock -> short continuation` is the only other quadrant that looks even somewhat promising, but it is much less robust because the stressed lower bound dipped slightly negative
   - both `upshock` quadrants were materially weaker on the same discovery sample
+
+## 2026-03-14 - Binance historical bulk-archive smoke
+
+- Project: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-binance-historical-meanrev-v1/plan.md`
+- Checkpoint: `btc-binance-historical-smoke-20260314T115752`
+- Downloader: `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/download_btc_binance_historical.py`
+- Dataset builder: `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/build_btc_binance_historical_dataset.py`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/datasets/btc_binance_historical_1s_20260301_20260301_v1/dataset/features.csv.gz`
+- Training report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/models/btc_multivenue_catboost_impulse_20260314T115354_v1/reports/metadata.json`
+- Smoke replay report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/validation/btc_meanrev_validation_20260314T115751_v1/reports/metadata.json`
+- Dataset stats:
+  - rows: `86,400`
+  - columns: `68`
+  - candidate downshock events: `2,204`
+- First Binance-only model read:
+  - `meanrev_after_downshock_30s` test AUC `0.4911`
+  - test precision@top-decile `0.1972`
+- Frozen post-cost smoke replay:
+  - trades: `567`
+  - win rate: `30.5%`
+  - total net: `-2014.59 bps`
+- Read:
+  - official Binance bulk data is now a working BTC backtest source inside Oracle
+  - this first Binance-only historical sample is materially weaker than the multivenue discovery track
+  - so Binance historical should stay a separate research lane, not be used to “confirm” the Coinbase-aware shadow model

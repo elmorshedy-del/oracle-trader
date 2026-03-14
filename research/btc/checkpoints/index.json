@@ -229,5 +229,26 @@
       "up_meanrev_short_p05_total_net_bps": -14.741855089145455,
       "up_cont_long_survived": 0
     }
+  },
+  {
+    "checkpoint_id": "btc-binance-historical-smoke-20260314T115752",
+    "created_at": "2026-03-14T11:58:36.497797+00:00",
+    "status": "historical_smoke_negative",
+    "category": "binance_historical_mean_reversion",
+    "summary": "First Binance-only historical BTC mean-reversion smoke on official bulk archives was strongly negative under frozen post-cost replay.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-binance-historical-meanrev-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/datasets/btc_binance_historical_1s_20260301_20260301_v1/dataset/features.csv.gz",
+      "training_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/models/btc_multivenue_catboost_impulse_20260314T115354_v1/reports/metadata.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_binance_historical/validation/btc_meanrev_validation_20260314T115751_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86400,
+      "candidate_events": 2204,
+      "test_auc": 0.4911027892561983,
+      "trades": 567,
+      "total_net_bps": -2014.59329040561,
+      "win_rate": 0.30511463844797176
+    }
   }
 ]

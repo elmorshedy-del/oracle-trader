@@ -67,10 +67,6 @@ def main() -> None:
     execution = spec["execution_definition"]
 
     df = pd.read_csv(dataset_path, index_col=0, parse_dates=True)
-    feature_columns = [column for column in df.columns if not column.startswith("target_")]
-    X = df[feature_columns].replace([np.inf, -np.inf], np.nan)
-    X = X.fillna(X.median(numeric_only=True)).fillna(0.0)
-
     past_window_column = f"fut_ret_{int(signal['shock_window_seconds'])}s"
     if past_window_column not in df.columns:
         raise SystemExit(f"Missing required impulse feature: {past_window_column}")
@@ -79,6 +75,7 @@ def main() -> None:
 
     model = CatBoostClassifier()
     model.load_model(str(model_path))
+    X = prepare_model_features(df, model=model)
     scores = pd.Series(np.nan, index=df.index, dtype=float)
     if int(candidate_mask.sum()) > 0:
         scores.loc[candidate_mask] = model.predict_proba(X.loc[candidate_mask])[:, 1]
@@ -221,6 +218,19 @@ def simulate_params(
         no_path_skips=no_path_skips,
     )
     return validation, trade_records
+
+
+def prepare_model_features(frame: pd.DataFrame, *, model: CatBoostClassifier) -> pd.DataFrame:
+    feature_columns = list(model.feature_names_ or [])
+    if not feature_columns:
+        feature_columns = [column for column in frame.columns if not column.startswith("target_")]
+    missing = [column for column in feature_columns if column not in frame.columns]
+    if missing:
+        raise SystemExit(f"Dataset is missing model features: {missing[:10]}")
+    X = frame[feature_columns].copy()
+    X = X.replace([np.inf, -np.inf], np.nan)
+    X = X.fillna(X.median(numeric_only=True)).fillna(0.0)
+    return X
 
 
 def simulate_trade(

@@ -241,6 +241,14 @@ class Pipeline:
         # Initial whale refresh
         whale: WhaleTrackingStrategy = self.strategies["whale"]
         await whale.refresh_whales()
+        self._latest_diagnostics = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "scan": self._scan_count,
+            "phase": "startup_ready",
+            "markets_total": len(self._markets),
+            "markets_tradeable": len(self._markets),
+        }
+        self._refresh_cached_state()
 
         while self._running:
             try:
@@ -281,6 +289,15 @@ class Pipeline:
 
             # Refresh market data every cycle
             await self._refresh_data()
+            self._latest_diagnostics = {
+                "timestamp": cycle_start.isoformat(),
+                "scan": self._scan_count,
+                "phase": "scan_running",
+                "markets_total": len(self._markets),
+                "markets_tradeable": len(self._markets),
+                "duration_secs": round((datetime.now(timezone.utc) - cycle_start).total_seconds(), 2),
+            }
+            self._refresh_cached_state()
 
             if not self._markets:
                 logger.warning("No markets available, skipping cycle")

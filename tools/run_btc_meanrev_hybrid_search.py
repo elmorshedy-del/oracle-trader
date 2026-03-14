@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hybrid search for BTC downshock mean reversion.
+Hybrid search for BTC impulse-conditioned replay candidates.
 
 This runner does:
 1. exhaustive grid search over core structural parameters
@@ -50,12 +50,14 @@ class SimulationResult:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run hybrid search for BTC downshock mean reversion.")
+    parser = argparse.ArgumentParser(description="Run hybrid search for BTC impulse-conditioned replay candidates.")
     parser.add_argument("--dataset-path", required=True, help="Path to multivenue features.csv.gz")
-    parser.add_argument("--model-path", required=True, help="Path to trained CatBoost downshock mean-reversion model")
+    parser.add_argument("--model-path", required=True, help="Path to trained CatBoost impulse-conditioned model")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Output root for search runs")
-    parser.add_argument("--shock-window-seconds", type=int, default=5, help="Past return window used to define the downshock candidate")
-    parser.add_argument("--shock-bps", type=float, default=5.0, help="Minimum 5s down impulse in bps")
+    parser.add_argument("--shock-window-seconds", type=int, default=5, help="Past return window used to define the impulse candidate")
+    parser.add_argument("--shock-bps", type=float, default=5.0, help="Minimum absolute impulse magnitude in bps")
+    parser.add_argument("--candidate-direction", choices=("down", "up"), default="down", help="Which shock direction defines candidate events")
+    parser.add_argument("--trade-direction", choices=("long", "short"), default="long", help="Whether the replay enters long or short after a qualifying candidate event")
     parser.add_argument("--min-trades", type=int, default=15, help="Minimum trades required for a simulation to count")
     parser.add_argument("--top-core-count", type=int, default=20, help="Number of best core parameter sets to stress with execution Monte Carlo")
     parser.add_argument("--execution-draws", type=int, default=250, help="Execution uncertainty draws per top core configuration")
@@ -83,7 +85,10 @@ def main() -> None:
     if past_window_column not in df.columns:
         raise SystemExit(f"Missing required impulse feature: {past_window_column}")
     past_return_bps = pd.to_numeric(df[past_window_column], errors="coerce") * 10000.0
-    candidate_mask = past_return_bps <= -args.shock_bps
+    if args.candidate_direction == "down":
+        candidate_mask = past_return_bps <= -args.shock_bps
+    else:
+        candidate_mask = past_return_bps >= args.shock_bps
 
     model = CatBoostClassifier()
     model.load_model(str(model_path))
@@ -113,6 +118,7 @@ def main() -> None:
             entry_slippage_bps=0.5,
             exit_slippage_bps=0.5,
             min_trades=args.min_trades,
+            trade_direction=args.trade_direction,
         )
         if simulation is not None:
             core_results.append(simulation)
@@ -136,6 +142,7 @@ def main() -> None:
                     min_trades=args.min_trades,
                     draws=args.execution_draws,
                     rng=rng,
+                    trade_direction=args.trade_direction,
                 )
             )
         stressed_results.sort(
@@ -167,6 +174,8 @@ def main() -> None:
         "mode": "hybrid_grid_plus_execution_monte_carlo",
         "shock_window_seconds": args.shock_window_seconds,
         "shock_bps": args.shock_bps,
+        "candidate_direction": args.candidate_direction,
+        "trade_direction": args.trade_direction,
         "core_grid_size": len(build_core_grid()),
         "top_core_count": args.top_core_count,
         "execution_draws": args.execution_draws,
@@ -212,6 +221,7 @@ def stress_core_config(
     min_trades: int,
     draws: int,
     rng: np.random.Generator,
+    trade_direction: str,
 ) -> dict[str, object]:
     stressed: list[SimulationResult] = []
     trade_records_by_idx: dict[int, list[dict[str, object]]] = {}
@@ -230,6 +240,7 @@ def stress_core_config(
             entry_slippage_bps=float(rng.choice([0.0, 0.25, 0.5, 0.75, 1.0])),
             exit_slippage_bps=float(rng.choice([0.0, 0.25, 0.5, 0.75, 1.0])),
             min_trades=min_trades,
+            trade_direction=trade_direction,
         )
         if simulation is not None:
             stressed.append(simulation)
@@ -285,6 +296,7 @@ def simulate_params(
     entry_slippage_bps: float,
     exit_slippage_bps: float,
     min_trades: int,
+    trade_direction: str,
 ) -> tuple[SimulationResult | None, list[dict[str, object]]]:
     trade_records: list[dict[str, object]] = []
     next_allowed_time = None
@@ -311,6 +323,7 @@ def simulate_params(
             fee_bps_per_side=fee_bps_per_side,
             entry_slippage_bps=entry_slippage_bps,
             exit_slippage_bps=exit_slippage_bps,
+            trade_direction=trade_direction,
         )
         if trade is None:
             no_path_skips += 1
@@ -370,13 +383,17 @@ def simulate_trade(
     fee_bps_per_side: float,
     entry_slippage_bps: float,
     exit_slippage_bps: float,
+    trade_direction: str,
 ) -> dict[str, object] | None:
     entry_mid = float(prices[entry_pos])
     if not np.isfinite(entry_mid) or entry_mid <= 0.0:
         return None
 
     entry_time = timestamps[entry_pos]
-    entry_price = entry_mid * (1.0 + entry_slippage_bps / 10000.0)
+    if trade_direction == "long":
+        entry_price = entry_mid * (1.0 + entry_slippage_bps / 10000.0)
+    else:
+        entry_price = entry_mid * (1.0 - entry_slippage_bps / 10000.0)
 
     last_pos = entry_pos
     exit_reason = "timeout"
@@ -392,7 +409,10 @@ def simulate_trade(
         mid = float(prices[pos])
         if not np.isfinite(mid) or mid <= 0.0:
             continue
-        gross_mid_bps = (mid / entry_price - 1.0) * 10000.0
+        if trade_direction == "long":
+            gross_mid_bps = (mid / entry_price - 1.0) * 10000.0
+        else:
+            gross_mid_bps = (entry_price / mid - 1.0) * 10000.0
         if gross_mid_bps >= take_profit_bps:
             exit_reason = "take_profit"
             exit_mid = mid
@@ -408,14 +428,19 @@ def simulate_trade(
     if exit_mid is None:
         exit_mid = float(prices[last_pos])
     exit_time = timestamps[last_pos]
-    exit_price = exit_mid * (1.0 - exit_slippage_bps / 10000.0)
-    gross_bps = (exit_price / entry_price - 1.0) * 10000.0
+    if trade_direction == "long":
+        exit_price = exit_mid * (1.0 - exit_slippage_bps / 10000.0)
+        gross_bps = (exit_price / entry_price - 1.0) * 10000.0
+    else:
+        exit_price = exit_mid * (1.0 + exit_slippage_bps / 10000.0)
+        gross_bps = (entry_price / exit_price - 1.0) * 10000.0
     net_bps = gross_bps - (2.0 * fee_bps_per_side)
     return {
         "entry_time": str(entry_time),
         "exit_time": exit_time,
         "entry_price": entry_price,
         "exit_price": exit_price,
+        "trade_direction": trade_direction,
         "gross_bps": gross_bps,
         "net_bps": net_bps,
         "exit_reason": exit_reason,
@@ -477,11 +502,15 @@ def to_json_safe(value: object) -> object:
 
 
 def render_report(report: dict[str, object]) -> str:
+    candidate_direction = report.get("candidate_direction", "down")
+    trade_direction = report.get("trade_direction", "long")
     lines = [
-        "# BTC Downshock Mean Reversion Hybrid Search",
+        "# BTC Impulse Replay Hybrid Search",
         "",
         f"- Dataset: `{report['dataset_path']}`",
         f"- Model: `{report['model_path']}`",
+        f"- Candidate direction: `{candidate_direction}`",
+        f"- Trade direction: `{trade_direction}`",
         f"- Candidate events: `{report['candidate_event_count']}`",
         f"- Core grid size: `{report['core_grid_size']}`",
         f"- Execution draws per top core: `{report['execution_draws']}`",

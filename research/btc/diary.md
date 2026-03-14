@@ -202,3 +202,43 @@ Initial read:
 - Aggregate validation day count: `1`
 - Aggregate positive-day share: `0.0`
 - Aggregate bootstrap p05 total net bps: `-7.232742120291565`
+
+## 2026-03-14 - Replay family across all 30s impulse quadrants
+
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz`
+- Runner: `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/run_btc_meanrev_hybrid_search.py`
+- Family checkpoint: `btc-quadrant-hybrid-family-20260314T035538`
+- Purpose: rerun the same hybrid replay structure across all four 30-second impulse quadrants on the same March 13 discovery sample.
+
+Results:
+
+- `downshock -> long mean reversion`
+  - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/down_meanrev_long/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md`
+  - candidate events: `265`
+  - stressed mean total net: `91.63 bps`
+  - stressed p05 total net: `49.46 bps`
+  - positive total share: `1.000`
+
+- `downshock -> short continuation`
+  - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/down_cont_short/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md`
+  - candidate events: `265`
+  - stressed mean total net: `43.80 bps`
+  - stressed p05 total net: `-2.92 bps`
+  - positive total share: `0.944`
+
+- `upshock -> short mean reversion`
+  - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/up_meanrev_short/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md`
+  - candidate events: `218`
+  - stressed mean total net: `7.29 bps`
+  - stressed p05 total net: `-14.74 bps`
+  - positive total share: `0.731`
+
+- `upshock -> long continuation`
+  - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/up_cont_long/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md`
+  - candidate events: `218`
+  - no replay configuration survived the minimum trade filter
+
+- Read:
+  - the March 13 monster was real, but it was concentrated in the `downshock -> long mean reversion` quadrant
+  - `downshock -> short continuation` is the only other quadrant that looks even somewhat promising, but it is much less robust because the stressed lower bound dipped slightly negative
+  - both `upshock` quadrants were materially weaker on the same discovery sample

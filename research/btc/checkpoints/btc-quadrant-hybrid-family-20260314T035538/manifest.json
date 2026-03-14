@@ -1,0 +1,22 @@
+{
+  "checkpoint_id": "btc-quadrant-hybrid-family-20260314T035538",
+  "created_at": "2026-03-14T03:58:16.993022+00:00",
+  "status": "replay_family_scan",
+  "category": "impulse_replay_family",
+  "summary": "Hybrid replay family across all four 30-second impulse quadrants on the March 13 multivenue discovery sample.",
+  "artifacts": {
+    "down_meanrev_long_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/down_meanrev_long/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md",
+    "down_cont_short_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/down_cont_short/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md",
+    "up_meanrev_short_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/up_meanrev_short/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md",
+    "up_cont_long_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_hybrid_family/up_cont_long/btc_meanrev_hybrid_search_20260314T035538_v1/reports/report.md"
+  },
+  "metrics": {
+    "down_meanrev_long_mean_total_net_bps": 91.6300633015726,
+    "down_meanrev_long_p05_total_net_bps": 49.4577339089129,
+    "down_cont_short_mean_total_net_bps": 43.800053726108075,
+    "down_cont_short_p05_total_net_bps": -2.918042725797913,
+    "up_meanrev_short_mean_total_net_bps": 7.2859402441272945,
+    "up_meanrev_short_p05_total_net_bps": -14.741855089145455,
+    "up_cont_long_survived": 0
+  }
+}

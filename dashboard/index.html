@@ -293,6 +293,7 @@
     font-weight: 700;
   }
   .sanity-ok { background: var(--green-dim); color: var(--green); }
+  .sanity-warn { background: var(--yellow-dim); color: var(--yellow); }
   .sanity-bad { background: var(--red-dim); color: var(--red); }
   .sanity-note { color: var(--text-dim); text-align: right; }
 
@@ -737,6 +738,23 @@ function timeAgo(iso) {
 
 function truncate(s, n) {
   return s && s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+function checkState(check) {
+  if (check.state) return check.state;
+  return check.ok ? 'ok' : 'bad';
+}
+
+function checkIcon(state) {
+  if (state === 'ok') return '✓';
+  if (state === 'warn') return '!';
+  return '✕';
+}
+
+function checkClass(state) {
+  if (state === 'ok') return 'sanity-ok';
+  if (state === 'warn') return 'sanity-warn';
+  return 'sanity-bad';
 }
 
 function viewBadge(view) {
@@ -1304,12 +1322,24 @@ function renderSanity(d) {
         + (coinbaseStats.level2_events || 0);
       const feedWarm = !!feedStats.warmup_ready;
       const feedAlive = feedWarm && archiveFresh && venueEventCount > 0 && venueConnectedCount >= 2;
+      const feedDegraded = !feedAlive && !!runtime.enabled && (
+        (runtime.heartbeat_logs || 0) > 0
+        || (runtime.warmup_rejects || 0) > 0
+        || venueConnectedCount > 0
+        || venueEventCount > 0
+        || !!runtime.last_loop_at
+      );
       const tradeFlowAlive =
         (runtime.entries || 0) > 0
         || (runtime.closed_trades || 0) > 0
         || !!runtime.open_position
         || (runtime.candidate_events || 0) > 0
         || (runtime.evaluated_buckets || 0) > 0;
+      const tradeFlowDegraded = !tradeFlowAlive && !!runtime.enabled && (
+        (runtime.heartbeat_logs || 0) > 0
+        || (runtime.warmup_rejects || 0) > 0
+        || !!runtime.last_loop_at
+      );
       checks.splice(2, 0, {
         label: 'Frozen model loaded',
         ok: !!runtime.enabled && !!runtime.bundle_ready && !!runtime.frozen_model_only && runtime.online_learning_enabled === false,
@@ -1320,26 +1350,33 @@ function renderSanity(d) {
       checks.splice(3, 0, {
         label: 'Multivenue live feeds',
         ok: feedAlive,
+        state: feedAlive ? 'ok' : (feedDegraded ? 'warn' : 'bad'),
         note: `${venueConnectedCount}/3 connected / fut ${futuresStats.agg_trade_events || 0} / spot ${spotStats.agg_trade_events || 0} / cb ${coinbaseStats.level2_events || 0} / arch ${timeAgo(latestArchiveWriteAt)}`,
       });
       checks.splice(4, 0, {
         label: 'Future data archived',
         ok: (archiveStats.archive_entries || 0) > 0 && !!latestArchiveWriteAt,
+        state: ((archiveStats.archive_entries || 0) > 0 && !!latestArchiveWriteAt) ? 'ok' : (((runtime.heartbeat_logs || 0) > 0 || !!runtime.last_loop_at) ? 'warn' : 'bad'),
         note: `${archiveStats.archive_entries || 0} archived / ${latestArchiveWriteAt || 'no writes yet'}`,
       });
       checks.splice(5, 0, {
         label: 'Shadow trade flow',
         ok: tradeFlowAlive,
+        state: tradeFlowAlive ? 'ok' : (tradeFlowDegraded ? 'warn' : 'bad'),
         note: `${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed / ${runtime.candidate_events || 0} shock / ${runtime.qualified_candidates || 0} qualified / ${runtime.evaluated_buckets || 0} eval`,
       });
       checks.splice(6, 0, {
         label: 'PnL book updating',
         ok: !!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.evaluated_buckets || 0) > 0),
+        state: (!!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.evaluated_buckets || 0) > 0))
+          ? 'ok'
+          : (!!runtime.last_loop_at ? 'warn' : 'bad'),
         note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}% / ${runtime.last_reject_reason || 'no-reject'}`,
       });
       checks.splice(7, 0, {
         label: 'Trigger diagnostics',
         ok: (runtime.evaluated_buckets || 0) > 0,
+        state: (runtime.evaluated_buckets || 0) > 0 ? 'ok' : (((runtime.heartbeat_logs || 0) > 0 || (runtime.warmup_rejects || 0) > 0) ? 'warn' : 'bad'),
         note: `worst ${Number(runtime.worst_past_return_bps || 0).toFixed(2)}bps / best rej ${Number(runtime.best_rejected_score || 0).toFixed(3)} / miss ${runtime.shock_filter_misses || 0} shock / ${runtime.score_filter_misses || 0} score`,
       });
     }
@@ -1458,17 +1495,18 @@ function renderSanity(d) {
       });
     }
 
-    const blockers = checks.filter(check => !check.ok).map(check => check.label);
-    const overallOk = blockers.length === 0;
+    const blockers = checks.filter(check => checkState(check) === 'bad').map(check => check.label);
+    const warnings = checks.filter(check => checkState(check) === 'warn').map(check => check.label);
     const badge = document.getElementById('sanity-badge');
-    badge.textContent = overallOk ? 'GREEN' : 'RED';
-    badge.style.background = overallOk ? 'var(--green-dim)' : 'var(--red-dim)';
-    badge.style.color = overallOk ? 'var(--green)' : 'var(--red)';
+    const overallState = blockers.length > 0 ? 'bad' : (warnings.length > 0 ? 'warn' : 'ok');
+    badge.textContent = overallState === 'ok' ? 'GREEN' : (overallState === 'warn' ? 'YELLOW' : 'RED');
+    badge.style.background = overallState === 'ok' ? 'var(--green-dim)' : (overallState === 'warn' ? 'var(--yellow-dim)' : 'var(--red-dim)');
+    badge.style.color = overallState === 'ok' ? 'var(--green)' : (overallState === 'warn' ? 'var(--yellow)' : 'var(--red)');
 
     const rows = checks.map(check => `
       <div class="sanity-item">
         <div class="sanity-left">
-          <span class="sanity-icon ${check.ok ? 'sanity-ok' : 'sanity-bad'}">${check.ok ? '✓' : '✕'}</span>
+          <span class="sanity-icon ${checkClass(checkState(check))}">${checkIcon(checkState(check))}</span>
           <span>${check.label}</span>
         </div>
         <div class="sanity-note">${check.note}</div>
@@ -1477,7 +1515,9 @@ function renderSanity(d) {
 
     const footer = blockers.length
       ? `<div style="margin-top:10px;color:var(--red);font-family:var(--mono);font-size:11px">${activeView.label} blockers: ${blockers.join(' | ')}</div>`
-      : `<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">${activeView.label} checks look healthy</div>`;
+      : warnings.length
+        ? `<div style="margin-top:10px;color:var(--yellow);font-family:var(--mono);font-size:11px">${activeView.label} degraded: ${warnings.join(' | ')}</div>`
+        : `<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">${activeView.label} checks look healthy</div>`;
 
     document.getElementById('sanity-panel').innerHTML = rows + footer;
     return;

@@ -653,10 +653,15 @@
 
 <script>
 const API = window.location.origin + '/api/state';
+const STATE_POLL_INTERVAL_MS = 8000;
+const STATE_HIDDEN_POLL_INTERVAL_MS = 20000;
+const STATE_FETCH_TIMEOUT_MS = 7000;
 let lastState = null;
 let selectedView = 'all';
 let legacyConsultLoading = false;
 let legacyConsultResponse = null;
+let stateFetchInFlight = false;
+let statePollTimer = null;
 
 function stratBadge(source) {
   const map = {
@@ -800,8 +805,14 @@ window.selectView = selectView;
 window.runLegacyConsult = runLegacyConsult;
 
 async function fetchState() {
+  if (stateFetchInFlight) {
+    return;
+  }
+  stateFetchInFlight = true;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STATE_FETCH_TIMEOUT_MS);
   try {
-    const resp = await fetch(API);
+    const resp = await fetch(API, { cache: 'no-store', signal: controller.signal });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     lastState = data;
@@ -812,7 +823,19 @@ async function fetchState() {
     document.getElementById('last-update').textContent = 'Disconnected';
     document.getElementById('last-update').className = 'dot-pulse';
     console.error('Fetch error:', err);
+  } finally {
+    clearTimeout(timeoutId);
+    stateFetchInFlight = false;
+    scheduleStateFetch();
   }
+}
+
+function scheduleStateFetch() {
+  if (statePollTimer) {
+    clearTimeout(statePollTimer);
+  }
+  const delay = document.hidden ? STATE_HIDDEN_POLL_INTERVAL_MS : STATE_POLL_INTERVAL_MS;
+  statePollTimer = setTimeout(fetchState, delay);
 }
 
 function render(d) {
@@ -1569,9 +1592,15 @@ function renderAB(d) {
   document.getElementById('ab-panel').innerHTML = html;
 }
 
-// Poll every 5 seconds
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    fetchState();
+    return;
+  }
+  scheduleStateFetch();
+});
+
 fetchState();
-setInterval(fetchState, 5000);
 </script>
 </body>
 </html>

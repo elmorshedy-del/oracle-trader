@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 import io
 from fastapi.staticfiles import StaticFiles
@@ -174,6 +175,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # ---------------------------------------------------------------------------

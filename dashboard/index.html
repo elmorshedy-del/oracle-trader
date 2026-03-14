@@ -1183,8 +1183,14 @@ function renderSanity(d) {
       },
       {
         label: 'Signal or trade flow',
-        ok: signals.length > 0 || (p.total_trades || 0) > 0 || (runtime.signals_generated || 0) > 0,
-        note: `${signals.length} live / ${p.total_trades || 0} trades`,
+        ok:
+          signals.length > 0
+          || (p.total_trades || 0) > 0
+          || (runtime.signals_generated || 0) > 0
+          || (activeView.key === 'bitcoin_meanrev_shadow' && ((runtime.evaluated_buckets || 0) > 0 || (runtime.candidate_events || 0) > 0)),
+        note: activeView.key === 'bitcoin_meanrev_shadow'
+          ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.candidate_events || 0} shock / ${runtime.evaluated_buckets || 0} eval`
+          : `${signals.length} live / ${p.total_trades || 0} trades`,
       },
       {
         label: 'Capacity available',
@@ -1266,6 +1272,21 @@ function renderSanity(d) {
       const spotStats = feedStats.spot || {};
       const coinbaseStats = feedStats.coinbase || {};
       const archiveStats = feedStats.archive || {};
+      const latestArchiveWriteAt = archiveStats.last_archive_write_at || feedStats.archive_last_write_at || runtime.last_archive_write_at;
+      const archiveFresh = !!latestArchiveWriteAt && (Date.now() - new Date(latestArchiveWriteAt).getTime()) <= 120000;
+      const venueConnectedCount = [futuresStats, spotStats, coinbaseStats].filter((venue) => !!venue.connected).length;
+      const venueEventCount =
+        (futuresStats.agg_trade_events || 0)
+        + (spotStats.agg_trade_events || 0)
+        + (coinbaseStats.level2_events || 0);
+      const feedWarm = !!feedStats.warmup_ready;
+      const feedAlive = feedWarm && archiveFresh && venueEventCount > 0 && venueConnectedCount >= 2;
+      const tradeFlowAlive =
+        (runtime.entries || 0) > 0
+        || (runtime.closed_trades || 0) > 0
+        || !!runtime.open_position
+        || (runtime.candidate_events || 0) > 0
+        || (runtime.evaluated_buckets || 0) > 0;
       checks.splice(2, 0, {
         label: 'Frozen model loaded',
         ok: !!runtime.enabled && !!runtime.bundle_ready && !!runtime.frozen_model_only && runtime.online_learning_enabled === false,
@@ -1275,23 +1296,28 @@ function renderSanity(d) {
       });
       checks.splice(3, 0, {
         label: 'Multivenue live feeds',
-        ok: !!futuresStats.connected && !!spotStats.connected && !!coinbaseStats.connected && !!feedStats.warmup_ready,
-        note: `fut ${futuresStats.agg_trade_events || 0} / spot ${spotStats.agg_trade_events || 0} / cb ${coinbaseStats.level2_events || 0}`,
+        ok: feedAlive,
+        note: `${venueConnectedCount}/3 connected / fut ${futuresStats.agg_trade_events || 0} / spot ${spotStats.agg_trade_events || 0} / cb ${coinbaseStats.level2_events || 0} / arch ${timeAgo(latestArchiveWriteAt)}`,
       });
       checks.splice(4, 0, {
         label: 'Future data archived',
-        ok: (archiveStats.archive_entries || 0) > 0 && !!archiveStats.last_archive_write_at,
-        note: `${archiveStats.archive_entries || 0} archived / ${archiveStats.last_archive_write_at || 'no writes yet'}`,
+        ok: (archiveStats.archive_entries || 0) > 0 && !!latestArchiveWriteAt,
+        note: `${archiveStats.archive_entries || 0} archived / ${latestArchiveWriteAt || 'no writes yet'}`,
       });
       checks.splice(5, 0, {
         label: 'Shadow trade flow',
-        ok: (runtime.entries || 0) > 0 || (runtime.closed_trades || 0) > 0 || !!runtime.open_position,
-        note: `${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed / ${runtime.candidate_events || 0} candidates`,
+        ok: tradeFlowAlive,
+        note: `${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed / ${runtime.candidate_events || 0} shock / ${runtime.qualified_candidates || 0} qualified / ${runtime.evaluated_buckets || 0} eval`,
       });
       checks.splice(6, 0, {
         label: 'PnL book updating',
-        ok: !!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.candidate_events || 0) > 0),
-        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}%`,
+        ok: !!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.evaluated_buckets || 0) > 0),
+        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}% / ${runtime.last_reject_reason || 'no-reject'}`,
+      });
+      checks.splice(7, 0, {
+        label: 'Trigger diagnostics',
+        ok: (runtime.evaluated_buckets || 0) > 0,
+        note: `worst ${Number(runtime.worst_past_return_bps || 0).toFixed(2)}bps / best rej ${Number(runtime.best_rejected_score || 0).toFixed(3)} / miss ${runtime.shock_filter_misses || 0} shock / ${runtime.score_filter_misses || 0} score`,
       });
     }
 

@@ -35,6 +35,15 @@ except Exception:  # pragma: no cover - runtime dependency gate
 UTC = timezone.utc
 MAX_RECENT_TRADES = 120
 MAX_RECENT_SIGNALS = 40
+HEARTBEAT_INTERVAL_SECONDS = 60.0
+REJECT_NOT_READY = "not_ready"
+REJECT_DUPLICATE_BUCKET = "duplicate_bucket"
+REJECT_SHOCK_FILTER = "shock_filter"
+REJECT_MISSING_SCORE = "missing_score"
+REJECT_SCORE_FILTER = "score_filter"
+REJECT_OPEN_POSITION = "open_position"
+REJECT_COOLDOWN = "cooldown"
+REJECT_ENTERED = "entered"
 
 
 @dataclass
@@ -154,6 +163,7 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
         self._loop_task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self._last_scored_bucket: str | None = None
+        self._last_heartbeat_log_at: datetime | None = None
         self._next_allowed_time: datetime | None = None
         self._open_position: ShadowPosition | None = None
         self._recent_trades: list[dict[str, Any]] = []
@@ -185,8 +195,19 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
                 "last_bucket_at": None,
                 "last_price": 0.0,
                 "last_score": 0.0,
+                "last_qualified_score": 0.0,
+                "best_rejected_score": 0.0,
+                "evaluated_buckets": 0,
+                "ready_buckets": 0,
+                "warmup_rejects": 0,
+                "duplicate_buckets_skipped": 0,
                 "candidate_events": 0,
                 "qualified_candidates": 0,
+                "shock_filter_misses": 0,
+                "score_filter_misses": 0,
+                "missing_score_rejects": 0,
+                "open_position_blocks": 0,
+                "cooldown_blocks": 0,
                 "entries": 0,
                 "closed_trades": 0,
                 "wins": 0,
@@ -201,13 +222,20 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
                 "open_position": False,
                 "open_hold_seconds": 0.0,
                 "last_exit_reason": None,
+                "last_reject_reason": None,
+                "last_candidate_at": None,
+                "last_qualified_at": None,
                 "last_trade_day": None,
+                "last_past_return_bps": 0.0,
+                "worst_past_return_bps": 0.0,
                 "positive_days": 0,
                 "negative_days": 0,
                 "day_count": 0,
                 "feed_stats": self.feed.stats,
                 "log_entries": 0,
                 "last_log_at": None,
+                "heartbeat_logs": 0,
+                "last_heartbeat_at": None,
             }
         )
 
@@ -302,6 +330,7 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
                 self._stats["feed_stats"] = self.feed.stats
                 self._stats["last_loop_at"] = datetime.now(UTC).isoformat()
                 self._process_snapshot(snapshot)
+                self._maybe_append_heartbeat(snapshot)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -319,29 +348,51 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
         self._update_open_position(now=now, fut_mid_price=float(snapshot.fut_mid_price))
 
         if not snapshot.ready or snapshot.feature_row is None:
+            self._stats["warmup_rejects"] += 1
+            self._stats["last_reject_reason"] = REJECT_NOT_READY
             return
 
         bucket_key = now.isoformat()
         if bucket_key == self._last_scored_bucket:
+            self._stats["duplicate_buckets_skipped"] += 1
+            self._stats["last_reject_reason"] = REJECT_DUPLICATE_BUCKET
             return
         self._last_scored_bucket = bucket_key
+        self._stats["ready_buckets"] += 1
+        self._stats["evaluated_buckets"] += 1
 
         past_return = float(snapshot.feature_row.get(self.bundle.past_window_column, 0.0) or 0.0) * 10000.0
+        self._stats["last_past_return_bps"] = round(past_return, 4)
+        self._stats["worst_past_return_bps"] = round(min(float(self._stats["worst_past_return_bps"]), past_return), 4)
         if past_return > -self.bundle.shock_bps:
+            self._stats["shock_filter_misses"] += 1
+            self._stats["last_reject_reason"] = REJECT_SHOCK_FILTER
             return
 
         self._stats["candidate_events"] += 1
+        self._stats["last_candidate_at"] = now.isoformat()
         score = self.bundle.predict_score(snapshot.feature_row)
         if score is None:
+            self._stats["missing_score_rejects"] += 1
+            self._stats["last_reject_reason"] = REJECT_MISSING_SCORE
             return
         self._stats["last_score"] = round(score, 6)
         if score < self.bundle.score_threshold:
+            self._stats["score_filter_misses"] += 1
+            self._stats["best_rejected_score"] = round(max(float(self._stats["best_rejected_score"]), score), 6)
+            self._stats["last_reject_reason"] = REJECT_SCORE_FILTER
             return
 
         self._stats["qualified_candidates"] += 1
+        self._stats["last_qualified_at"] = now.isoformat()
+        self._stats["last_qualified_score"] = round(score, 6)
         if self._open_position is not None:
+            self._stats["open_position_blocks"] += 1
+            self._stats["last_reject_reason"] = REJECT_OPEN_POSITION
             return
         if self._next_allowed_time is not None and now < self._next_allowed_time:
+            self._stats["cooldown_blocks"] += 1
+            self._stats["last_reject_reason"] = REJECT_COOLDOWN
             return
 
         entry_mid = float(snapshot.fut_mid_price)
@@ -355,6 +406,7 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
         )
         self._stats["entries"] += 1
         self._stats["open_position"] = True
+        self._stats["last_reject_reason"] = REJECT_ENTERED
         self._record_signal(
             {
                 "id": f"btc-shadow-{now.strftime('%H%M%S')}",
@@ -473,3 +525,34 @@ class BitcoinMeanRevShadowStrategy(BaseStrategy):
             handle.write(json.dumps(entry, separators=(",", ":")) + "\n")
         self._stats["log_entries"] += 1
         self._stats["last_log_at"] = now.isoformat()
+
+    def _maybe_append_heartbeat(self, snapshot: MultiVenueFeedSnapshot) -> None:
+        now = datetime.now(UTC)
+        if self._last_heartbeat_log_at is not None:
+            elapsed = (now - self._last_heartbeat_log_at).total_seconds()
+            if elapsed < HEARTBEAT_INTERVAL_SECONDS:
+                return
+
+        archive_stats = (self.feed.stats or {}).get("archive") or {}
+        self._append_log(
+            "heartbeat",
+            now=now,
+            extra={
+                "ready": bool(snapshot.ready),
+                "bucket_at": snapshot.bucket_at.isoformat() if snapshot.bucket_at else None,
+                "fut_mid_price": round(float(snapshot.fut_mid_price), 2) if snapshot.fut_mid_price is not None else None,
+                "evaluated_buckets": int(self._stats["evaluated_buckets"]),
+                "candidate_events": int(self._stats["candidate_events"]),
+                "qualified_candidates": int(self._stats["qualified_candidates"]),
+                "entries": int(self._stats["entries"]),
+                "closed_trades": int(self._stats["closed_trades"]),
+                "last_reject_reason": self._stats["last_reject_reason"],
+                "last_past_return_bps": float(self._stats["last_past_return_bps"]),
+                "last_score": float(self._stats["last_score"]),
+                "archive_entries": int(archive_stats.get("archive_entries") or 0),
+                "last_archive_write_at": archive_stats.get("last_archive_write_at"),
+            },
+        )
+        self._last_heartbeat_log_at = now
+        self._stats["heartbeat_logs"] += 1
+        self._stats["last_heartbeat_at"] = now.isoformat()

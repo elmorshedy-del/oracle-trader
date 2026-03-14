@@ -228,6 +228,7 @@ class Pipeline:
         self._errors: list[str] = []
         self._scan_count = 0
         self._latest_diagnostics: dict = {}
+        self._cached_state: dict | None = None
 
     async def start(self):
         """Start the main loop."""
@@ -504,6 +505,7 @@ class Pipeline:
             )
             weather: WeatherForecastStrategy = self.strategies["weather"]
             weather.save_state()
+            self._cached_state = self._build_state()
 
     async def reset_state(self):
         """Reset portfolio and per-strategy transient state without deleting persisted logs."""
@@ -548,6 +550,7 @@ class Pipeline:
             self.health = HealthMonitor(log_dir=str(LOG_DIR))
             await self._refresh_data()
             self.trader.save_state()
+            self._cached_state = self._build_state()
             logger.info("[PIPELINE] Reset live paper trading state")
 
     def _filter_comparison_signals(self, *, view_key: str, signals: list[Signal]) -> list[Signal]:
@@ -792,6 +795,13 @@ class Pipeline:
 
     def get_state(self) -> dict:
         """Get full dashboard state."""
+        if self._cached_state is not None:
+            return self._cached_state
+
+        return self._build_state()
+
+    def _build_state(self) -> dict:
+        """Build the full dashboard state payload."""
         uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds()
         news_strat: NewsLatencyStrategy = self.strategies["news"]
         whale_strat: WhaleTrackingStrategy = self.strategies["whale"]

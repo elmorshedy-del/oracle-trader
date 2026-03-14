@@ -669,6 +669,7 @@ function stratBadge(source) {
     'mean_reversion': ['MEAN', 'strat-mean'],
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
     'bitcoin_futures_ml': ['BTC ML', 'strat-crypto'],
+    'bitcoin_meanrev_shadow': ['BTC MR', 'strat-crypto'],
     'sports_nba_model': ['SPORTS', 'strat-sports'],
     'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
@@ -695,6 +696,7 @@ function normalizeStrategyKey(key) {
     mean_reversion: 'mean_reversion',
     crypto_arb: 'crypto_temporal_arb',
     bitcoin_model: 'bitcoin_futures_ml',
+    bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
     sports_model: 'sports_nba_model',
     weather: 'weather_forecast',
     weather_sniper: 'weather_sniper',
@@ -771,6 +773,7 @@ function renderViewTabs(d) {
     'news_whale',
     'bitcoin',
     'bitcoin_model',
+    'bitcoin_meanrev_shadow',
     'sports',
     'bitcoin_whale',
     'arbitrage',
@@ -822,7 +825,8 @@ function render(d) {
   badge.className = `mode-badge mode-${d.mode}`;
   document.getElementById('uptime').textContent = `Uptime: ${d.uptime_human || '--'}`;
   document.getElementById('scan-count').textContent = `Scans: ${d.scan_count || 0}`;
-  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} paper portfolio</span> <span style="margin-left:10px;color:var(--text-dim)">Budget $${((activeView.portfolio || {}).starting_capital || 0).toFixed(0)}</span>`;
+  const viewModeLabel = activeView.key === 'bitcoin_meanrev_shadow' ? 'shadow book' : 'paper portfolio';
+  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} ${viewModeLabel}</span> <span style="margin-left:10px;color:var(--text-dim)">Budget $${((activeView.portfolio || {}).starting_capital || 0).toFixed(0)}</span>`;
 
   // Stats
   const p = activeView.portfolio || {};
@@ -884,7 +888,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_meanrev_shadow', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const sportsIndex = order.indexOf('bitcoin_whale');
   order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
@@ -1122,6 +1126,7 @@ function renderSanity(d) {
       news: 'news',
       bitcoin: 'crypto_arb',
       bitcoin_model: 'bitcoin_model',
+      bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
       sports: 'sports_model',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',
@@ -1161,7 +1166,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : 10))));
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_meanrev_shadow' ? 1 : 10)))));
     const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const checks = [
       {
@@ -1252,6 +1257,41 @@ function renderSanity(d) {
         label: 'BTC ML flow',
         ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
         note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}${runtime.last_direction_mode ? ` (${runtime.last_direction_mode})` : ''} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin_meanrev_shadow') {
+      const feedStats = runtime.feed_stats || {};
+      const futuresStats = feedStats.futures || {};
+      const spotStats = feedStats.spot || {};
+      const coinbaseStats = feedStats.coinbase || {};
+      const archiveStats = feedStats.archive || {};
+      checks.splice(2, 0, {
+        label: 'Frozen model loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && !!runtime.frozen_model_only && runtime.online_learning_enabled === false,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error}`
+          : `${runtime.feature_count || 0} features / score ${Number(runtime.score_threshold || 0).toFixed(2)}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Multivenue live feeds',
+        ok: !!futuresStats.connected && !!spotStats.connected && !!coinbaseStats.connected && !!feedStats.warmup_ready,
+        note: `fut ${futuresStats.agg_trade_events || 0} / spot ${spotStats.agg_trade_events || 0} / cb ${coinbaseStats.level2_events || 0}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Future data archived',
+        ok: (archiveStats.archive_entries || 0) > 0 && !!archiveStats.last_archive_write_at,
+        note: `${archiveStats.archive_entries || 0} archived / ${archiveStats.last_archive_write_at || 'no writes yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'Shadow trade flow',
+        ok: (runtime.entries || 0) > 0 || (runtime.closed_trades || 0) > 0 || !!runtime.open_position,
+        note: `${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed / ${runtime.candidate_events || 0} candidates`,
+      });
+      checks.splice(6, 0, {
+        label: 'PnL book updating',
+        ok: !!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.candidate_events || 0) > 0),
+        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}%`,
       });
     }
 

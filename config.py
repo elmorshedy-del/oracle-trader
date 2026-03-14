@@ -354,6 +354,26 @@ class BitcoinModelConfig:
 
 
 @dataclass
+class BitcoinMeanRevShadowConfig:
+    """Frozen BTC multivenue mean-reversion shadow sleeve."""
+    enabled: bool = os.getenv("BITCOIN_MEANREV_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    spec_path: str = os.getenv(
+        "BITCOIN_MEANREV_SHADOW_SPEC_PATH",
+        "research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+    )
+    budget_usd: float = float(os.getenv("BITCOIN_MEANREV_SHADOW_BUDGET_USD", "600"))
+    trade_notional_usd: float = float(os.getenv("BITCOIN_MEANREV_SHADOW_TRADE_NOTIONAL_USD", "600"))
+    symbol: str = os.getenv("BITCOIN_MEANREV_SHADOW_SYMBOL", "BTCUSDT")
+    product_id: str = os.getenv("BITCOIN_MEANREV_SHADOW_PRODUCT_ID", "BTC-USD")
+    bucket_seconds: int = int(os.getenv("BITCOIN_MEANREV_SHADOW_BUCKET_SECONDS", "1"))
+    levels: int = int(os.getenv("BITCOIN_MEANREV_SHADOW_LEVELS", "20"))
+    warmup_buckets: int = int(os.getenv("BITCOIN_MEANREV_SHADOW_WARMUP_BUCKETS", "45"))
+    evaluation_interval_seconds: float = float(os.getenv("BITCOIN_MEANREV_SHADOW_EVAL_INTERVAL_SECONDS", "0.5"))
+    session_label: str = os.getenv("BITCOIN_MEANREV_SHADOW_SESSION_LABEL", "runtime_meanrev_shadow_v1")
+    capture_root: str = os.getenv("BITCOIN_MEANREV_SHADOW_CAPTURE_ROOT", "")
+
+
+@dataclass
 class SportsModelConfig:
     """Standalone NBA sportsbook-anchor sleeve (comparison-book only)."""
     enabled: bool = os.getenv("SPORTS_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
@@ -419,6 +439,7 @@ class PipelineConfig:
     weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
     weather_model_v2: WeatherModelV2Config = field(default_factory=WeatherModelV2Config)
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
+    bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
     sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 

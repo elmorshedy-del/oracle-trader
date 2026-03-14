@@ -21,6 +21,7 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.bitcoin_model import BitcoinModelStrategy
+from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
 from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_model import WeatherModelStrategy
@@ -105,6 +106,12 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.BITCOIN_MODEL.value,
         "signal_sources": (SignalSource.BITCOIN_MODEL.value,),
     },
+    "bitcoin_meanrev_shadow": {
+        "label": "BTC MeanRev Shadow",
+        "strategy": "bitcoin_meanrev_shadow",
+        "source": SignalSource.BITCOIN_MEANREV_SHADOW.value,
+        "signal_sources": (),
+    },
     "sports": {
         "label": "Sports",
         "strategy": "sports_model",
@@ -167,6 +174,7 @@ class Pipeline:
                 self.config,
                 crypto_strategy=self.strategies["crypto_arb"],
             ),
+            "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
         }
 
@@ -382,6 +390,23 @@ class Pipeline:
                 strategy_signals["bitcoin_model"] = []
                 self.health.record_strategy_error("bitcoin_model", str(e))
 
+            bitcoin_meanrev_shadow: BitcoinMeanRevShadowStrategy = self.comparison_only_strategies["bitcoin_meanrev_shadow"]
+            try:
+                _bitcoin_shadow_start = _time.time()
+                bitcoin_shadow_signals = await bitcoin_meanrev_shadow.scan(self._markets, self._events)
+                _bitcoin_shadow_dur = (_time.time() - _bitcoin_shadow_start) * 1000
+                strategy_signals["bitcoin_meanrev_shadow"] = bitcoin_shadow_signals
+                self.health.record_strategy_run(
+                    "bitcoin_meanrev_shadow",
+                    len(bitcoin_shadow_signals),
+                    _bitcoin_shadow_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy bitcoin_meanrev_shadow error: {e}")
+                bitcoin_meanrev_shadow._stats["errors"] += 1
+                strategy_signals["bitcoin_meanrev_shadow"] = []
+                self.health.record_strategy_error("bitcoin_meanrev_shadow", str(e))
+
             sports_model: SportsModelStrategy = self.comparison_only_strategies["sports_model"]
             try:
                 _sports_model_start = _time.time()
@@ -444,6 +469,8 @@ class Pipeline:
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
                 self._latest_comparison_signals[view_key] = view_signals[:30]
+                if view_key == "bitcoin_meanrev_shadow":
+                    continue
                 for signal in view_signals:
                     trader.execute_signal(signal, current_prices)
                 trader.save_state()
@@ -662,6 +689,8 @@ class Pipeline:
             return self.config.weather_model_v2.signal_budget_usd
         if view_key == "bitcoin_model":
             return self.config.bitcoin_model.budget_usd
+        if view_key == "bitcoin_meanrev_shadow":
+            return self.config.bitcoin_meanrev_shadow.budget_usd
         if view_key == "sports":
             return self.config.sports_model.budget_usd
         return self.config.risk.max_total_exposure_usd
@@ -777,6 +806,9 @@ class Pipeline:
         for view_key, meta in COMPARISON_VIEW_CONFIG.items():
             if view_key == "all":
                 continue
+            if view_key == "bitcoin_meanrev_shadow":
+                comparison_views[view_key] = self.comparison_only_strategies["bitcoin_meanrev_shadow"].serialize_view()
+                continue
             comparison_views[view_key] = self._serialize_view(
                 view_key=view_key,
                 label=meta["label"],
@@ -801,6 +833,7 @@ class Pipeline:
                 "weather_model": self.comparison_only_strategies["weather_model"].stats,
                 "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
+                "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
             },
             "whale_wallets": [
@@ -925,6 +958,7 @@ class Pipeline:
                     "signal": self.config.weather_model_v2.signal_budget_usd,
                 },
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
+                "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
             },
             "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),
             "app_log_path": str(LEGACY_APP_LOG_PATH),

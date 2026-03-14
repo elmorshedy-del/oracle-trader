@@ -267,3 +267,26 @@ Results:
   - official Binance bulk data is now a working BTC backtest source inside Oracle
   - this first Binance-only historical sample is materially weaker than the multivenue discovery track
   - so Binance historical should stay a separate research lane, not be used to “confirm” the Coinbase-aware shadow model
+
+## 2026-03-14 - March 14 runtime multivenue same-day validation slice
+
+- Source runtime session import:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_runtime_imports/20260314_065637_runtime_meanrev_shadow_v1`
+- Dataset:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_runtime_shadow_single_v3/btc_multivenue_1s_20260314T065738_20260314T121119_1sessions_v1/dataset/features.csv.gz`
+- Validation report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation_runtime_shadow/btc_meanrev_validation_20260314T130746_v1/reports/report.md`
+- Dataset stats:
+  - rows: `9,372`
+  - columns: `67`
+  - span: `2026-03-14 06:57:38 UTC` to `2026-03-14 12:11:19 UTC`
+- Frozen same-day runtime validation read:
+  - candidate events: `1`
+  - trades: `1`
+  - win rate: `0.0%`
+  - total net: `-0.58 bps`
+  - exit: `timeout`
+- Read:
+  - the real March 14 runtime shadow archive did contain enough multivenue data to reconstruct a same-day dataset
+  - the frozen downshock mean-reversion winner barely triggered in this runtime window
+  - this is useful same-day exploratory evidence, but it is not a clean independent multi-day confirmation because it uses the same March 14 live regime

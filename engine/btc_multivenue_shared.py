@@ -16,7 +16,7 @@ def build_binance_book_ticker_frame(
     bucket_seconds: int,
     prefix: str,
 ) -> pd.DataFrame:
-    records: list[dict[str, Any]] = []
+    records_by_bucket: dict[pd.Timestamp, dict[str, Any]] = {}
     for payload in payloads:
         data = payload.get("data") or {}
         bid = _float_or_none(data.get("b"))
@@ -30,22 +30,21 @@ def build_binance_book_ticker_frame(
         spread_bps = ((ask - bid) / mid) * 10000.0 if mid > 0 else 0.0
         total_qty = bid_qty + ask_qty
         size_imbalance = ((bid_qty - ask_qty) / total_qty) if total_qty > 0 else 0.0
-        records.append(
-            {
-                "bucket": pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s"),
-                f"{prefix}bid_price": bid,
-                f"{prefix}ask_price": ask,
-                f"{prefix}mid_price": mid,
-                f"{prefix}spread_bps": spread_bps,
-                f"{prefix}bid_qty": bid_qty,
-                f"{prefix}ask_qty": ask_qty,
-                f"{prefix}size_imbalance": size_imbalance,
-            }
-        )
-    if not records:
+        bucket = pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s")
+        records_by_bucket[bucket] = {
+            f"{prefix}bid_price": bid,
+            f"{prefix}ask_price": ask,
+            f"{prefix}mid_price": mid,
+            f"{prefix}spread_bps": spread_bps,
+            f"{prefix}bid_qty": bid_qty,
+            f"{prefix}ask_qty": ask_qty,
+            f"{prefix}size_imbalance": size_imbalance,
+        }
+    if not records_by_bucket:
         return pd.DataFrame()
-    frame = pd.DataFrame.from_records(records)
-    return frame.groupby("bucket").last().sort_index()
+    frame = pd.DataFrame.from_dict(records_by_bucket, orient="index")
+    frame.index.name = "bucket"
+    return frame.sort_index()
 
 
 def build_binance_agg_trade_frame(
@@ -54,7 +53,7 @@ def build_binance_agg_trade_frame(
     bucket_seconds: int,
     prefix: str,
 ) -> pd.DataFrame:
-    records: list[dict[str, Any]] = []
+    buckets: dict[pd.Timestamp, dict[str, Any]] = {}
     for payload in payloads:
         data = payload.get("data") or {}
         event_ms = data.get("E") or data.get("T")
@@ -64,30 +63,28 @@ def build_binance_agg_trade_frame(
         if None in (event_ms, qty, price):
             continue
         signed_qty = -qty if is_buyer_maker else qty
-        records.append(
+        bucket = pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s")
+        entry = buckets.setdefault(
+            bucket,
             {
-                "bucket": pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s"),
-                f"{prefix}trade_count": 1.0,
-                f"{prefix}trade_qty": qty,
-                f"{prefix}signed_trade_qty": signed_qty,
-                f"{prefix}trade_notional": qty * price,
-                f"{prefix}signed_trade_notional": signed_qty * price,
+                f"{prefix}trade_count": 0.0,
+                f"{prefix}trade_qty": 0.0,
+                f"{prefix}signed_trade_qty": 0.0,
+                f"{prefix}trade_notional": 0.0,
+                f"{prefix}signed_trade_notional": 0.0,
                 f"{prefix}last_trade_price": price,
-            }
+            },
         )
-    if not records:
+        entry[f"{prefix}trade_count"] += 1.0
+        entry[f"{prefix}trade_qty"] += qty
+        entry[f"{prefix}signed_trade_qty"] += signed_qty
+        entry[f"{prefix}trade_notional"] += qty * price
+        entry[f"{prefix}signed_trade_notional"] += signed_qty * price
+        entry[f"{prefix}last_trade_price"] = price
+    if not buckets:
         return pd.DataFrame()
-    frame = pd.DataFrame.from_records(records)
-    grouped = frame.groupby("bucket").agg(
-        {
-            f"{prefix}trade_count": "sum",
-            f"{prefix}trade_qty": "sum",
-            f"{prefix}signed_trade_qty": "sum",
-            f"{prefix}trade_notional": "sum",
-            f"{prefix}signed_trade_notional": "sum",
-            f"{prefix}last_trade_price": "last",
-        }
-    )
+    grouped = pd.DataFrame.from_dict(buckets, orient="index")
+    grouped.index.name = "bucket"
     qty = grouped[f"{prefix}trade_qty"].replace(0.0, np.nan)
     grouped[f"{prefix}signed_trade_ratio"] = (grouped[f"{prefix}signed_trade_qty"] / qty).fillna(0.0)
     return grouped.sort_index()
@@ -100,7 +97,7 @@ def build_binance_partial_depth_frame(
     levels: int,
     prefix: str,
 ) -> pd.DataFrame:
-    records: list[dict[str, Any]] = []
+    records_by_bucket: dict[pd.Timestamp, dict[str, Any]] = {}
     for payload in payloads:
         data = payload.get("data") or {}
         event_ms = data.get("E") or data.get("T")
@@ -116,23 +113,22 @@ def build_binance_partial_depth_frame(
         ask_notional = float(np.sum(np.asarray(ask_prices) * np.asarray(ask_sizes)))
         qty_denom = bid_qty + ask_qty
         notional_denom = bid_notional + ask_notional
-        records.append(
-            {
-                "bucket": pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s"),
-                f"{prefix}depth_bid_qty": bid_qty,
-                f"{prefix}depth_ask_qty": ask_qty,
-                f"{prefix}depth_bid_notional": bid_notional,
-                f"{prefix}depth_ask_notional": ask_notional,
-                f"{prefix}depth_qty_imbalance": ((bid_qty - ask_qty) / qty_denom) if qty_denom > 0 else 0.0,
-                f"{prefix}depth_notional_imbalance": ((bid_notional - ask_notional) / notional_denom) if notional_denom > 0 else 0.0,
-                f"{prefix}depth_best_bid": bid_prices[0],
-                f"{prefix}depth_best_ask": ask_prices[0],
-            }
-        )
-    if not records:
+        bucket = pd.to_datetime(int(event_ms), unit="ms", utc=True).floor(f"{bucket_seconds}s")
+        records_by_bucket[bucket] = {
+            f"{prefix}depth_bid_qty": bid_qty,
+            f"{prefix}depth_ask_qty": ask_qty,
+            f"{prefix}depth_bid_notional": bid_notional,
+            f"{prefix}depth_ask_notional": ask_notional,
+            f"{prefix}depth_qty_imbalance": ((bid_qty - ask_qty) / qty_denom) if qty_denom > 0 else 0.0,
+            f"{prefix}depth_notional_imbalance": ((bid_notional - ask_notional) / notional_denom) if notional_denom > 0 else 0.0,
+            f"{prefix}depth_best_bid": bid_prices[0],
+            f"{prefix}depth_best_ask": ask_prices[0],
+        }
+    if not records_by_bucket:
         return pd.DataFrame()
-    frame = pd.DataFrame.from_records(records)
-    return frame.groupby("bucket").last().sort_index()
+    frame = pd.DataFrame.from_dict(records_by_bucket, orient="index")
+    frame.index.name = "bucket"
+    return frame.sort_index()
 
 
 def build_coinbase_level2_frame(
@@ -144,11 +140,52 @@ def build_coinbase_level2_frame(
 ) -> pd.DataFrame:
     bids: dict[float, float] = {}
     asks: dict[float, float] = {}
-    records: list[dict[str, Any]] = []
+    records_by_bucket: dict[pd.Timestamp, dict[str, Any]] = {}
+    active_bucket: pd.Timestamp | None = None
+
+    def snapshot_bucket(bucket: pd.Timestamp) -> None:
+        if not bids or not asks:
+            return
+        top_bids = sorted(bids.items(), key=lambda item: item[0], reverse=True)[:levels]
+        top_asks = sorted(asks.items(), key=lambda item: item[0])[:levels]
+        if not top_bids or not top_asks:
+            return
+
+        best_bid = top_bids[0][0]
+        best_ask = top_asks[0][0]
+        if best_ask <= best_bid:
+            return
+        mid = (best_bid + best_ask) / 2.0
+        spread_bps = ((best_ask - best_bid) / mid) * 10000.0 if mid > 0 else 0.0
+        bid_qty = float(sum(size for _, size in top_bids))
+        ask_qty = float(sum(size for _, size in top_asks))
+        bid_notional = float(sum(price * size for price, size in top_bids))
+        ask_notional = float(sum(price * size for price, size in top_asks))
+        qty_denom = bid_qty + ask_qty
+        notional_denom = bid_notional + ask_notional
+        records_by_bucket[bucket] = {
+            f"{prefix}bid_price": best_bid,
+            f"{prefix}ask_price": best_ask,
+            f"{prefix}mid_price": mid,
+            f"{prefix}spread_bps": spread_bps,
+            f"{prefix}depth_bid_qty": bid_qty,
+            f"{prefix}depth_ask_qty": ask_qty,
+            f"{prefix}depth_bid_notional": bid_notional,
+            f"{prefix}depth_ask_notional": ask_notional,
+            f"{prefix}depth_qty_imbalance": ((bid_qty - ask_qty) / qty_denom) if qty_denom > 0 else 0.0,
+            f"{prefix}depth_notional_imbalance": ((bid_notional - ask_notional) / notional_denom) if notional_denom > 0 else 0.0,
+        }
 
     for payload in payloads:
         data = payload.get("data") or {}
         message_type = data.get("type")
+        timestamp = data.get("time") or payload.get("captured_at")
+        if not timestamp:
+            continue
+        bucket = pd.to_datetime(timestamp, utc=True).floor(f"{bucket_seconds}s")
+        if active_bucket is not None and bucket != active_bucket:
+            snapshot_bucket(active_bucket)
+
         if message_type == "snapshot":
             bids = parse_coinbase_book(data.get("bids") or [])
             asks = parse_coinbase_book(data.get("asks") or [])
@@ -163,53 +200,16 @@ def build_coinbase_level2_frame(
                     book[price] = size
         else:
             continue
+        active_bucket = bucket
 
-        if not bids or not asks:
-            continue
+    if active_bucket is not None:
+        snapshot_bucket(active_bucket)
 
-        timestamp = data.get("time") or payload.get("captured_at")
-        if not timestamp:
-            continue
-        bucket = pd.to_datetime(timestamp, utc=True).floor(f"{bucket_seconds}s")
-
-        top_bids = sorted(bids.items(), key=lambda item: item[0], reverse=True)[:levels]
-        top_asks = sorted(asks.items(), key=lambda item: item[0])[:levels]
-        if not top_bids or not top_asks:
-            continue
-
-        best_bid = top_bids[0][0]
-        best_ask = top_asks[0][0]
-        if best_ask <= best_bid:
-            continue
-        mid = (best_bid + best_ask) / 2.0
-        spread_bps = ((best_ask - best_bid) / mid) * 10000.0 if mid > 0 else 0.0
-        bid_qty = float(sum(size for _, size in top_bids))
-        ask_qty = float(sum(size for _, size in top_asks))
-        bid_notional = float(sum(price * size for price, size in top_bids))
-        ask_notional = float(sum(price * size for price, size in top_asks))
-        qty_denom = bid_qty + ask_qty
-        notional_denom = bid_notional + ask_notional
-
-        records.append(
-            {
-                "bucket": bucket,
-                f"{prefix}bid_price": best_bid,
-                f"{prefix}ask_price": best_ask,
-                f"{prefix}mid_price": mid,
-                f"{prefix}spread_bps": spread_bps,
-                f"{prefix}depth_bid_qty": bid_qty,
-                f"{prefix}depth_ask_qty": ask_qty,
-                f"{prefix}depth_bid_notional": bid_notional,
-                f"{prefix}depth_ask_notional": ask_notional,
-                f"{prefix}depth_qty_imbalance": ((bid_qty - ask_qty) / qty_denom) if qty_denom > 0 else 0.0,
-                f"{prefix}depth_notional_imbalance": ((bid_notional - ask_notional) / notional_denom) if notional_denom > 0 else 0.0,
-            }
-        )
-
-    if not records:
+    if not records_by_bucket:
         return pd.DataFrame()
-    frame = pd.DataFrame.from_records(records)
-    return frame.groupby("bucket").last().sort_index()
+    frame = pd.DataFrame.from_dict(records_by_bucket, orient="index")
+    frame.index.name = "bucket"
+    return frame.sort_index()
 
 
 def build_coinbase_ticker_frame(
@@ -218,7 +218,7 @@ def build_coinbase_ticker_frame(
     bucket_seconds: int,
     prefix: str,
 ) -> pd.DataFrame:
-    records: list[dict[str, Any]] = []
+    records_by_bucket: dict[pd.Timestamp, dict[str, Any]] = {}
     for payload in payloads:
         data = payload.get("data") or {}
         if data.get("type") != "ticker":
@@ -230,18 +230,19 @@ def build_coinbase_ticker_frame(
         if not timestamp or price is None:
             continue
         record = {
-            "bucket": pd.to_datetime(timestamp, utc=True).floor(f"{bucket_seconds}s"),
             f"{prefix}last_trade_price": price,
         }
         if best_bid is not None:
             record[f"{prefix}ticker_best_bid"] = best_bid
         if best_ask is not None:
             record[f"{prefix}ticker_best_ask"] = best_ask
-        records.append(record)
-    if not records:
+        bucket = pd.to_datetime(timestamp, utc=True).floor(f"{bucket_seconds}s")
+        records_by_bucket[bucket] = record
+    if not records_by_bucket:
         return pd.DataFrame()
-    frame = pd.DataFrame.from_records(records)
-    return frame.groupby("bucket").last().sort_index()
+    frame = pd.DataFrame.from_dict(records_by_bucket, orient="index")
+    frame.index.name = "bucket"
+    return frame.sort_index()
 
 
 def add_cross_venue_features(frame: pd.DataFrame) -> pd.DataFrame:

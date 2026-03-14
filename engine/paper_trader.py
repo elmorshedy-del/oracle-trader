@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from data.models import (
@@ -158,6 +159,9 @@ WEATHER_SOURCES = {
     SignalSource.WEATHER_MODEL_V2_TRADER,
     SignalSource.WEATHER_MODEL_V2_SIGNAL,
 }
+TRADE_EVENTS_FILENAME = "trade_events.jsonl"
+TRADE_AUDIT_DB_FILENAME = "trade_audit.sqlite3"
+TRADE_AUDIT_SCHEMA_VERSION = 1
 
 
 class PaperTrader:
@@ -167,6 +171,8 @@ class PaperTrader:
         self.state_path = Path(state_path)
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.audit_db_path = self.log_dir / TRADE_AUDIT_DB_FILENAME
+        self._ensure_trade_audit_store()
 
         # Try to restore state from disk, fall back to fresh start
         if not self._load_state():
@@ -181,6 +187,7 @@ class PaperTrader:
                 self.portfolio.peak_value = max(self.portfolio.starting_capital, self.portfolio.total_value)
                 logger.info(f"[PAPER] Reset peak_value to ${self.portfolio.peak_value:.2f}")
             self._backfill_position_groups()
+            self._backfill_position_trade_links()
             logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
 
     def _load_state(self) -> bool:
@@ -251,6 +258,16 @@ class PaperTrader:
                 continue
             pos.group_key = self._infer_group_key(pos)
 
+    def _backfill_position_trade_links(self):
+        for pos in self.portfolio.positions:
+            if pos.opened_trade_id:
+                continue
+            trade = self._find_open_trade_for_position(pos)
+            if trade is None:
+                continue
+            pos.opened_trade_id = trade.id
+            pos.opened_signal_id = trade.signal_id
+
     def _infer_group_key(self, pos: Position) -> str | None:
         slug = (pos.market_slug or "").lower()
         if not slug:
@@ -310,6 +327,187 @@ class PaperTrader:
         )
         thesis = "bull" if bullish else "bear"
         return f"crypto:{symbol}:barrier:{thesis}:{expiry_bucket}"
+
+    def _ensure_trade_audit_store(self):
+        try:
+            with sqlite3.connect(self.audit_db_path) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS trade_events (
+                        event_id TEXT PRIMARY KEY,
+                        logged_at TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        trade_id TEXT,
+                        signal_id TEXT,
+                        source TEXT,
+                        market_slug TEXT,
+                        condition_id TEXT,
+                        token_id TEXT,
+                        position_side TEXT,
+                        trade_side TEXT,
+                        entry_price REAL,
+                        exit_price REAL,
+                        size_shares REAL,
+                        size_usd REAL,
+                        realized_pnl REAL,
+                        net_realized_pnl REAL,
+                        total_fees REAL,
+                        hold_hours REAL,
+                        close_reason TEXT,
+                        group_key TEXT,
+                        portfolio_value REAL,
+                        cash REAL,
+                        payload_json TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_trade_id ON trade_events(trade_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_source_logged_at ON trade_events(source, logged_at)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_market_logged_at ON trade_events(market_slug, logged_at)"
+                )
+        except Exception as exc:
+            logger.error("[PAPER] Failed to initialize trade audit store: %s", exc)
+
+    def _attach_trade_to_position(self, pos: Position, trade: PaperTrade):
+        pos.opened_trade_id = trade.id
+        pos.opened_signal_id = trade.signal_id
+
+    def _find_open_trade_for_position(self, pos: Position) -> PaperTrade | None:
+        if pos.opened_trade_id:
+            for trade in reversed(self.trade_log):
+                if trade.id == pos.opened_trade_id:
+                    return trade
+
+        for trade in reversed(self.trade_log):
+            if trade.exit_timestamp is not None:
+                continue
+            if trade.condition_id != pos.condition_id:
+                continue
+            if trade.token_id != pos.token_id:
+                continue
+            if trade.source != pos.source:
+                continue
+            return trade
+        return None
+
+    def _record_trade_event(
+        self,
+        *,
+        event_type: str,
+        trade: PaperTrade,
+        signal: Signal | None = None,
+        position: Position | None = None,
+        close_reason: str | None = None,
+        net_realized_pnl: float | None = None,
+    ):
+        logged_at = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "schema_version": TRADE_AUDIT_SCHEMA_VERSION,
+            "logged_at": logged_at,
+            "event_type": event_type,
+            "trade": trade.model_dump(mode="json"),
+            "signal": signal.model_dump(mode="json") if signal is not None else None,
+            "position": position.model_dump(mode="json") if position is not None else None,
+            "portfolio_value": self.portfolio.total_value,
+            "cash": self.portfolio.cash,
+            "close_reason": close_reason,
+            "net_realized_pnl": net_realized_pnl,
+        }
+        self._append_jsonl(TRADE_EVENTS_FILENAME, payload)
+
+        event_id = f"{trade.id}:{event_type}:{logged_at}"
+        try:
+            with sqlite3.connect(self.audit_db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO trade_events (
+                        event_id, logged_at, event_type, trade_id, signal_id, source,
+                        market_slug, condition_id, token_id, position_side, trade_side,
+                        entry_price, exit_price, size_shares, size_usd, realized_pnl,
+                        net_realized_pnl, total_fees, hold_hours, close_reason, group_key,
+                        portfolio_value, cash, payload_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event_id,
+                        logged_at,
+                        event_type,
+                        trade.id,
+                        trade.signal_id,
+                        trade.source.value,
+                        trade.market_slug,
+                        trade.condition_id,
+                        trade.token_id,
+                        position.side if position is not None else None,
+                        trade.side.value,
+                        trade.price,
+                        trade.exit_price,
+                        trade.size_shares,
+                        trade.size_usd,
+                        trade.realized_pnl,
+                        net_realized_pnl,
+                        trade.total_fees,
+                        trade.hold_hours,
+                        close_reason,
+                        position.group_key if position is not None else None,
+                        self.portfolio.total_value,
+                        self.portfolio.cash,
+                        json.dumps(payload, default=str),
+                    ),
+                )
+        except Exception as exc:
+            logger.error("[PAPER] Failed to persist trade audit event: %s", exc)
+
+    def _close_trade_record(
+        self,
+        *,
+        pos: Position,
+        exit_price: float,
+        realized_pnl: float,
+        total_fees: float,
+        close_reason: str,
+        event_type: str,
+    ):
+        trade = self._find_open_trade_for_position(pos)
+        exit_timestamp = datetime.now(timezone.utc)
+        hold_hours = max(0.0, (exit_timestamp - pos.opened_at).total_seconds() / 3600)
+        net_realized_pnl = realized_pnl - total_fees
+
+        if trade is None:
+            trade = PaperTrade(
+                signal_id=pos.opened_signal_id or "unknown",
+                source=pos.source,
+                market_slug=pos.market_slug,
+                condition_id=pos.condition_id,
+                token_id=pos.token_id,
+                side=Side.BUY,
+                price=pos.avg_entry_price,
+                size_shares=pos.shares,
+                size_usd=pos.shares * pos.avg_entry_price,
+                status=TradeStatus.FILLED,
+            )
+            self.trade_log.append(trade)
+
+        trade.exit_price = exit_price
+        trade.exit_timestamp = exit_timestamp
+        trade.realized_pnl = realized_pnl
+        trade.close_reason = close_reason
+        trade.hold_hours = hold_hours
+        trade.total_fees = total_fees
+
+        self._record_trade_event(
+            event_type=event_type,
+            trade=trade,
+            position=pos,
+            close_reason=close_reason,
+            net_realized_pnl=net_realized_pnl,
+        )
 
     def _strategy_exposure_cap_pct(
         self, source: SignalSource, action: SignalAction | None = None
@@ -556,7 +754,9 @@ class PaperTrader:
             size_shares=shares,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
+            total_fees=fee,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
 
@@ -601,7 +801,9 @@ class PaperTrader:
             size_shares=size_usd,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
+            total_fees=0.0,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
         logger.info(f"[PAPER] Hedge position on {signal.market_slug}: ${size_usd:.2f}")
@@ -680,7 +882,9 @@ class PaperTrader:
             size_usd=size_usd,
             status=TradeStatus.FILLED,
             realized_pnl=0.0,  # credited at resolution, not now
+            total_fees=fee_estimate,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
 
@@ -923,6 +1127,14 @@ class PaperTrader:
             elif pnl < 0:
                 self.portfolio.losing_trades += 1
 
+            self._close_trade_record(
+                pos=pos,
+                exit_price=exit_price,
+                realized_pnl=pnl,
+                total_fees=fee,
+                close_reason=reason,
+                event_type="trade_closed",
+            )
             self.portfolio.positions.remove(pos)
             if pos.side == "ARB":
                 self._set_group_cooldown(pos.group_key or pos.market_slug, ARB_REENTRY_COOLDOWN_HOURS)
@@ -1068,6 +1280,15 @@ class PaperTrader:
             elif pnl < 0:
                 self.portfolio.losing_trades += 1
 
+            exit_price = 1.0 if pnl >= 0 else 0.0
+            self._close_trade_record(
+                pos=pos,
+                exit_price=exit_price,
+                realized_pnl=pnl,
+                total_fees=0.0,
+                close_reason=f"RESOLVED:{result['winner_name']}",
+                event_type="trade_resolved",
+            )
             resolved.append((pos, pnl))
 
         # Remove resolved positions
@@ -1179,6 +1400,17 @@ class PaperTrader:
             "cash": self.portfolio.cash,
         }
         self._append_jsonl("trades.jsonl", entry)
+        position = next(
+            (pos for pos in self.portfolio.positions if pos.opened_trade_id == trade.id),
+            None,
+        )
+        self._record_trade_event(
+            event_type="trade_opened",
+            trade=trade,
+            signal=signal,
+            position=position,
+            net_realized_pnl=None,
+        )
 
     def _append_jsonl(self, filename: str, data: dict):
         """Append a JSON line to a log file."""

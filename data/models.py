@@ -147,6 +147,9 @@ class PaperTrade(BaseModel):
     exit_price: Optional[float] = None
     exit_timestamp: Optional[datetime] = None
     realized_pnl: Optional[float] = None
+    close_reason: Optional[str] = None
+    hold_hours: Optional[float] = None
+    total_fees: Optional[float] = None
 
 
 class Position(BaseModel):
@@ -161,6 +164,8 @@ class Position(BaseModel):
     source: SignalSource
     group_key: Optional[str] = None
     opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    opened_trade_id: Optional[str] = None
+    opened_signal_id: Optional[str] = None
 
 
 class Portfolio(BaseModel):

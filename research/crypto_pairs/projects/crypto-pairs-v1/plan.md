@@ -36,12 +36,28 @@ Top tradeable pairs:
 ## Phase 8: Backtester
 
 - Status: `implemented`
-- First coarse archive backtest:
-  - pair: `LINK/SOL`
-  - report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260314T223158_v1/report.json`
-  - trades: `44`
-  - win rate: `70.45%`
-  - total PnL: `233.7625 bps`
+- Historical loader fix:
+  - Binance spot archive timestamps were in microseconds, not milliseconds
+  - corrected in `engine/crypto_pairs/historical.py`
+  - earlier coarse single-pair backtest numbers are superseded
+- Corrected single-pair backtests:
+  - `LINK/SOL`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358537377_v1/report.json`
+    - `22` trades
+    - `77.27%` win rate
+    - `+624.5312 bps`
+  - `AVAX/ETH`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json`
+    - `21` trades
+    - `42.86%` win rate
+    - `-166.8219 bps`
+  - `AAVE/DOGE`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json`
+    - `18` trades
+    - `50.00%` win rate
+    - `+475.8089 bps`
+- Corrected 3-pair basket:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json`
+  - `69` trades
+  - `57.97%` win rate
+  - `+687.4537 bps`
 
 ## Next
 

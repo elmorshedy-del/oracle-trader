@@ -43,3 +43,25 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - primary Binance websocket returned `HTTP 451`
   - fallback `data-stream.binance.vision` worked
   - `17` messages, `6` bars emitted
+
+
+## 2026-03-15 - Corrected V1 pair and basket backtests
+
+- Historical data fix:
+  - Binance spot kline archive timestamps were parsed as milliseconds but are microseconds in the downloaded files
+  - corrected in `engine/crypto_pairs/historical.py`
+  - the earlier first coarse backtest is superseded
+- Corrected single-pair results:
+  - `LINK/SOL`: `22` trades, `77.27%` win rate, `+624.5312 bps`
+  - `AVAX/ETH`: `21` trades, `42.86%` win rate, `-166.8219 bps`
+  - `AAVE/DOGE`: `18` trades, `50.00%` win rate, `+475.8089 bps`
+- Corrected basket result:
+  - top `3` pairs
+  - `69` trades
+  - `57.97%` win rate
+  - `+687.4537 bps`
+- Reports:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358537377_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json`

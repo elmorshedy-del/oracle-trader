@@ -45,12 +45,21 @@ class PositionManager:
     def get_position_size_per_leg(self) -> float:
         return self.total_capital * self.risk.max_capital_per_pair_pct / 2
 
-    def open_position(self, *, pair_key: str, direction: str, entry_trade: dict[str, object], zscore: float, max_hold_seconds: int) -> None:
+    def open_position(
+        self,
+        *,
+        pair_key: str,
+        direction: str,
+        entry_trade: dict[str, object],
+        zscore: float,
+        max_hold_seconds: int,
+        entry_time_ms: int | None = None,
+    ) -> None:
         self.positions[pair_key] = Position(
             pair_key=pair_key,
             direction=direction,
             entry_trade=entry_trade,
-            entry_time_ms=int(time.time() * 1000),
+            entry_time_ms=entry_time_ms if entry_time_ms is not None else int(time.time() * 1000),
             entry_zscore=zscore,
             max_hold_seconds=max_hold_seconds,
         )
@@ -83,4 +92,3 @@ class PositionManager:
 
     def reset_daily(self) -> None:
         self.daily_pnl_usd = 0.0
-

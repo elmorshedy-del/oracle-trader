@@ -9,6 +9,9 @@ from zipfile import ZipFile
 import pandas as pd
 
 
+MICROSECOND_EPOCH_THRESHOLD = 10**15
+
+
 def load_binance_spot_klines(
     *,
     raw_root: Path,
@@ -33,7 +36,8 @@ def load_binance_spot_klines(
                     )
             frame["close"] = pd.to_numeric(frame["close"], errors="coerce")
             frame["volume"] = pd.to_numeric(frame["volume"], errors="coerce")
-            frame["timestamp"] = pd.to_datetime(frame["open_time"], unit="ms", utc=True)
+            timestamp_unit = detect_binance_time_unit(frame["open_time"])
+            frame["timestamp"] = pd.to_datetime(frame["open_time"], unit=timestamp_unit, utc=True)
             frames.append(frame[["timestamp", "close", "volume"]])
         day += timedelta(days=1)
     if not frames:
@@ -46,3 +50,9 @@ def load_binance_spot_klines(
     )
     return merged.set_index("timestamp")
 
+
+def detect_binance_time_unit(values: pd.Series) -> str:
+    numeric = pd.to_numeric(values, errors="coerce").dropna()
+    if numeric.empty:
+        return "ms"
+    return "us" if int(numeric.iloc[0]) >= MICROSECOND_EPOCH_THRESHOLD else "ms"

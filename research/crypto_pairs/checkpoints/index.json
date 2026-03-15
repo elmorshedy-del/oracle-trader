@@ -35,5 +35,27 @@
       "live_messages": 17,
       "live_bars": 6
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-corrected-backtests-20260315T001600",
+    "created_at": "2026-03-15T00:16:16.093617+00:00",
+    "status": "corrected_backtest",
+    "category": "backtest_v1",
+    "summary": "Corrected crypto pairs V1 single-pair and basket backtests after fixing Binance spot archive timestamp parsing from ms to us.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1",
+      "link_sol_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358537377_v1/report.json",
+      "avax_eth_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json",
+      "aave_doge_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json",
+      "basket_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_bps": 624.5312,
+      "avax_eth_bps": -166.8219,
+      "aave_doge_bps": 475.8089,
+      "basket_bps": 687.4537,
+      "basket_trades": 69,
+      "basket_win_rate": 0.5797101449275363
+    }
   }
 ]

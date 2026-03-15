@@ -20,7 +20,9 @@ def load_discovery_report(report_path: str | Path | None = None) -> dict[str, ob
 
 def resolve_discovery_report_path(report_path: str | Path | None = None) -> Path:
     if report_path is not None:
-        return Path(report_path).expanduser().resolve()
+        report_path_str = str(report_path).strip()
+        if report_path_str:
+            return Path(report_path_str).expanduser().resolve()
     project_root = Path(DEFAULT_DISCOVERY_PROJECT_ROOT).expanduser().resolve()
     candidates = sorted(project_root.glob(f"crypto_pairs_discovery_*_v1/{DISCOVERY_FILE_NAME}"))
     if not candidates:

@@ -280,3 +280,49 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - `ADA/COMP` full `-865.6643 bps`
   - `BONK/GRT` full `663.9122 bps`
   - `BONK/FLOKI` full `418.0875 bps`
+
+
+## 2026-03-15 - Oracle triple crypto-pairs shadow deployed
+
+- Checkpoint: `crypto-pairs-oracle-triple-shadow-20260315T064100`
+- Deploy sequence:
+  - failed startup deploy `bc87003d-b822-4a71-8dc1-5b94425062b2`
+    - root cause: Oracle runtime still defaulted to the old `crypto-pairs-v1` discovery root, so `COMP/FLOKI` was missing at startup
+  - fixed live deploy `aa6f2fcb-9cc2-46c2-ad5f-23de2165f6e7`
+    - commits:
+      - `0b684e8` triple crypto-pairs Oracle runtime + dashboard + monitor
+      - `e12a952` live runtime discovery-root fix
+- What is live in Oracle now:
+  - `AAVE/DOGE`
+  - `COMP/FLOKI`
+  - `COMP/LINK`
+- Live comparison views:
+  - `crypto_pairs_aave_doge`
+  - `crypto_pairs_comp_floki`
+  - `crypto_pairs_comp_link`
+- Live audit roots on Railway:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_floki_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_link_shadow`
+- Combined monitor snapshot:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_shadow_monitor/latest.json`
+- First verified live state after warmup:
+  - `AAVE/DOGE`
+    - `43` ratio updates
+    - `0` signals
+    - `0` entries
+    - `0` closed trades
+  - `COMP/FLOKI`
+    - `66` ratio updates
+    - `0` signals
+    - `0` entries
+    - `0` closed trades
+  - `COMP/LINK`
+    - `59` ratio updates
+    - `0` signals
+    - `0` entries
+    - `0` closed trades
+- Read:
+  - all three sleeves are running simultaneously
+  - same ratio/trade/daily/hourly logging is active for each pair
+  - the monitoring path is now multi-pair, so a 5-day paper comparison can be done from a single root plus the per-pair audit files

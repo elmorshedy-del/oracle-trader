@@ -244,5 +244,28 @@
       "cointegrated_pairs": 44,
       "survivors": 29
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-oracle-triple-shadow-20260315T064100",
+    "created_at": "2026-03-15T06:41:00+00:00",
+    "status": "oracle_shadow_live",
+    "category": "runtime_v1",
+    "summary": "Deployed three frozen crypto-pairs shadow sleeves into Oracle paper using the brute-force survivor universe and verified live ratio tick logging for AAVE/DOGE, COMP/FLOKI, and COMP/LINK.",
+    "artifacts": {
+      "deployment_id": "aa6f2fcb-9cc2-46c2-ad5f-23de2165f6e7",
+      "failed_deployment_id": "bc87003d-b822-4a71-8dc1-5b94425062b2",
+      "monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_shadow_monitor/latest.json",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260315T051554_v1/summary.json"
+    },
+    "metrics": {
+      "pairs_live": 3,
+      "aave_doge_ratio_updates": 43,
+      "comp_floki_ratio_updates": 66,
+      "comp_link_ratio_updates": 59,
+      "total_signals": 0,
+      "total_entries": 0,
+      "total_closed_trades": 0
+    }
   }
 ]

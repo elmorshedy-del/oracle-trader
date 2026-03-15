@@ -197,3 +197,33 @@ Top tradeable pairs:
   - `0` closed trades
 - Monitor script:
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_crypto_pairs_shadow_health.py`
+
+## Oracle Triple Crypto-Pairs Shadow
+
+- Status: `live in Oracle`
+- Deployment:
+  - Railway `aa6f2fcb-9cc2-46c2-ad5f-23de2165f6e7`
+  - startup fix after failed attempt `bc87003d-b822-4a71-8dc1-5b94425062b2`
+- Live pairs:
+  - `AAVE/DOGE`
+  - `COMP/FLOKI`
+  - `COMP/LINK`
+- Runtime source of truth:
+  - brute-force discovery lane
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json`
+- Live verification after warmup:
+  - `AAVE/DOGE`: `43` ratio updates
+  - `COMP/FLOKI`: `66` ratio updates
+  - `COMP/LINK`: `59` ratio updates
+  - all three currently `0` signals / `0` entries / `0` closed trades
+- Audit roots on Railway:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_floki_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_link_shadow`
+- Combined monitor root:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_shadow_monitor`
+- 5-day comparison basis:
+  - per-pair `trade_ledger.csv`
+  - per-pair `daily_summary.jsonl`
+  - per-pair `hourly_checks.jsonl`
+  - combined hourly monitor snapshots in `crypto_pairs_shadow_monitor`

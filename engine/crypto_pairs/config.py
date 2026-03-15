@@ -23,7 +23,7 @@ DEFAULT_STATS_SAMPLE_SECONDS = 3_600
 DEFAULT_PAPER_FEE_BPS = 1.0
 DEFAULT_PAPER_SLIPPAGE_BPS = 0.5
 DEFAULT_PAPER_QTY_PRECISION = 8
-DEFAULT_DISCOVERY_PROJECT_ROOT = "research/crypto_pairs/projects/crypto-pairs-v1"
+DEFAULT_DISCOVERY_PROJECT_ROOT = "research/crypto_pairs/projects/crypto-pairs-bruteforce-v1"
 DEFAULT_LOG_ROOT = "output/crypto_pairs/sessions"
 
 

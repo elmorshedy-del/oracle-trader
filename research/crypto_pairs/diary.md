@@ -130,3 +130,35 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json`
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json`
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json`
+
+
+## 2026-03-15 - Split-half and 15-day robustness check
+
+- Purpose:
+  - check whether the two positive 60-day pairs survive a stricter time split without changing any V1 rules
+- 30-day split used:
+  - first half `2026-01-13` to `2026-02-11`
+  - second half `2026-02-12` to `2026-03-13`
+- 30-day split results:
+  - `LINK/SOL`
+    - first half: `26` trades, `50.00%` win rate, `-153.1950 bps`
+    - second half: `22` trades, `77.27%` win rate, `+624.5312 bps`
+  - `AAVE/DOGE`
+    - first half: `18` trades, `77.78%` win rate, `+296.1293 bps`
+    - second half: `18` trades, `50.00%` win rate, `+475.8089 bps`
+- 15-day quarter cuts:
+  - `LINK/SOL`
+    - `2026-01-13` to `2026-01-27`: `+81.9375 bps`
+    - `2026-01-28` to `2026-02-11`: `-211.2614 bps`
+    - `2026-02-12` to `2026-02-26`: `+278.7251 bps`
+    - `2026-02-27` to `2026-03-13`: `+237.9989 bps`
+  - `AAVE/DOGE`
+    - `2026-01-13` to `2026-01-27`: `+51.2314 bps`
+    - `2026-01-28` to `2026-02-11`: `+285.4920 bps`
+    - `2026-02-12` to `2026-02-26`: `-47.6122 bps`
+    - `2026-02-27` to `2026-03-13`: `+423.1097 bps`
+- Read:
+  - `AAVE/DOGE` passes the coarse 30/30 split, so it is the more stable candidate than `LINK/SOL`
+  - neither pair is cleanly profitable in every 15-day cut, so both still show regime dependence
+  - `LINK/SOL` is materially more fragile because its first 30 days were negative overall
+  - strict live focus should shift toward `AAVE/DOGE` first, with `LINK/SOL` treated as a secondary candidate

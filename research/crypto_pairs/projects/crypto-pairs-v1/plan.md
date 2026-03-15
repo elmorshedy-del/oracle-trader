@@ -78,6 +78,33 @@ Top tradeable pairs:
 - Read:
   - `LINK/SOL` and `AAVE/DOGE` remain positive on 60 days
   - `AVAX/ETH` remains the weak leg and is a natural drop candidate
+- Split-half robustness check:
+  - first half `2026-01-13` to `2026-02-11`
+  - second half `2026-02-12` to `2026-03-13`
+  - `LINK/SOL`
+    - first half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957851054_v1/report.json`
+      - `26` trades
+      - `50.00%` win rate
+      - `-153.1950 bps`
+    - second half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957850673_v1/report.json`
+      - `22` trades
+      - `77.27%` win rate
+      - `+624.5312 bps`
+  - `AAVE/DOGE`
+    - first half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957849753_v1/report.json`
+      - `18` trades
+      - `77.78%` win rate
+      - `+296.1293 bps`
+    - second half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957853835_v1/report.json`
+      - `18` trades
+      - `50.00%` win rate
+      - `+475.8089 bps`
+  - 15-day cuts:
+    - `LINK/SOL`: `+81.9375`, `-211.2614`, `+278.7251`, `+237.9989 bps`
+    - `AAVE/DOGE`: `+51.2314`, `+285.4920`, `-47.6122`, `+423.1097 bps`
+  - Read:
+    - `AAVE/DOGE` is the stronger live-first candidate
+    - `LINK/SOL` remains usable as a secondary candidate, but not as the primary overfitting-safe pair
 
 ## Next
 

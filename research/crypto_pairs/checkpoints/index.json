@@ -111,5 +111,34 @@
       "basket_trades": 156,
       "basket_win_rate": 0.532051282051282
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-split-robustness-20260315T035300",
+    "created_at": "2026-03-15T03:51:58.114339+00:00",
+    "status": "robustness_check",
+    "category": "backtest_v1",
+    "summary": "Split the 60-day V1 pairs into first/last 30 days and 15-day quarters to check whether profitability survives out-of-window slices without changing any rules.",
+    "artifacts": {
+      "link_sol_first_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957851054_v1/report.json",
+      "link_sol_second_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957850673_v1/report.json",
+      "aave_doge_first_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957849753_v1/report.json",
+      "aave_doge_second_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957853835_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_first_half_bps": -153.195,
+      "link_sol_second_half_bps": 624.5312,
+      "aave_doge_first_half_bps": 296.1293,
+      "aave_doge_second_half_bps": 475.8089,
+      "link_sol_profitable_both_halves": 0,
+      "aave_doge_profitable_both_halves": 1,
+      "link_sol_q1_bps": 81.9375,
+      "link_sol_q2_bps": -211.2614,
+      "link_sol_q3_bps": 278.7251,
+      "link_sol_q4_bps": 237.9989,
+      "aave_doge_q1_bps": 51.2314,
+      "aave_doge_q2_bps": 285.492,
+      "aave_doge_q3_bps": -47.6122,
+      "aave_doge_q4_bps": 423.1097
+    }
   }
 ]

@@ -247,3 +247,36 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
 - Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json`
 - Top pairs:
   - `AAVE/DOGE` score `6.1357` halflife `45.18h`
+
+
+## 2026-03-15 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260315T050434`
+- Date range: `2026-01-14` to `2026-03-14`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Tradeable pairs: `44`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json`
+- Top pairs:
+  - `AAVE/COMP` score `4.818` halflife `19.31h`
+  - `COMP/DOGE` score `5.1176` halflife `24.53h`
+  - `DOGE/XLM` score `5.1197` halflife `26.35h`
+  - `COMP/XLM` score `5.376` halflife `25.54h`
+  - `ADA/COMP` score `5.5773` halflife `25.58h`
+
+
+## 2026-03-15 - Brute-force crypto pairs screen
+
+- Checkpoint: `crypto-pairs-bruteforce-20260315T051554`
+- Date range: `2026-01-14` to `2026-03-14`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Cointegrated pairs: `44`
+- Survivors after 30-day split: `29`
+- Summary: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260315T051554_v1/summary.json`
+- Survivors:
+  - `DOGE/XLM` full `729.767 bps`
+  - `COMP/XLM` full `-636.1661 bps`
+  - `ADA/COMP` full `-865.6643 bps`
+  - `BONK/GRT` full `663.9122 bps`
+  - `BONK/FLOKI` full `418.0875 bps`

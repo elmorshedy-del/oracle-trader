@@ -162,3 +162,38 @@ Top tradeable pairs:
 - Active focused supervisor:
   - id `crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1`
   - state `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json`
+
+## Candidate Sweep Follow-Up
+
+- Status: `screened`
+- New requested pairs checked on the frozen 60-day discovery window:
+  - `DOGE/SHIB`
+  - `ARB/OP`
+  - `AAVE/UNI`
+  - `FET/RENDER`
+  - `SEI/SUI`
+- Report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json`
+- Read:
+  - none passed the same discovery gate used for the original basket
+  - all five failed at the cointegration screen, so none advanced to the rule-based backtest stage
+
+## Oracle AAVE/DOGE Shadow
+
+- Status: `live in Oracle`
+- Deployment:
+  - Railway `1136d74d-9d32-4e45-a194-1cf6a7db553d`
+  - commit `bd4e893`
+- Runtime files written on Railway:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/ratio_ticks.csv`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/trade_ledger.csv`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/daily_summary.jsonl`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/hourly_checks.jsonl`
+- Live verification snapshot:
+  - `507` streamer messages
+  - `48` emitted bars
+  - `26` ratio updates
+  - `0` entry signals
+  - `0` closed trades
+- Monitor script:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_crypto_pairs_shadow_health.py`

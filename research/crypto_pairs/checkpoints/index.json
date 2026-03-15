@@ -157,5 +157,58 @@
       "smoke_signals": 0,
       "smoke_trades": 0
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260315T042844",
+    "created_at": "2026-03-15T04:28:44.074637+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 10,
+      "pairs_tested": 45,
+      "tradeable_pairs": 1
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-candidate-sweep-20260315T043800",
+    "created_at": "2026-03-15T04:38:57.335916+00:00",
+    "status": "candidate_screen",
+    "category": "pair_discovery",
+    "summary": "Screened five requested candidate pairs on the frozen 60-day discovery window before any backtests; none passed the cointegration gate required to continue the pipeline.",
+    "artifacts": {
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "doge_shib_pvalue": 0.22478,
+      "arb_op_pvalue": 0.488602,
+      "aave_uni_pvalue": 0.761735,
+      "fet_render_pvalue": 0.986946,
+      "sei_sui_pvalue": 0.808758,
+      "passed_pairs": 0
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-oracle-aave-shadow-20260315T044500",
+    "created_at": "2026-03-15T04:44:20.371462+00:00",
+    "status": "oracle_shadow_live",
+    "category": "runtime_v1",
+    "summary": "Deployed the focused AAVE/DOGE crypto pairs shadow sleeve into Oracle with durable ratio/trade/daily/hourly audit files and verified live feed activity plus ratio tick recording on Railway.",
+    "artifacts": {
+      "deployment_id": "1136d74d-9d32-4e45-a194-1cf6a7db553d",
+      "monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_aave_doge_monitor/latest.json",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "ratio_updates": 26,
+      "streamer_messages": 507,
+      "streamer_bars": 48,
+      "entry_signals": 0,
+      "closed_trades": 0
+    }
   }
 ]

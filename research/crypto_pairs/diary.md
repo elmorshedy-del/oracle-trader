@@ -185,3 +185,65 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
     - `AAVE/DOGE`
 - Read:
   - the live lane can now be narrowed to the more stable candidate without changing entry/exit logic
+
+
+## 2026-03-15 - Candidate sweep on requested new pairs
+
+- Project:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1`
+- Discovery report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json`
+- Requested pairs screened on the same frozen 60-day discovery window:
+  - `DOGE/SHIB`
+  - `ARB/OP`
+  - `AAVE/UNI`
+  - `FET/RENDER`
+  - `SEI/SUI`
+- Read:
+  - none passed the same cointegration gate that produced `AAVE/DOGE`
+  - all five were rejected at phase 1, so none advanced to 60-day backtest / 30-day split / 15-day split
+- Key p-values:
+  - `DOGE/SHIB`: `0.224780`
+  - `ARB/OP`: `0.488602`
+  - `AAVE/UNI`: `0.761735`
+  - `FET/RENDER`: `0.986946`
+  - `SEI/SUI`: `0.808758`
+
+
+## 2026-03-15 - Oracle AAVE/DOGE shadow deployed
+
+- Deployment:
+  - Railway `1136d74d-9d32-4e45-a194-1cf6a7db553d`
+  - commit `bd4e893`
+- What shipped:
+  - focused `AAVE/DOGE` comparison/shadow sleeve inside Oracle
+  - durable audit files for:
+    - ratio ticks
+    - trade ledger
+    - daily summaries
+    - hourly checks
+  - external monitor script:
+    - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_crypto_pairs_shadow_health.py`
+- Live Oracle audit root:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow`
+- First live verified state from Railway runtime:
+  - `507` streamer messages
+  - `48` emitted bars
+  - `26` ratio updates
+  - `0` entry signals
+  - `0` closed trades
+- Read:
+  - the sleeve is now truly recording on Oracle
+  - it has not traded yet, but the recording pipeline is alive and the hourly monitor snapshot is clean
+
+
+## 2026-03-15 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260315T042844`
+- Date range: `2026-01-13` to `2026-03-13`
+- Symbols loaded: `10`
+- Pairs tested: `45`
+- Tradeable pairs: `1`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json`
+- Top pairs:
+  - `AAVE/DOGE` score `6.1357` halflife `45.18h`

@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run crypto pairs paper/shadow runtime.")
     parser.add_argument("--discovery-report", default=None, help="Path to a frozen pair_discovery_results.json")
     parser.add_argument("--top-pairs", type=int, default=5)
+    parser.add_argument("--pair-key", action="append", default=[], help="Explicit pair key like AAVE/DOGE; can be passed multiple times")
     parser.add_argument("--runtime-seconds", type=int, default=None)
     parser.add_argument("--total-capital", type=float, default=10_000.0)
     parser.add_argument("--session-root", default=str(DEFAULT_SESSION_ROOT))
@@ -53,7 +54,11 @@ async def main() -> None:
     args = parse_args()
     discovery_path = resolve_discovery_report_path(args.discovery_report)
     discovery_report = load_discovery_report(discovery_path)
-    symbols, pair_configs, active_pairs = build_runtime_configs(discovery_report, top_pairs=args.top_pairs)
+    symbols, pair_configs, active_pairs = build_runtime_configs(
+        discovery_report,
+        top_pairs=args.top_pairs,
+        pair_keys=args.pair_key,
+    )
 
     session_id = f"crypto_pairs_shadow_{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}_v1"
     session_root = resolve_path(args.session_root) / session_id
@@ -61,6 +66,7 @@ async def main() -> None:
     logger.flush_summary(
         discovery_report=str(discovery_path),
         active_pairs=[row["pair"] for row in active_pairs],
+        requested_pair_keys=args.pair_key,
     )
 
     streamer = PriceStreamer(symbols)

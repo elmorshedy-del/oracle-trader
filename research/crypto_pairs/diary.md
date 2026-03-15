@@ -162,3 +162,26 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - neither pair is cleanly profitable in every 15-day cut, so both still show regime dependence
   - `LINK/SOL` is materially more fragile because its first 30 days were negative overall
   - strict live focus should shift toward `AAVE/DOGE` first, with `LINK/SOL` treated as a secondary candidate
+
+
+## 2026-03-15 - Pair-key live focus added
+
+- Runtime upgrade:
+  - added explicit `--pair-key` support to:
+    - `engine/crypto_pairs/discovery.py`
+    - `tools/run_crypto_pairs_shadow.py`
+    - `tools/supervise_crypto_pairs_shadow.py`
+- Purpose:
+  - let the live paper lane follow robustness results directly instead of being forced to use only `top N` discovery ranking
+- Smoke verification:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T035315_v1/summary.json`
+  - active pair: `AAVE/DOGE`
+  - symbols: `AAVEUSDT`, `DOGEUSDT`
+  - `1` ratio tick in a short `20s` run
+- Focused live supervisor:
+  - id `crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1`
+  - state `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json`
+  - pair keys:
+    - `AAVE/DOGE`
+- Read:
+  - the live lane can now be narrowed to the more stable candidate without changing entry/exit logic

@@ -145,3 +145,20 @@ Top tradeable pairs:
 - Read:
   - the live pipeline is no longer dead
   - the next live blocker is warmup depth, not pair synchronization
+
+## Focused Live Follow-Up
+
+- Status: `implemented and running`
+- Runtime selection upgrade:
+  - explicit `--pair-key` support added to the discovery/runtime path
+  - live shadow and external supervisor can now run a specific pair instead of only `top N`
+- Why:
+  - the split-half robustness check showed `AAVE/DOGE` is the stronger live-first candidate
+- Smoke verification:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T035315_v1/summary.json`
+  - active pairs:
+    - `AAVE/DOGE`
+  - `1` ratio tick in a short validation run
+- Active focused supervisor:
+  - id `crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1`
+  - state `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json`

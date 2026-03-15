@@ -32,8 +32,20 @@ def build_runtime_configs(
     discovery_report: dict[str, object],
     *,
     top_pairs: int = 5,
+    pair_keys: list[str] | None = None,
 ) -> tuple[list[str], list[PairRuntimeConfig], list[dict[str, object]]]:
-    active_pairs = list(discovery_report.get("tradeable_pairs", []))[:top_pairs]
+    tradeable_pairs = list(discovery_report.get("tradeable_pairs", []))
+    if pair_keys:
+        requested = {pair_key.upper() for pair_key in pair_keys}
+        active_pairs = [
+            row for row in tradeable_pairs if f"{row['token_a']}/{row['token_b']}".upper() in requested
+        ]
+        if len(active_pairs) != len(requested):
+            found = {f"{row['token_a']}/{row['token_b']}".upper() for row in active_pairs}
+            missing = sorted(requested - found)
+            raise ValueError(f"Requested pair(s) not found in discovery report: {', '.join(missing)}")
+    else:
+        active_pairs = tradeable_pairs[:top_pairs]
     if not active_pairs:
         raise ValueError("No tradeable pairs available in discovery report")
     symbols: set[str] = set()

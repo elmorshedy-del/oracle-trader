@@ -60,6 +60,7 @@ def add_common_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--state-root", default=str(DEFAULT_STATE_ROOT))
     parser.add_argument("--discovery-report", default=None)
     parser.add_argument("--top-pairs", type=int, default=3)
+    parser.add_argument("--pair-key", action="append", default=[], help="Explicit pair key like AAVE/DOGE; can be passed multiple times")
     parser.add_argument("--runtime-seconds", type=int, default=3900)
     parser.add_argument("--restart-delay-seconds", type=int, default=DEFAULT_RESTART_DELAY_SECONDS)
     parser.add_argument("--max-restarts", type=int, default=10)
@@ -98,6 +99,7 @@ def command_start(args: argparse.Namespace) -> None:
         "requested_at": now_iso(),
         "discovery_report": str(resolve_discovery_report_path(args.discovery_report)),
         "top_pairs": args.top_pairs,
+        "pair_keys": args.pair_key,
         "runtime_seconds": args.runtime_seconds,
         "restart_delay_seconds": args.restart_delay_seconds,
         "max_restarts": args.max_restarts,
@@ -121,6 +123,11 @@ def command_start(args: argparse.Namespace) -> None:
                 str(resolve_discovery_report_path(args.discovery_report)),
                 "--top-pairs",
                 str(args.top_pairs),
+                *[
+                    item
+                    for pair_key in args.pair_key
+                    for item in ("--pair-key", pair_key)
+                ],
                 "--runtime-seconds",
                 str(args.runtime_seconds),
                 "--restart-delay-seconds",
@@ -201,6 +208,7 @@ def command_supervise(args: argparse.Namespace) -> None:
             "updated_at": now_iso(),
             "discovery_report": discovery_report,
             "top_pairs": args.top_pairs,
+            "pair_keys": args.pair_key,
             "runtime_seconds": args.runtime_seconds,
             "restart_delay_seconds": args.restart_delay_seconds,
             "max_restarts": args.max_restarts,
@@ -235,6 +243,11 @@ def command_supervise(args: argparse.Namespace) -> None:
                     discovery_report,
                     "--top-pairs",
                     str(args.top_pairs),
+                    *[
+                        item
+                        for pair_key in args.pair_key
+                        for item in ("--pair-key", pair_key)
+                    ],
                     "--runtime-seconds",
                     str(remaining),
                 ],

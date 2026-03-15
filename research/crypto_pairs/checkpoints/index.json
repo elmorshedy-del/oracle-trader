@@ -140,5 +140,22 @@
       "aave_doge_q3_bps": -47.6122,
       "aave_doge_q4_bps": 423.1097
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-live-aave-focus-20260315T035500",
+    "created_at": "2026-03-15T03:54:28.161858+00:00",
+    "status": "runtime_focus",
+    "category": "runtime_v1",
+    "summary": "Added explicit pair-key selection to the crypto pairs live shadow runtime and started a focused AAVE/DOGE supervisor run after the split-half robustness check favored that pair.",
+    "artifacts": {
+      "smoke_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T035315_v1/summary.json",
+      "supervisor_state": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json"
+    },
+    "metrics": {
+      "focused_pair": "AAVE/DOGE",
+      "smoke_ratio_ticks": 1,
+      "smoke_signals": 0,
+      "smoke_trades": 0
+    }
   }
 ]

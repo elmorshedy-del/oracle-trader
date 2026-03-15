@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -124,12 +123,13 @@ def resolve_path(raw: str) -> Path:
 
 def fetch_json(url: str, *, timeout_seconds: float) -> dict[str, object]:
     try:
-        with urlopen(url, timeout=timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        raise SystemExit(f"HTTP error fetching {url}: {exc.code}") from exc
-    except URLError as exc:
-        raise SystemExit(f"Network error fetching {url}: {exc.reason}") from exc
+        output = subprocess.check_output(
+            ["curl", "-fsSL", "--max-time", str(int(timeout_seconds)), url],
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"Network error fetching {url}: curl exited with {exc.returncode}") from exc
+    return json.loads(output)
 
 
 def append_snapshot(output_root: Path, snapshot: CheckSnapshot) -> None:

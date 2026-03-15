@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -130,7 +131,8 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             }
         )
 
-        self._stream_task: asyncio.Task | None = None
+        self._stream_thread: threading.Thread | None = None
+        self._stream_loop: asyncio.AbstractEventLoop | None = None
         self._stop = False
         self._last_hourly_check_at: datetime | None = None
         self._last_daily_day_key: str | None = None
@@ -190,17 +192,27 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         self.streamer.on_bar(self._on_bar)
 
     async def ensure_started(self) -> None:
-        if not self.enabled or self._stream_task is not None:
+        if not self.enabled or self._stream_thread is not None:
             return
-        self._stream_task = asyncio.create_task(self.streamer.run_forever(), name="crypto-pairs-shadow-stream")
+        thread = threading.Thread(
+            target=self._run_streamer_thread,
+            name="crypto-pairs-shadow-stream",
+            daemon=True,
+        )
+        self._stream_thread = thread
+        thread.start()
 
     async def close(self) -> None:
         self._stop = True
         self.streamer.stop()
-        if self._stream_task is not None:
-            self._stream_task.cancel()
-            await asyncio.gather(self._stream_task, return_exceptions=True)
-            self._stream_task = None
+        if self._stream_loop is not None:
+            try:
+                self._stream_loop.call_soon_threadsafe(lambda: None)
+            except RuntimeError:
+                pass
+        if self._stream_thread is not None:
+            await asyncio.to_thread(self._stream_thread.join, 5.0)
+            self._stream_thread = None
         self._finalize_all_daily_records(finalize_open_position=True)
         self._write_runtime_state()
 
@@ -278,6 +290,21 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "blocked_entry_signals": int(self._stats["blocked_entry_signals"]),
             },
         }
+
+    def _run_streamer_thread(self) -> None:
+        loop = asyncio.new_event_loop()
+        self._stream_loop = loop
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self.streamer.run_forever())
+        except Exception as exc:
+            logger.exception("[CRYPTO_PAIRS_SHADOW] Stream thread crashed: %s", exc)
+            self._stats["errors"] = int(self._stats["errors"]) + 1
+            self._stats["last_block_reason"] = f"stream_thread_error:{type(exc).__name__}"
+        finally:
+            self._stream_loop = None
+            self._stream_thread = None
+            loop.close()
 
     def _resolve_audit_root(self) -> Path:
         base = Path(self.cfg.audit_root).resolve() if self.cfg.audit_root else (LOG_DIR / "comparison" / self.cfg.session_label)

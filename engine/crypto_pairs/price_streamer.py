@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Callable
@@ -11,6 +12,9 @@ from typing import Callable
 import websockets
 
 from .config import DEFAULT_BAR_INTERVAL_SECONDS, PriceStreamerConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -39,6 +43,9 @@ class PriceStreamer:
             "bars_emitted": 0,
             "reconnects": 0,
             "started_at": int(time.time() * 1000),
+            "connected_url": None,
+            "last_message_at": None,
+            "last_error": None,
         }
         self._active_bars: dict[str, dict[str, float | int]] = {}
         self._stop_requested = False
@@ -62,8 +69,10 @@ class PriceStreamer:
                     break
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as exc:
                     self.stats["reconnects"] += 1
+                    self.stats["last_error"] = str(exc)
+                    logger.warning("[CRYPTO_PAIRS] stream reconnect after error via %s: %s", ws_url, exc)
                     continue
             if connected:
                 continue
@@ -74,12 +83,14 @@ class PriceStreamer:
         streams = "/".join(f"{symbol.lower()}@trade" for symbol in self.symbols)
         url = f"{ws_url}?streams={streams}"
         async with websockets.connect(url, ping_interval=20, ping_timeout=20, max_size=None) as ws:
+            self.stats["connected_url"] = ws_url
             async for raw_message in ws:
                 if self._stop_requested:
                     break
                 if deadline is not None and time.monotonic() >= deadline:
                     break
                 self.stats["messages"] += 1
+                self.stats["last_message_at"] = int(time.time() * 1000)
                 payload = json.loads(raw_message)
                 trade = payload["data"]
                 self._handle_trade(

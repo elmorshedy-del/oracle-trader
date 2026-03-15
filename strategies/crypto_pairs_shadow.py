@@ -1,4 +1,4 @@
-"""Oracle-integrated AAVE/DOGE crypto-pairs shadow sleeve."""
+"""Oracle-integrated crypto-pairs shadow sleeve."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from engine.crypto_pairs.ratio_engine import PairState, RatioEngine
 from engine.crypto_pairs.signal_engine_v1 import Signal, SignalEngineV1
 from runtime_paths import LOG_DIR
 from strategies.base import BaseStrategy
+from config import CryptoPairsShadowProfileConfig
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +53,20 @@ class LivePairPosition:
 
 class CryptoPairsShadowStrategy(BaseStrategy):
     name = "crypto_pairs_shadow"
-    description = "Frozen AAVE/DOGE crypto pairs shadow sleeve"
+    description = "Frozen crypto pairs shadow sleeve"
 
-    def __init__(self, config):
+    def __init__(self, config, profile: CryptoPairsShadowProfileConfig):
         super().__init__(config)
         self.cfg = config.crypto_pairs_shadow
+        self.profile = profile
+        self.name = profile.strategy_key
+        self.description = f"Frozen {profile.pair_key} crypto pairs shadow sleeve"
         self.discovery_path = resolve_discovery_report_path(self.cfg.discovery_report)
         self.discovery_report = load_discovery_report(self.discovery_path)
         symbols, pair_configs, active_pairs = build_runtime_configs(
             self.discovery_report,
             top_pairs=self.cfg.top_pairs,
-            pair_keys=list(self.cfg.pair_keys),
+            pair_keys=[self.profile.pair_key],
         )
         if len(pair_configs) != 1:
             raise ValueError(f"Expected exactly one crypto pairs runtime config, got {len(pair_configs)}")
@@ -113,7 +117,9 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             {
                 "started_at": datetime.now(UTC).isoformat(),
                 "strategy": self.name,
-                "label": self.cfg.label,
+                "label": self.profile.label,
+                "view_key": self.profile.view_key,
+                "source": self.profile.source,
                 "pair_key": self.pair_config.pair_key,
                 "token_a": self.pair_config.token_a,
                 "token_b": self.pair_config.token_b,
@@ -146,6 +152,8 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         self._stats.update(
             {
                 "pair_key": self.pair_config.pair_key,
+                "view_key": self.profile.view_key,
+                "source": self.profile.source,
                 "token_a": self.pair_config.token_a,
                 "token_b": self.pair_config.token_b,
                 "budget_usd": self.cfg.budget_usd,
@@ -252,16 +260,16 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                     "entry": round(self._open_position.entry_ratio, 6),
                     "current": round(float(current_ratio), 6),
                     "pnl": round(unrealized_usd, 2),
-                    "source": "crypto_pairs_aave_doge_shadow",
+                    "source": self.profile.source,
                 }
             )
         total_value = cash + positions_value
         total_pnl = total_value - self.cfg.budget_usd
         total_pnl_pct = (total_pnl / self.cfg.budget_usd * 100.0) if self.cfg.budget_usd else 0.0
         return {
-            "key": "crypto_pairs_aave_doge",
-            "label": self.cfg.label,
-            "source": "crypto_pairs_aave_doge_shadow",
+            "key": self.profile.view_key,
+            "label": self.profile.label,
+            "source": self.profile.source,
             "portfolio": {
                 "starting_capital": round(self.cfg.budget_usd, 2),
                 "total_value": round(total_value, 2),
@@ -307,7 +315,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             loop.close()
 
     def _resolve_audit_root(self) -> Path:
-        base = Path(self.cfg.audit_root).resolve() if self.cfg.audit_root else (LOG_DIR / "comparison" / self.cfg.session_label)
+        base = Path(self.cfg.audit_root).resolve() if self.cfg.audit_root else (LOG_DIR / "comparison" / self.profile.session_label)
         base.mkdir(parents=True, exist_ok=True)
         return base
 
@@ -387,7 +395,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         signal_payload = {
             "id": f"{state.pair_key}-{now.strftime('%H%M%S')}",
             "time": now.isoformat(),
-            "source": "crypto_pairs_aave_doge_shadow",
+            "source": self.profile.source,
             "action": decision.signal.value,
             "market": state.pair_key,
             "confidence": round(min(abs(float(state.current_zscore)) / max(self.cfg.entry_z, 1e-6), 1.0), 2),
@@ -494,7 +502,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         trade_view = {
             "id": f"{state.pair_key}-trade-{now.strftime('%H%M%S')}",
             "time": ledger_row["exit_timestamp"],
-            "source": "crypto_pairs_aave_doge_shadow",
+            "source": self.profile.source,
             "market": state.pair_key,
             "side": ledger_row["direction"],
             "price": ledger_row["entry_ratio"],
@@ -750,7 +758,9 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             {
                 "updated_at": datetime.now(UTC).isoformat(),
                 "strategy": self.name,
-                "label": self.cfg.label,
+                "label": self.profile.label,
+                "view_key": self.profile.view_key,
+                "source": self.profile.source,
                 "pair": self.pair_config.pair_key,
                 "stats": self.stats,
                 "recent_trades": self._recent_trades[:10],
@@ -763,10 +773,9 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         capital_per_leg = self.cfg.budget_usd * self.cfg.capital_per_pair_pct / 2.0
         return capital_per_leg * 4 * self.cfg.fee_bps / 10_000 * closed
 
-    @staticmethod
-    def _human_direction(direction: str) -> str:
+    def _human_direction(self, direction: str) -> str:
         if direction == Signal.LONG_A_SHORT_B.value:
-            return "LONG_AAVE_SHORT_DOGE"
+            return f"LONG_{self.pair_config.token_a}_SHORT_{self.pair_config.token_b}"
         if direction == Signal.SHORT_A_LONG_B.value:
-            return "SHORT_AAVE_LONG_DOGE"
+            return f"SHORT_{self.pair_config.token_a}_LONG_{self.pair_config.token_b}"
         return direction

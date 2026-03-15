@@ -375,15 +375,67 @@ class BitcoinMeanRevShadowConfig:
     capture_root: str = os.getenv("BITCOIN_MEANREV_SHADOW_CAPTURE_ROOT", "")
 
 
+@dataclass(frozen=True)
+class CryptoPairsShadowProfileConfig:
+    strategy_key: str
+    view_key: str
+    pair_key: str
+    label: str
+    source: str
+    session_label: str
+
+
+CRYPTO_PAIRS_SHADOW_DEFAULT_PROFILE_SPECS = (
+    ("crypto_pairs_shadow", "crypto_pairs_aave_doge", "AAVE/DOGE", "AAVE/DOGE Shadow", "crypto_pairs_aave_doge_shadow", "crypto_pairs_aave_doge_shadow"),
+    ("crypto_pairs_shadow_comp_floki", "crypto_pairs_comp_floki", "COMP/FLOKI", "COMP/FLOKI Shadow", "crypto_pairs_comp_floki_shadow", "crypto_pairs_comp_floki_shadow"),
+    ("crypto_pairs_shadow_comp_link", "crypto_pairs_comp_link", "COMP/LINK", "COMP/LINK Shadow", "crypto_pairs_comp_link_shadow", "crypto_pairs_comp_link_shadow"),
+)
+
+
+def build_crypto_pairs_shadow_profiles() -> list[CryptoPairsShadowProfileConfig]:
+    raw_profiles = os.getenv("CRYPTO_PAIRS_SHADOW_PROFILES", "").strip()
+    if raw_profiles:
+        profiles: list[CryptoPairsShadowProfileConfig] = []
+        for raw_profile in raw_profiles.split(";"):
+            parts = [part.strip() for part in raw_profile.split("|")]
+            if len(parts) != 6:
+                raise ValueError(
+                    "CRYPTO_PAIRS_SHADOW_PROFILES entries must use "
+                    "strategy_key|view_key|pair_key|label|source|session_label"
+                )
+            profiles.append(CryptoPairsShadowProfileConfig(*parts))
+        return profiles
+
+    legacy_pair_keys = [
+        pair.strip()
+        for pair in os.getenv("CRYPTO_PAIRS_SHADOW_PAIR_KEYS", "").split(",")
+        if pair.strip()
+    ]
+    legacy_label = os.getenv("CRYPTO_PAIRS_SHADOW_LABEL", "").strip()
+    legacy_session_label = os.getenv("CRYPTO_PAIRS_SHADOW_SESSION_LABEL", "").strip()
+    legacy_single_profile_requested = bool(legacy_pair_keys or legacy_label or legacy_session_label)
+    if legacy_single_profile_requested:
+        pair_key = legacy_pair_keys[0] if legacy_pair_keys else "AAVE/DOGE"
+        return [
+            CryptoPairsShadowProfileConfig(
+                strategy_key="crypto_pairs_shadow",
+                view_key="crypto_pairs_aave_doge",
+                pair_key=pair_key,
+                label=legacy_label or f"{pair_key} Shadow",
+                source="crypto_pairs_aave_doge_shadow",
+                session_label=legacy_session_label or "crypto_pairs_aave_doge_shadow",
+            )
+        ]
+
+    return [CryptoPairsShadowProfileConfig(*spec) for spec in CRYPTO_PAIRS_SHADOW_DEFAULT_PROFILE_SPECS]
+
+
 @dataclass
 class CryptoPairsShadowConfig:
-    """Focused AAVE/DOGE crypto pairs shadow sleeve for live Oracle paper validation."""
+    """Focused crypto-pairs shadow sleeves for live Oracle paper validation."""
     enabled: bool = os.getenv("CRYPTO_PAIRS_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
-    label: str = os.getenv("CRYPTO_PAIRS_SHADOW_LABEL", "AAVE/DOGE Shadow")
     discovery_report: str = os.getenv("CRYPTO_PAIRS_SHADOW_DISCOVERY_REPORT", "")
-    pair_keys: list[str] = field(
-        default_factory=lambda: [pair.strip() for pair in os.getenv("CRYPTO_PAIRS_SHADOW_PAIR_KEYS", "AAVE/DOGE").split(",") if pair.strip()]
-    )
+    profiles: list[CryptoPairsShadowProfileConfig] = field(default_factory=build_crypto_pairs_shadow_profiles)
     top_pairs: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_TOP_PAIRS", "3"))
     budget_usd: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_BUDGET_USD", "10000"))
     capital_per_pair_pct: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_CAPITAL_PER_PAIR_PCT", "0.20"))
@@ -411,7 +463,6 @@ class CryptoPairsShadowConfig:
         ]
     )
     hourly_check_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_HOURLY_CHECK_SECONDS", "3600"))
-    session_label: str = os.getenv("CRYPTO_PAIRS_SHADOW_SESSION_LABEL", "crypto_pairs_aave_doge_shadow")
     audit_root: str = os.getenv("CRYPTO_PAIRS_SHADOW_AUDIT_ROOT", "")
 
 

@@ -119,6 +119,18 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.CRYPTO_PAIRS_AAVE_DOGE_SHADOW.value,
         "signal_sources": (),
     },
+    "crypto_pairs_comp_floki": {
+        "label": "COMP/FLOKI Shadow",
+        "strategy": "crypto_pairs_shadow_comp_floki",
+        "source": "crypto_pairs_comp_floki_shadow",
+        "signal_sources": (),
+    },
+    "crypto_pairs_comp_link": {
+        "label": "COMP/LINK Shadow",
+        "strategy": "crypto_pairs_shadow_comp_link",
+        "source": "crypto_pairs_comp_link_shadow",
+        "signal_sources": (),
+    },
     "sports": {
         "label": "Sports",
         "strategy": "sports_model",
@@ -135,6 +147,12 @@ COMPARISON_VIEW_CONFIG = {
     "whale_follow": {"label": "Whale Follow", "strategy": "whale", "source": SignalSource.WHALE.value},
     "momentum": {"label": "Momentum", "strategy": "mean_reversion", "source": "mean_reversion"},
 }
+
+CRYPTO_PAIRS_SHADOW_VIEW_KEYS = (
+    "crypto_pairs_aave_doge",
+    "crypto_pairs_comp_floki",
+    "crypto_pairs_comp_link",
+)
 
 
 class Pipeline:
@@ -182,9 +200,17 @@ class Pipeline:
                 crypto_strategy=self.strategies["crypto_arb"],
             ),
             "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
-            "crypto_pairs_shadow": CryptoPairsShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
         }
+        self.crypto_pairs_shadow_profiles = tuple(self.config.crypto_pairs_shadow.profiles)
+        self.crypto_pairs_shadow_strategy_keys = tuple(
+            profile.strategy_key for profile in self.crypto_pairs_shadow_profiles
+        )
+        for profile in self.crypto_pairs_shadow_profiles:
+            self.comparison_only_strategies[profile.strategy_key] = CryptoPairsShadowStrategy(
+                self.config,
+                profile,
+            )
 
         # Engine
         self.trader = PaperTrader(
@@ -434,22 +460,23 @@ class Pipeline:
                 strategy_signals["bitcoin_meanrev_shadow"] = []
                 self.health.record_strategy_error("bitcoin_meanrev_shadow", str(e))
 
-            crypto_pairs_shadow: CryptoPairsShadowStrategy = self.comparison_only_strategies["crypto_pairs_shadow"]
-            try:
-                _crypto_pairs_shadow_start = _time.time()
-                crypto_pairs_shadow_signals = await crypto_pairs_shadow.scan(self._markets, self._events)
-                _crypto_pairs_shadow_dur = (_time.time() - _crypto_pairs_shadow_start) * 1000
-                strategy_signals["crypto_pairs_shadow"] = crypto_pairs_shadow_signals
-                self.health.record_strategy_run(
-                    "crypto_pairs_shadow",
-                    len(crypto_pairs_shadow_signals),
-                    _crypto_pairs_shadow_dur,
-                )
-            except Exception as e:
-                logger.error(f"Strategy crypto_pairs_shadow error: {e}")
-                crypto_pairs_shadow._stats["errors"] += 1
-                strategy_signals["crypto_pairs_shadow"] = []
-                self.health.record_strategy_error("crypto_pairs_shadow", str(e))
+            for strategy_key in self.crypto_pairs_shadow_strategy_keys:
+                crypto_pairs_shadow: CryptoPairsShadowStrategy = self.comparison_only_strategies[strategy_key]
+                try:
+                    _crypto_pairs_shadow_start = _time.time()
+                    crypto_pairs_shadow_signals = await crypto_pairs_shadow.scan(self._markets, self._events)
+                    _crypto_pairs_shadow_dur = (_time.time() - _crypto_pairs_shadow_start) * 1000
+                    strategy_signals[strategy_key] = crypto_pairs_shadow_signals
+                    self.health.record_strategy_run(
+                        strategy_key,
+                        len(crypto_pairs_shadow_signals),
+                        _crypto_pairs_shadow_dur,
+                    )
+                except Exception as e:
+                    logger.error(f"Strategy {strategy_key} error: {e}")
+                    crypto_pairs_shadow._stats["errors"] += 1
+                    strategy_signals[strategy_key] = []
+                    self.health.record_strategy_error(strategy_key, str(e))
 
             sports_model: SportsModelStrategy = self.comparison_only_strategies["sports_model"]
             try:
@@ -513,7 +540,7 @@ class Pipeline:
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
                 self._latest_comparison_signals[view_key] = view_signals[:30]
-                if view_key in {"bitcoin_meanrev_shadow", "crypto_pairs_aave_doge"}:
+                if view_key in {"bitcoin_meanrev_shadow", *CRYPTO_PAIRS_SHADOW_VIEW_KEYS}:
                     continue
                 for signal in view_signals:
                     trader.execute_signal(signal, current_prices)
@@ -737,7 +764,7 @@ class Pipeline:
             return self.config.bitcoin_model.budget_usd
         if view_key == "bitcoin_meanrev_shadow":
             return self.config.bitcoin_meanrev_shadow.budget_usd
-        if view_key == "crypto_pairs_aave_doge":
+        if view_key in CRYPTO_PAIRS_SHADOW_VIEW_KEYS:
             return self.config.crypto_pairs_shadow.budget_usd
         if view_key == "sports":
             return self.config.sports_model.budget_usd
@@ -885,8 +912,11 @@ class Pipeline:
             if view_key == "bitcoin_meanrev_shadow":
                 comparison_views[view_key] = self.comparison_only_strategies["bitcoin_meanrev_shadow"].serialize_view()
                 continue
-            if view_key == "crypto_pairs_aave_doge":
-                comparison_views[view_key] = self.comparison_only_strategies["crypto_pairs_shadow"].serialize_view()
+            if view_key in CRYPTO_PAIRS_SHADOW_VIEW_KEYS:
+                strategy = self.comparison_only_strategies.get(meta["strategy"])
+                if strategy is None:
+                    continue
+                comparison_views[view_key] = strategy.serialize_view()
                 continue
             comparison_views[view_key] = self._serialize_view(
                 view_key=view_key,
@@ -913,8 +943,10 @@ class Pipeline:
                 "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
-                "crypto_pairs_shadow": self.comparison_only_strategies["crypto_pairs_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
+            } | {
+                strategy_key: self.comparison_only_strategies[strategy_key].stats
+                for strategy_key in self.crypto_pairs_shadow_strategy_keys
             },
             "whale_wallets": [
                 {

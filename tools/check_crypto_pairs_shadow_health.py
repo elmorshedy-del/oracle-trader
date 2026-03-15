@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check and record the live Oracle AAVE/DOGE shadow sleeve health."""
+"""Check and record the live Oracle crypto-pairs shadow sleeve health."""
 
 from __future__ import annotations
 
@@ -21,16 +21,50 @@ from runtime_paths import LOG_DIR
 
 UTC = timezone.utc
 DEFAULT_BASE_URL = "https://just-grace-production-a401.up.railway.app"
-DEFAULT_OUTPUT_ROOT = LOG_DIR / "comparison" / "crypto_pairs_aave_doge_monitor"
+DEFAULT_OUTPUT_ROOT = LOG_DIR / "comparison" / "crypto_pairs_shadow_monitor"
 RATIO_STALE_SECONDS = 20 * 60
 HOURLY_STALE_SECONDS = 70 * 60
 COINTEGRATION_FAIL_THRESHOLD = 0.05
+
+
+@dataclass(frozen=True, slots=True)
+class MonitorTarget:
+    slug: str
+    label: str
+    view_key: str
+    strategy_key: str
+
+
+DEFAULT_TARGETS = (
+    MonitorTarget(
+        slug="aave_doge",
+        label="AAVE/DOGE",
+        view_key="crypto_pairs_aave_doge",
+        strategy_key="crypto_pairs_shadow",
+    ),
+    MonitorTarget(
+        slug="comp_floki",
+        label="COMP/FLOKI",
+        view_key="crypto_pairs_comp_floki",
+        strategy_key="crypto_pairs_shadow_comp_floki",
+    ),
+    MonitorTarget(
+        slug="comp_link",
+        label="COMP/LINK",
+        view_key="crypto_pairs_comp_link",
+        strategy_key="crypto_pairs_shadow_comp_link",
+    ),
+)
 
 
 @dataclass(slots=True)
 class CheckSnapshot:
     checked_at: str
     base_url: str
+    slug: str
+    label: str
+    view_key: str
+    strategy_key: str
     health_status: str
     ratio_updates: int
     entry_signals: int
@@ -52,10 +86,14 @@ class CheckSnapshot:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Check the Oracle AAVE/DOGE shadow sleeve and persist a monitoring snapshot.")
+    parser = argparse.ArgumentParser(description="Check the Oracle crypto-pairs shadow sleeves and persist monitoring snapshots.")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--timeout-seconds", type=float, default=20.0)
+    parser.add_argument("--view-key", help="Optional single-target comparison view key.")
+    parser.add_argument("--strategy-key", help="Optional single-target strategy key.")
+    parser.add_argument("--label", help="Optional single-target label.")
+    parser.add_argument("--slug", help="Optional single-target output slug.")
     return parser.parse_args()
 
 
@@ -66,9 +104,52 @@ def main() -> None:
 
     health_payload = fetch_json(f"{args.base_url.rstrip('/')}/api/health", timeout_seconds=args.timeout_seconds)
     state_payload = fetch_json(f"{args.base_url.rstrip('/')}/api/state", timeout_seconds=args.timeout_seconds)
+    snapshots = [
+        build_snapshot(
+            target=target,
+            base_url=args.base_url,
+            health_payload=health_payload,
+            state_payload=state_payload,
+        )
+        for target in resolve_targets(args)
+    ]
 
-    runtime = (((state_payload or {}).get("strategies") or {}).get("crypto_pairs_shadow") or {})
-    view = (((state_payload or {}).get("comparison_views") or {}).get("crypto_pairs_aave_doge") or {})
+    for snapshot in snapshots:
+        append_snapshot(output_root / snapshot_slug(snapshot), snapshot)
+
+    combined_payload = {
+        "checked_at": datetime.now(UTC).isoformat(),
+        "base_url": args.base_url,
+        "health_status": str(health_payload.get("status") or "unknown"),
+        "targets": [asdict(snapshot) for snapshot in snapshots],
+        "alerts": {snapshot.label: list(snapshot.alerts) for snapshot in snapshots if snapshot.alerts},
+    }
+    append_combined_snapshot(output_root, combined_payload)
+    print(json.dumps(combined_payload, indent=2))
+
+
+def resolve_targets(args: argparse.Namespace) -> tuple[MonitorTarget, ...]:
+    if args.view_key or args.strategy_key or args.label or args.slug:
+        return (
+            MonitorTarget(
+                slug=args.slug or normalize_slug(args.label or args.view_key or args.strategy_key or "crypto_pairs"),
+                label=args.label or args.view_key or args.strategy_key or "Crypto Pairs",
+                view_key=args.view_key or "crypto_pairs_aave_doge",
+                strategy_key=args.strategy_key or "crypto_pairs_shadow",
+            ),
+        )
+    return DEFAULT_TARGETS
+
+
+def build_snapshot(
+    *,
+    target: MonitorTarget,
+    base_url: str,
+    health_payload: dict[str, object],
+    state_payload: dict[str, object],
+) -> CheckSnapshot:
+    runtime = (((state_payload or {}).get("strategies") or {}).get(target.strategy_key) or {})
+    view = (((state_payload or {}).get("comparison_views") or {}).get(target.view_key) or {})
     portfolio = (view.get("portfolio") or {})
 
     alerts: list[str] = []
@@ -90,9 +171,13 @@ def main() -> None:
     if cointegration_pvalue is not None and float(cointegration_pvalue) > COINTEGRATION_FAIL_THRESHOLD:
         alerts.append(f"cointegration_broken:{cointegration_pvalue}")
 
-    snapshot = CheckSnapshot(
+    return CheckSnapshot(
         checked_at=datetime.now(UTC).isoformat(),
-        base_url=args.base_url,
+        base_url=base_url,
+        slug=target.slug,
+        label=target.label,
+        view_key=target.view_key,
+        strategy_key=target.strategy_key,
         health_status=str(health_payload.get("status") or "unknown"),
         ratio_updates=int(runtime.get("ratio_updates") or 0),
         entry_signals=int(runtime.get("entry_signals") or 0),
@@ -112,8 +197,6 @@ def main() -> None:
         positions_count=len(portfolio.get("positions") or []),
         alerts=alerts,
     )
-    append_snapshot(output_root, snapshot)
-    print(json.dumps(asdict(snapshot), indent=2))
 
 
 def resolve_path(raw: str) -> Path:
@@ -133,6 +216,7 @@ def fetch_json(url: str, *, timeout_seconds: float) -> dict[str, object]:
 
 
 def append_snapshot(output_root: Path, snapshot: CheckSnapshot) -> None:
+    output_root.mkdir(parents=True, exist_ok=True)
     payload = asdict(snapshot)
     latest_path = output_root / "latest.json"
     history_path = output_root / "history.jsonl"
@@ -140,6 +224,23 @@ def append_snapshot(output_root: Path, snapshot: CheckSnapshot) -> None:
     with history_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, sort_keys=True))
         handle.write("\n")
+
+
+def append_combined_snapshot(output_root: Path, payload: dict[str, object]) -> None:
+    latest_path = output_root / "latest.json"
+    history_path = output_root / "history.jsonl"
+    latest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    with history_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True))
+        handle.write("\n")
+
+
+def snapshot_slug(snapshot: CheckSnapshot) -> str:
+    return snapshot.slug
+
+
+def normalize_slug(raw: str) -> str:
+    return "".join(character.lower() if character.isalnum() else "_" for character in raw).strip("_")
 
 
 def timestamp_is_stale(raw: str | None, *, threshold_seconds: int) -> bool:

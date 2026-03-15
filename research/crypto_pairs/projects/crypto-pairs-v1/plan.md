@@ -58,6 +58,26 @@ Top tradeable pairs:
   - `69` trades
   - `57.97%` win rate
   - `+687.4537 bps`
+- Extended 60-day backtests:
+  - `LINK/SOL`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038366_v1/report.json`
+    - `50` trades
+    - `62.00%` win rate
+    - `+439.3625 bps`
+  - `AVAX/ETH`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json`
+    - `49` trades
+    - `46.94%` win rate
+    - `-263.6010 bps`
+  - `AAVE/DOGE`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json`
+    - `43` trades
+    - `58.14%` win rate
+    - `+634.6798 bps`
+  - basket: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json`
+    - `156` trades
+    - `53.21%` win rate
+    - `+595.2121 bps`
+- Read:
+  - `LINK/SOL` and `AAVE/DOGE` remain positive on 60 days
+  - `AVAX/ETH` remains the weak leg and is a natural drop candidate
 
 ## Next
 

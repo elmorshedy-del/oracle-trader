@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -30,6 +30,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pair", default=None, help="Pair key like LINK/SOL; defaults to the best pair")
     parser.add_argument("--top-pairs", type=int, default=1, help="Use the top N discovered pairs")
     parser.add_argument("--basket", action="store_true", help="Run a basket backtest across the selected pairs")
+    parser.add_argument("--start-date", default=None, help="Override inclusive backtest start date YYYY-MM-DD")
+    parser.add_argument("--end-date", default=None, help="Override inclusive backtest end date YYYY-MM-DD")
+    parser.add_argument("--lookback-days", type=int, default=None, help="Override the backtest window to the last N calendar days ending on --end-date or the discovery end date")
     parser.add_argument("--raw-root", default=str(DEFAULT_RAW_ROOT))
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--entry-z", type=float, default=2.0)
@@ -56,8 +59,12 @@ def main() -> None:
     available_pairs = max(len(list(discovery_report.get("tradeable_pairs", []))), 1)
     pair_limit = available_pairs if args.pair else max(args.top_pairs, 1)
     _, pair_configs, _ = build_runtime_configs(discovery_report, top_pairs=pair_limit)
-    start_date = datetime.fromisoformat(str(discovery_report["start_date"])).date()
-    end_date = datetime.fromisoformat(str(discovery_report["end_date"])).date()
+    start_date, end_date = resolve_backtest_dates(
+        discovery_report=discovery_report,
+        start_date_raw=args.start_date,
+        end_date_raw=args.end_date,
+        lookback_days=args.lookback_days,
+    )
     signal_config = SignalConfig(
         entry_z=args.entry_z,
         exit_z=args.exit_z,
@@ -129,6 +136,29 @@ def select_pair(pair_configs, pair_key: str | None):
         if config.pair_key == pair_key:
             return config
     raise ValueError(f"Pair {pair_key} not found in discovery report")
+
+
+def resolve_backtest_dates(*, discovery_report: dict[str, object], start_date_raw: str | None, end_date_raw: str | None, lookback_days: int | None):
+    discovery_start = datetime.fromisoformat(str(discovery_report["start_date"])).date()
+    discovery_end = datetime.fromisoformat(str(discovery_report["end_date"])).date()
+    if start_date_raw and not end_date_raw:
+        raise ValueError("--end-date is required when --start-date is set")
+    if end_date_raw and not start_date_raw and lookback_days is None:
+        raise ValueError("--start-date or --lookback-days is required when --end-date is set")
+    if start_date_raw and end_date_raw:
+        start_date = datetime.strptime(start_date_raw, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_raw, "%Y-%m-%d").date()
+    elif lookback_days is not None:
+        if lookback_days <= 0:
+            raise ValueError("--lookback-days must be positive")
+        end_date = datetime.strptime(end_date_raw, "%Y-%m-%d").date() if end_date_raw else discovery_end
+        start_date = end_date - timedelta(days=lookback_days - 1)
+    else:
+        start_date = discovery_start
+        end_date = discovery_end
+    if end_date < start_date:
+        raise ValueError("backtest end date must be on or after start date")
+    return start_date, end_date
 
 
 if __name__ == "__main__":

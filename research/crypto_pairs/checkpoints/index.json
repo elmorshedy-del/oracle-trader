@@ -90,5 +90,26 @@
       "streamer_messages": 283,
       "streamer_bars": 33
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-60day-backtests-20260315T034500",
+    "created_at": "2026-03-15T03:44:49.481365+00:00",
+    "status": "extended_backtest",
+    "category": "backtest_v1",
+    "summary": "Extended crypto pairs V1 backtests to a 60-day window using the same frozen pair selection and rule-based signal engine.",
+    "artifacts": {
+      "link_sol_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038366_v1/report.json",
+      "avax_eth_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json",
+      "aave_doge_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json",
+      "basket_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_bps": 439.3625,
+      "avax_eth_bps": -263.601,
+      "aave_doge_bps": 634.6798,
+      "basket_bps": 595.2121,
+      "basket_trades": 156,
+      "basket_win_rate": 0.532051282051282
+    }
   }
 ]

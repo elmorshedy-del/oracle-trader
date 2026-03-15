@@ -108,3 +108,25 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
 - Read:
   - pair synchronization is no longer the blocker
   - warmup depth is now the reason there are still no live signals/trades in a short run
+
+
+## 2026-03-15 - Extended 60-day V1 backtests
+
+- Archive extension:
+  - downloaded `2026-01-13` through `2026-02-11` for:
+    - `LINKUSDT`
+    - `SOLUSDT`
+    - `AVAXUSDT`
+    - `ETHUSDT`
+    - `AAVEUSDT`
+    - `DOGEUSDT`
+- 60-day results using the same frozen pair selection and V1 rules:
+  - `LINK/SOL`: `50` trades, `62.00%` win rate, `+439.3625 bps`
+  - `AVAX/ETH`: `49` trades, `46.94%` win rate, `-263.6010 bps`
+  - `AAVE/DOGE`: `43` trades, `58.14%` win rate, `+634.6798 bps`
+  - basket: `156` trades, `53.21%` win rate, `+595.2121 bps`
+- Reports:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038366_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json`
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json`

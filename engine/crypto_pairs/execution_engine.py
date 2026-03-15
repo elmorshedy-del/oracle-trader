@@ -37,6 +37,9 @@ class ExecutionEngine:
         price_b = self._require_quote(token_b)
         qty_a = round(capital_per_leg_usdt / price_a, self.config.quantity_precision)
         qty_b = round(capital_per_leg_usdt / price_b, self.config.quantity_precision)
+        fill_a = self._apply_slippage(price_a, side_a)
+        fill_b = self._apply_slippage(price_b, side_b)
+        slippage_usd = abs(fill_a - price_a) * qty_a + abs(fill_b - price_b) * qty_b
 
         trade = {
             "pair": pair_key,
@@ -48,11 +51,14 @@ class ExecutionEngine:
             "side_b": side_b,
             "qty_a": qty_a,
             "qty_b": qty_b,
-            "fill_a": self._apply_slippage(price_a, side_a),
-            "fill_b": self._apply_slippage(price_b, side_b),
+            "raw_price_a": price_a,
+            "raw_price_b": price_b,
+            "fill_a": fill_a,
+            "fill_b": fill_b,
             "capital_per_leg": capital_per_leg_usdt,
             "fee_bps": self.config.fee_bps,
             "slippage_bps": self.config.slippage_bps,
+            "slippage_usd": round(slippage_usd, 6),
             "paper": self.config.paper_trade,
         }
         self.trade_log.append(trade)
@@ -75,22 +81,35 @@ class ExecutionEngine:
         else:
             pnl_a = (float(entry_trade["fill_a"]) - fill_a) * qty_a
             pnl_b = (fill_b - float(entry_trade["fill_b"])) * qty_b
+        gross_pnl = pnl_a + pnl_b
         total_fee = capital_per_leg * 4 * self.config.fee_bps / 10_000
-        total_pnl = pnl_a + pnl_b - total_fee
+        entry_slippage_usd = float(entry_trade.get("slippage_usd") or 0.0)
+        exit_slippage_usd = abs(fill_a - price_a) * qty_a + abs(fill_b - price_b) * qty_b
+        total_slippage_usd = entry_slippage_usd + exit_slippage_usd
+        total_pnl = gross_pnl - total_fee
+        gross_bps = gross_pnl / (capital_per_leg * 2) * 10_000 if capital_per_leg > 0 else 0.0
         total_bps = total_pnl / (capital_per_leg * 2) * 10_000 if capital_per_leg > 0 else 0.0
 
         trade = {
             "pair": entry_trade["pair"],
             "timestamp_ms": int(time.time() * 1000),
+            "token_a": entry_trade["token_a"],
+            "token_b": entry_trade["token_b"],
             "side_a": exit_side_a,
             "side_b": exit_side_b,
+            "raw_price_a": price_a,
+            "raw_price_b": price_b,
             "fill_a": fill_a,
             "fill_b": fill_b,
+            "gross_pnl_usd": round(gross_pnl, 6),
+            "gross_pnl_bps": round(gross_bps, 4),
             "pnl_usd": round(total_pnl, 6),
             "pnl_bps": round(total_bps, 4),
             "pnl_a": round(pnl_a, 6),
             "pnl_b": round(pnl_b, 6),
             "fees_usd": round(total_fee, 6),
+            "slippage_usd": round(total_slippage_usd, 6),
+            "slippage_bps": round(total_slippage_usd / (capital_per_leg * 2) * 10_000, 4) if capital_per_leg > 0 else 0.0,
             "paper": self.config.paper_trade,
         }
         self.trade_log.append(trade)
@@ -105,4 +124,3 @@ class ExecutionEngine:
         if quote is None or quote <= 0:
             raise ValueError(f"Missing live quote for {symbol}")
         return float(quote)
-

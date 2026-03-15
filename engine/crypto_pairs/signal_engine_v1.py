@@ -38,18 +38,8 @@ class SignalEngineV1:
         if last_exit_ms is not None and timestamp_ms - last_exit_ms < self.config.cooldown_seconds * 1000:
             return SignalDecision(Signal.HOLD, "cooldown")
         if zscore >= self.config.entry_z:
-            self.open_positions[pair_key] = {
-                "direction": Signal.SHORT_A_LONG_B.value,
-                "entry_time_ms": timestamp_ms,
-                "entry_zscore": zscore,
-            }
             return SignalDecision(Signal.SHORT_A_LONG_B, "entry_z_high")
         if zscore <= -self.config.entry_z:
-            self.open_positions[pair_key] = {
-                "direction": Signal.LONG_A_SHORT_B.value,
-                "entry_time_ms": timestamp_ms,
-                "entry_zscore": zscore,
-            }
             return SignalDecision(Signal.LONG_A_SHORT_B, "entry_z_low")
         return SignalDecision(Signal.HOLD, "inside_entry_band")
 
@@ -58,17 +48,24 @@ class SignalEngineV1:
         direction = str(position["direction"])
         hold_seconds = (timestamp_ms - int(position["entry_time_ms"])) / 1000
         if direction == Signal.SHORT_A_LONG_B.value and zscore <= self.config.exit_z:
-            return self._close(pair_key, timestamp_ms, "take_profit_mean_reversion")
+            return SignalDecision(Signal.EXIT, "take_profit_mean_reversion")
         if direction == Signal.LONG_A_SHORT_B.value and zscore >= -self.config.exit_z:
-            return self._close(pair_key, timestamp_ms, "take_profit_mean_reversion")
+            return SignalDecision(Signal.EXIT, "take_profit_mean_reversion")
         if abs(zscore) >= self.config.stop_z:
-            return self._close(pair_key, timestamp_ms, "stop_loss")
+            return SignalDecision(Signal.EXIT, "stop_loss")
         if hold_seconds >= self.config.max_hold_seconds:
-            return self._close(pair_key, timestamp_ms, "max_hold_timeout")
+            return SignalDecision(Signal.EXIT, "max_hold_timeout")
         return SignalDecision(Signal.HOLD, "position_open")
 
-    def _close(self, pair_key: str, timestamp_ms: int, reason: str) -> SignalDecision:
+    def confirm_entry(self, *, pair_key: str, signal: Signal, zscore: float, timestamp_ms: int) -> None:
+        if signal not in {Signal.LONG_A_SHORT_B, Signal.SHORT_A_LONG_B}:
+            return
+        self.open_positions[pair_key] = {
+            "direction": signal.value,
+            "entry_time_ms": timestamp_ms,
+            "entry_zscore": zscore,
+        }
+
+    def confirm_exit(self, *, pair_key: str, timestamp_ms: int) -> None:
         self.open_positions.pop(pair_key, None)
         self.last_exit_timestamps_ms[pair_key] = timestamp_ms
-        return SignalDecision(Signal.EXIT, reason)
-

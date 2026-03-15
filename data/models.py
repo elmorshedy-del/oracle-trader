@@ -40,6 +40,7 @@ class SignalSource(str, Enum):
     WEATHER_MODEL_V2_SIGNAL = "weather_model_v2_signal"
     BITCOIN_MODEL = "bitcoin_futures_ml"
     BITCOIN_MEANREV_SHADOW = "bitcoin_meanrev_shadow"
+    CRYPTO_PAIRS_AAVE_DOGE_SHADOW = "crypto_pairs_aave_doge_shadow"
     SPORTS_MODEL = "sports_nba_model"
 
 

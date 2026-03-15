@@ -677,6 +677,7 @@ function stratBadge(source) {
     'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
     'bitcoin_futures_ml': ['BTC ML', 'strat-crypto'],
     'bitcoin_meanrev_shadow': ['BTC MR', 'strat-crypto'],
+    'crypto_pairs_aave_doge_shadow': ['PAIRS', 'strat-crypto'],
     'sports_nba_model': ['SPORTS', 'strat-sports'],
     'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
@@ -704,6 +705,7 @@ function normalizeStrategyKey(key) {
     crypto_arb: 'crypto_temporal_arb',
     bitcoin_model: 'bitcoin_futures_ml',
     bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
+    crypto_pairs_shadow: 'crypto_pairs_aave_doge_shadow',
     sports_model: 'sports_nba_model',
     weather: 'weather_forecast',
     weather_sniper: 'weather_sniper',
@@ -798,6 +800,7 @@ function renderViewTabs(d) {
     'bitcoin',
     'bitcoin_model',
     'bitcoin_meanrev_shadow',
+    'crypto_pairs_aave_doge',
     'sports',
     'bitcoin_whale',
     'arbitrage',
@@ -874,7 +877,7 @@ function render(d) {
   badge.className = `mode-badge mode-${d.mode}`;
   document.getElementById('uptime').textContent = `Uptime: ${d.uptime_human || '--'}`;
   document.getElementById('scan-count').textContent = `Scans: ${d.scan_count || 0}`;
-  const viewModeLabel = activeView.key === 'bitcoin_meanrev_shadow' ? 'shadow book' : 'paper portfolio';
+  const viewModeLabel = (activeView.key === 'bitcoin_meanrev_shadow' || activeView.key === 'crypto_pairs_aave_doge') ? 'shadow book' : 'paper portfolio';
   document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} ${viewModeLabel}</span> <span style="margin-left:10px;color:var(--text-dim)">Budget $${((activeView.portfolio || {}).starting_capital || 0).toFixed(0)}</span>`;
 
   // Stats
@@ -937,7 +940,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_meanrev_shadow', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const sportsIndex = order.indexOf('bitcoin_whale');
   order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
@@ -1176,6 +1179,7 @@ function renderSanity(d) {
       bitcoin: 'crypto_arb',
       bitcoin_model: 'bitcoin_model',
       bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
+      crypto_pairs_aave_doge: 'crypto_pairs_shadow',
       sports: 'sports_model',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',
@@ -1215,7 +1219,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_meanrev_shadow' ? 1 : 10)))));
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : ((activeView.key === 'bitcoin_meanrev_shadow' || activeView.key === 'crypto_pairs_aave_doge') ? 1 : 10)))));
     const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const checks = [
       {
@@ -1386,6 +1390,57 @@ function renderSanity(d) {
         ok: (runtime.evaluated_buckets || 0) > 0,
         state: (runtime.evaluated_buckets || 0) > 0 ? 'ok' : (((runtime.heartbeat_logs || 0) > 0 || (runtime.warmup_rejects || 0) > 0) ? 'warn' : 'bad'),
         note: `worst ${Number(runtime.worst_past_return_bps || 0).toFixed(2)}bps / best rej ${Number(runtime.best_rejected_score || 0).toFixed(3)} / miss ${runtime.shock_filter_misses || 0} shock / ${runtime.score_filter_misses || 0} score`,
+      });
+    }
+
+    if (activeView.key === 'crypto_pairs_aave_doge') {
+      const streamerStats = runtime.streamer_stats || {};
+      const ratioStats = runtime.ratio_engine_stats || {};
+      const lastRatioTickAt = runtime.last_ratio_tick_at;
+      const lastHourlyCheckAt = runtime.last_hourly_check_at;
+      const ratioFresh = !!lastRatioTickAt && (Date.now() - new Date(lastRatioTickAt).getTime()) <= 120000;
+      const hourlyFresh = !!lastHourlyCheckAt && (Date.now() - new Date(lastHourlyCheckAt).getTime()) <= 3900000;
+      const cointegration = runtime.current_cointegration_pvalue;
+      const tradeFlowAlive =
+        (runtime.entries || 0) > 0
+        || (runtime.closed_trades || 0) > 0
+        || !!runtime.open_position
+        || (runtime.entry_signals || 0) > 0;
+      checks.splice(2, 0, {
+        label: 'Pair feed live',
+        ok: (streamerStats.messages || 0) > 0 && (streamerStats.bars_emitted || 0) > 0 && ratioFresh,
+        state: ((streamerStats.messages || 0) > 0 && (streamerStats.bars_emitted || 0) > 0 && ratioFresh) ? 'ok' : (((streamerStats.messages || 0) > 0 || !!runtime.last_ratio_tick_at) ? 'warn' : 'bad'),
+        note: `${streamerStats.messages || 0} msgs / ${streamerStats.bars_emitted || 0} bars / ${timeAgo(lastRatioTickAt)}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Ratio ledger running',
+        ok: (runtime.ratio_updates || 0) > 0 && !!runtime.ratio_ticks_csv,
+        state: ((runtime.ratio_updates || 0) > 0 && !!runtime.ratio_ticks_csv) ? 'ok' : (((streamerStats.messages || 0) > 0) ? 'warn' : 'bad'),
+        note: `${runtime.ratio_updates || 0} ticks / csv live / no-price ${ratioStats.no_price_reject || 0} / lag ${ratioStats.lag_reject || 0} / warmup ${ratioStats.warmup_reject || 0}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Hourly checks writing',
+        ok: hourlyFresh,
+        state: hourlyFresh ? 'ok' : (!!runtime.hourly_checks_path ? 'warn' : 'bad'),
+        note: `${runtime.hourly_checks_path || 'no file'} / ${lastHourlyCheckAt || 'no hourly check yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'Trade ledger writing',
+        ok: tradeFlowAlive && !!runtime.trade_ledger_csv,
+        state: (tradeFlowAlive && !!runtime.trade_ledger_csv) ? 'ok' : (((runtime.entry_signals || 0) > 0 || (runtime.ratio_updates || 0) > 0) ? 'warn' : 'bad'),
+        note: `${runtime.entry_signals || 0} entry sig / ${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed`,
+      });
+      checks.splice(6, 0, {
+        label: 'Cointegration holding',
+        ok: cointegration == null || cointegration <= 0.05,
+        state: cointegration == null ? 'warn' : (cointegration <= 0.05 ? 'ok' : 'bad'),
+        note: cointegration == null ? 'not enough daily data yet' : `p=${Number(cointegration).toFixed(4)}`,
+      });
+      checks.splice(7, 0, {
+        label: 'PnL book updating',
+        ok: (runtime.ratio_updates || 0) > 0,
+        state: (runtime.ratio_updates || 0) > 0 ? 'ok' : (((streamerStats.messages || 0) > 0) ? 'warn' : 'bad'),
+        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}%`,
       });
     }
 

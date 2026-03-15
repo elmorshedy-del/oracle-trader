@@ -7,6 +7,8 @@ All tunable parameters in one place. Override with environment variables.
 import os
 from dataclasses import dataclass, field
 
+from engine.crypto_pairs.config import DEFAULT_BINANCE_SPOT_WS_URLS
+
 
 @dataclass
 class APIConfig:
@@ -374,6 +376,46 @@ class BitcoinMeanRevShadowConfig:
 
 
 @dataclass
+class CryptoPairsShadowConfig:
+    """Focused AAVE/DOGE crypto pairs shadow sleeve for live Oracle paper validation."""
+    enabled: bool = os.getenv("CRYPTO_PAIRS_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    label: str = os.getenv("CRYPTO_PAIRS_SHADOW_LABEL", "AAVE/DOGE Shadow")
+    discovery_report: str = os.getenv("CRYPTO_PAIRS_SHADOW_DISCOVERY_REPORT", "")
+    pair_keys: list[str] = field(
+        default_factory=lambda: [pair.strip() for pair in os.getenv("CRYPTO_PAIRS_SHADOW_PAIR_KEYS", "AAVE/DOGE").split(",") if pair.strip()]
+    )
+    top_pairs: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_TOP_PAIRS", "3"))
+    budget_usd: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_BUDGET_USD", "10000"))
+    capital_per_pair_pct: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_CAPITAL_PER_PAIR_PCT", "0.20"))
+    max_total_exposure_pct: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_MAX_TOTAL_EXPOSURE_PCT", "0.20"))
+    max_daily_loss_pct: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_MAX_DAILY_LOSS_PCT", "0.03"))
+    entry_z: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_ENTRY_Z", "2.0"))
+    exit_z: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_EXIT_Z", "0.0"))
+    stop_z: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_STOP_Z", "4.0"))
+    max_hold_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_MAX_HOLD_SECONDS", "21600"))
+    cooldown_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_COOLDOWN_SECONDS", "60"))
+    fee_bps: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_FEE_BPS", "1.0"))
+    slippage_bps: float = float(os.getenv("CRYPTO_PAIRS_SHADOW_SLIPPAGE_BPS", "0.5"))
+    quantity_precision: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_QUANTITY_PRECISION", "8"))
+    bar_interval_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_BAR_INTERVAL_SECONDS", "1"))
+    max_leg_lag_ms: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_MAX_LEG_LAG_MS", "10000"))
+    reconnect_delay_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_RECONNECT_DELAY_SECONDS", "5"))
+    ws_urls: list[str] = field(
+        default_factory=lambda: [
+            url.strip()
+            for url in os.getenv(
+                "CRYPTO_PAIRS_SHADOW_WS_URLS",
+                ",".join((DEFAULT_BINANCE_SPOT_WS_URLS[1], DEFAULT_BINANCE_SPOT_WS_URLS[0])),
+            ).split(",")
+            if url.strip()
+        ]
+    )
+    hourly_check_seconds: int = int(os.getenv("CRYPTO_PAIRS_SHADOW_HOURLY_CHECK_SECONDS", "3600"))
+    session_label: str = os.getenv("CRYPTO_PAIRS_SHADOW_SESSION_LABEL", "crypto_pairs_aave_doge_shadow")
+    audit_root: str = os.getenv("CRYPTO_PAIRS_SHADOW_AUDIT_ROOT", "")
+
+
+@dataclass
 class SportsModelConfig:
     """Standalone NBA sportsbook-anchor sleeve (comparison-book only)."""
     enabled: bool = os.getenv("SPORTS_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
@@ -440,6 +482,7 @@ class PipelineConfig:
     weather_model_v2: WeatherModelV2Config = field(default_factory=WeatherModelV2Config)
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
     bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
+    crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)
     sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 

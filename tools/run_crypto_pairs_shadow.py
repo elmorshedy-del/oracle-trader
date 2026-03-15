@@ -155,10 +155,17 @@ async def main() -> None:
                     zscore=state.current_zscore,
                     max_hold_seconds=signal_engine.config.max_hold_seconds,
                 )
+                signal_engine.confirm_entry(
+                    pair_key=pair_key,
+                    signal=decision.signal,
+                    zscore=state.current_zscore,
+                    timestamp_ms=state.last_ratio_timestamp_ms,
+                )
                 logger.log_trade_event({"event": "entry", **entry_trade, "entry_zscore": state.current_zscore})
             elif decision.signal == Signal.EXIT and pair_key in position_manager.positions:
                 exit_trade = executor.execute_exit(position_manager.positions[pair_key].entry_trade)
                 position_manager.close_position(pair_key=pair_key, exit_trade=exit_trade)
+                signal_engine.confirm_exit(pair_key=pair_key, timestamp_ms=state.last_ratio_timestamp_ms)
                 logger.log_trade_event({"event": "exit", **exit_trade, "reason": decision.reason})
 
         current_time_ms = bar.timestamp_ms
@@ -167,6 +174,7 @@ async def main() -> None:
                 continue
             exit_trade = executor.execute_exit(position_manager.positions[pair_key].entry_trade)
             position_manager.close_position(pair_key=pair_key, exit_trade=exit_trade)
+            signal_engine.confirm_exit(pair_key=pair_key, timestamp_ms=current_time_ms)
             logger.log_trade_event({"event": "timeout_exit", **exit_trade, "reason": "stale_position"})
 
     streamer.on_bar(on_bar)

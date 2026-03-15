@@ -20,6 +20,7 @@ from strategies.whale import WhaleTrackingStrategy
 from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
+from strategies.crypto_pairs_shadow import CryptoPairsShadowStrategy
 from strategies.bitcoin_model import BitcoinModelStrategy
 from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
 from strategies.sports_model import SportsModelStrategy
@@ -112,6 +113,12 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.BITCOIN_MEANREV_SHADOW.value,
         "signal_sources": (),
     },
+    "crypto_pairs_aave_doge": {
+        "label": "AAVE/DOGE Shadow",
+        "strategy": "crypto_pairs_shadow",
+        "source": SignalSource.CRYPTO_PAIRS_AAVE_DOGE_SHADOW.value,
+        "signal_sources": (),
+    },
     "sports": {
         "label": "Sports",
         "strategy": "sports_model",
@@ -175,6 +182,7 @@ class Pipeline:
                 crypto_strategy=self.strategies["crypto_arb"],
             ),
             "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
+            "crypto_pairs_shadow": CryptoPairsShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
         }
 
@@ -426,6 +434,23 @@ class Pipeline:
                 strategy_signals["bitcoin_meanrev_shadow"] = []
                 self.health.record_strategy_error("bitcoin_meanrev_shadow", str(e))
 
+            crypto_pairs_shadow: CryptoPairsShadowStrategy = self.comparison_only_strategies["crypto_pairs_shadow"]
+            try:
+                _crypto_pairs_shadow_start = _time.time()
+                crypto_pairs_shadow_signals = await crypto_pairs_shadow.scan(self._markets, self._events)
+                _crypto_pairs_shadow_dur = (_time.time() - _crypto_pairs_shadow_start) * 1000
+                strategy_signals["crypto_pairs_shadow"] = crypto_pairs_shadow_signals
+                self.health.record_strategy_run(
+                    "crypto_pairs_shadow",
+                    len(crypto_pairs_shadow_signals),
+                    _crypto_pairs_shadow_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy crypto_pairs_shadow error: {e}")
+                crypto_pairs_shadow._stats["errors"] += 1
+                strategy_signals["crypto_pairs_shadow"] = []
+                self.health.record_strategy_error("crypto_pairs_shadow", str(e))
+
             sports_model: SportsModelStrategy = self.comparison_only_strategies["sports_model"]
             try:
                 _sports_model_start = _time.time()
@@ -488,7 +513,7 @@ class Pipeline:
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
                 self._latest_comparison_signals[view_key] = view_signals[:30]
-                if view_key == "bitcoin_meanrev_shadow":
+                if view_key in {"bitcoin_meanrev_shadow", "crypto_pairs_aave_doge"}:
                     continue
                 for signal in view_signals:
                     trader.execute_signal(signal, current_prices)
@@ -712,6 +737,8 @@ class Pipeline:
             return self.config.bitcoin_model.budget_usd
         if view_key == "bitcoin_meanrev_shadow":
             return self.config.bitcoin_meanrev_shadow.budget_usd
+        if view_key == "crypto_pairs_aave_doge":
+            return self.config.crypto_pairs_shadow.budget_usd
         if view_key == "sports":
             return self.config.sports_model.budget_usd
         return self.config.risk.max_total_exposure_usd
@@ -858,6 +885,9 @@ class Pipeline:
             if view_key == "bitcoin_meanrev_shadow":
                 comparison_views[view_key] = self.comparison_only_strategies["bitcoin_meanrev_shadow"].serialize_view()
                 continue
+            if view_key == "crypto_pairs_aave_doge":
+                comparison_views[view_key] = self.comparison_only_strategies["crypto_pairs_shadow"].serialize_view()
+                continue
             comparison_views[view_key] = self._serialize_view(
                 view_key=view_key,
                 label=meta["label"],
@@ -883,6 +913,7 @@ class Pipeline:
                 "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
+                "crypto_pairs_shadow": self.comparison_only_strategies["crypto_pairs_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
             },
             "whale_wallets": [
@@ -1008,6 +1039,7 @@ class Pipeline:
                 },
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
                 "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
+                "crypto_pairs_shadow_budget": self.config.crypto_pairs_shadow.budget_usd,
             },
             "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),
             "app_log_path": str(LEGACY_APP_LOG_PATH),

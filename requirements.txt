@@ -8,3 +8,4 @@ catboost==1.2.10
 xgboost==2.1.2
 lightgbm==4.6.0
 websockets==15.0.1
+statsmodels==0.14.4

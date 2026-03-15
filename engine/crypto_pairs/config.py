@@ -9,9 +9,15 @@ DEFAULT_BINANCE_SPOT_WS_URLS = (
     "wss://stream.binance.com:9443/stream",
     "wss://data-stream.binance.vision/stream",
 )
+DEFAULT_BINANCE_SPOT_REST_URLS = (
+    "https://data-api.binance.vision/api/v3/ticker/price",
+    "https://api.binance.com/api/v3/ticker/price",
+)
 DEFAULT_BAR_INTERVAL_SECONDS = 1
 DEFAULT_MAX_LEG_LAG_MS = 10_000
 DEFAULT_RECONNECT_DELAY_SECONDS = 5
+DEFAULT_REST_POLL_SECONDS = 1.0
+DEFAULT_REST_IDLE_FALLBACK_SECONDS = 5.0
 DEFAULT_WARMUP_SECONDS = 3_600
 DEFAULT_STATS_SAMPLE_SECONDS = 3_600
 DEFAULT_PAPER_FEE_BPS = 1.0
@@ -36,8 +42,11 @@ class PairRuntimeConfig:
 @dataclass(slots=True)
 class PriceStreamerConfig:
     ws_urls: tuple[str, ...] = DEFAULT_BINANCE_SPOT_WS_URLS
+    rest_urls: tuple[str, ...] = DEFAULT_BINANCE_SPOT_REST_URLS
     bar_interval_seconds: int = DEFAULT_BAR_INTERVAL_SECONDS
     reconnect_delay_seconds: int = DEFAULT_RECONNECT_DELAY_SECONDS
+    rest_poll_seconds: float = DEFAULT_REST_POLL_SECONDS
+    rest_idle_fallback_seconds: float = DEFAULT_REST_IDLE_FALLBACK_SECONDS
 
 
 @dataclass(slots=True)

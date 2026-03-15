@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+import httpx
 import websockets
 
 from .config import DEFAULT_BAR_INTERVAL_SECONDS, PriceStreamerConfig
@@ -84,21 +85,67 @@ class PriceStreamer:
         url = f"{ws_url}?streams={streams}"
         async with websockets.connect(url, ping_interval=20, ping_timeout=20, max_size=None) as ws:
             self.stats["connected_url"] = ws_url
-            async for raw_message in ws:
-                if self._stop_requested:
-                    break
+            poller = asyncio.create_task(self._rest_fallback_loop(deadline=deadline), name="crypto-pairs-rest-fallback")
+            try:
+                async for raw_message in ws:
+                    if self._stop_requested:
+                        break
+                    if deadline is not None and time.monotonic() >= deadline:
+                        break
+                    self.stats["messages"] += 1
+                    self.stats["last_message_at"] = int(time.time() * 1000)
+                    payload = json.loads(raw_message)
+                    trade = payload["data"]
+                    self._handle_trade(
+                        symbol=str(trade["s"]).upper(),
+                        price=float(trade["p"]),
+                        quantity=float(trade["q"]),
+                        timestamp_ms=int(trade["T"]),
+                    )
+            finally:
+                poller.cancel()
+                await asyncio.gather(poller, return_exceptions=True)
+
+    async def _rest_fallback_loop(self, *, deadline: float | None) -> None:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            while not self._stop_requested:
                 if deadline is not None and time.monotonic() >= deadline:
-                    break
-                self.stats["messages"] += 1
-                self.stats["last_message_at"] = int(time.time() * 1000)
-                payload = json.loads(raw_message)
-                trade = payload["data"]
-                self._handle_trade(
-                    symbol=str(trade["s"]).upper(),
-                    price=float(trade["p"]),
-                    quantity=float(trade["q"]),
-                    timestamp_ms=int(trade["T"]),
-                )
+                    return
+                if not self._should_use_rest_fallback():
+                    await asyncio.sleep(self.config.rest_poll_seconds)
+                    continue
+                for rest_url in self.config.rest_urls:
+                    try:
+                        await self._poll_rest_prices(client=client, rest_url=rest_url)
+                        break
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as exc:
+                        self.stats["last_error"] = f"rest:{exc}"
+                        logger.warning("[CRYPTO_PAIRS] REST fallback failed via %s: %s", rest_url, exc)
+                await asyncio.sleep(self.config.rest_poll_seconds)
+
+    def _should_use_rest_fallback(self) -> bool:
+        last_message_at = self.stats.get("last_message_at")
+        if last_message_at is None:
+            return True
+        idle_seconds = (int(time.time() * 1000) - int(last_message_at)) / 1000.0
+        return idle_seconds >= self.config.rest_idle_fallback_seconds
+
+    async def _poll_rest_prices(self, *, client: httpx.AsyncClient, rest_url: str) -> None:
+        now_ms = int(time.time() * 1000)
+        responses = await asyncio.gather(
+            *(
+                client.get(rest_url, params={"symbol": symbol})
+                for symbol in self.symbols
+            )
+        )
+        for response in responses:
+            response.raise_for_status()
+            payload = response.json()
+            symbol = str(payload["symbol"]).upper()
+            price = float(payload["price"])
+            self._handle_trade(symbol=symbol, price=price, quantity=0.0, timestamp_ms=now_ms)
 
     def _handle_trade(self, *, symbol: str, price: float, quantity: float, timestamp_ms: int) -> None:
         bucket_ms = self._bucket_timestamp_ms(timestamp_ms)

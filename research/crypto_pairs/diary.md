@@ -65,3 +65,22 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json`
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json`
   - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json`
+
+
+## 2026-03-15 - External supervisor added
+
+- Tool:
+  - `tools/supervise_crypto_pairs_shadow.py`
+- What it does:
+  - detached external supervisor process
+  - `start / status / stop`
+  - restart-aware state management
+  - separate supervisor root with `state.json`, `supervisor.log`, and worker logs
+- Verified smoke lifecycle:
+  - start detached
+  - status while child running
+  - stop transitions final state to `stopped`
+- Live long run started:
+  - supervisor id `crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - root `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - runtime `3900s`

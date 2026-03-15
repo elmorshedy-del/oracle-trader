@@ -64,3 +64,18 @@ Top tradeable pairs:
 - Freeze this scaffold as the baseline runtime checkpoint.
 - Expand backtests from the top pair to the full active-pair basket using the same rule set.
 - Only after the rule-based lane is characterized, consider the CatBoost upgrade from the architecture.
+
+## External Supervision
+
+- Status: `implemented`
+- Tool:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/supervise_crypto_pairs_shadow.py`
+- Verified lifecycle:
+  - detached `start`
+  - independent `status`
+  - controlled `stop`
+- Active live supervisor:
+  - id `crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - root `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - worker runtime `3900s`
+  - status file shows supervisor and child both alive

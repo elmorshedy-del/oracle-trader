@@ -57,5 +57,20 @@
       "basket_trades": 69,
       "basket_win_rate": 0.5797101449275363
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-shadow-supervisor-v1-20260315T003100",
+    "created_at": "2026-03-15T00:30:52.577379+00:00",
+    "status": "supervisor_ready",
+    "category": "supervision",
+    "summary": "Added a detached external supervisor for the crypto pairs shadow runner with start/status/stop and restart-aware state management.",
+    "artifacts": {
+      "supervisor_tool": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/supervise_crypto_pairs_shadow.py",
+      "smoke_supervisor_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_smoke2_20260315T0031_v1"
+    },
+    "metrics": {
+      "smoke_runtime_seconds": 30,
+      "smoke_stop_returncode": -15
+    }
   }
 ]

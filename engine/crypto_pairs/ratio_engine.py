@@ -48,6 +48,13 @@ class RatioEngine:
         self.max_leg_lag_ms = max_leg_lag_ms
         self.pairs: dict[str, PairState] = {}
         self.symbol_to_pairs: dict[str, list[str]] = {}
+        self.stats: dict[str, object] = {
+            "ratio_updates": 0,
+            "no_price_reject": 0,
+            "lag_reject": 0,
+            "warmup_reject": 0,
+            "per_pair": {},
+        }
         for pair in pairs:
             state = PairState(
                 pair_key=pair.pair_key,
@@ -64,6 +71,12 @@ class RatioEngine:
             self.pairs[pair.pair_key] = state
             self.symbol_to_pairs.setdefault(pair.token_a, []).append(pair.pair_key)
             self.symbol_to_pairs.setdefault(pair.token_b, []).append(pair.pair_key)
+            self.stats["per_pair"][pair.pair_key] = {
+                "ratio_updates": 0,
+                "no_price_reject": 0,
+                "lag_reject": 0,
+                "warmup_reject": 0,
+            }
 
     def on_price_bar(self, bar: PriceBar) -> list[str]:
         """Update all affected pairs and return the pair keys that produced new ratio ticks."""
@@ -78,9 +91,16 @@ class RatioEngine:
                 state.last_timestamp_b_ms = bar.timestamp_ms
             else:
                 continue
-            if self._can_update_ratio(state) and bar.timestamp_ms > state.last_ratio_timestamp_ms:
-                self._update_ratio(state, bar.timestamp_ms)
-                updated_pairs.append(pair_key)
+            if bar.timestamp_ms <= state.last_ratio_timestamp_ms:
+                continue
+            reject_reason = self._rejection_reason(state)
+            if reject_reason is not None:
+                self._count_reject(pair_key, reject_reason)
+                continue
+            self._update_ratio(state, bar.timestamp_ms)
+            if not state.ready:
+                self._count_reject(pair_key, "warmup_reject")
+            updated_pairs.append(pair_key)
         return updated_pairs
 
     def get_state(self, pair_key: str) -> PairState | None:
@@ -89,12 +109,14 @@ class RatioEngine:
     def get_ready_states(self) -> dict[str, PairState]:
         return {pair_key: state for pair_key, state in self.pairs.items() if state.ready}
 
-    def _can_update_ratio(self, state: PairState) -> bool:
+    def _rejection_reason(self, state: PairState) -> str | None:
         if state.last_price_a <= 0 or state.last_price_b <= 0:
-            return False
+            return "no_price_reject"
         if state.last_timestamp_a_ms <= 0 or state.last_timestamp_b_ms <= 0:
-            return False
-        return abs(state.last_timestamp_a_ms - state.last_timestamp_b_ms) <= self.max_leg_lag_ms
+            return "no_price_reject"
+        if abs(state.last_timestamp_a_ms - state.last_timestamp_b_ms) > self.max_leg_lag_ms:
+            return "lag_reject"
+        return None
 
     def _update_ratio(self, state: PairState, timestamp_ms: int) -> None:
         ratio = float(np.log(state.last_price_a / state.last_price_b))
@@ -102,6 +124,7 @@ class RatioEngine:
         state.last_ratio_timestamp_ms = timestamp_ms
         state.ratio_history.append(ratio)
         state.timestamp_history.append(timestamp_ms)
+        self._count_stat(state.pair_key, "ratio_updates")
 
         count = len(state.ratio_history)
         if count < state.min_warmup_seconds:
@@ -172,3 +195,10 @@ class RatioEngine:
                 break
         return consecutive
 
+    def _count_reject(self, pair_key: str, reason: str) -> None:
+        self._count_stat(pair_key, reason)
+
+    def _count_stat(self, pair_key: str, key: str) -> None:
+        self.stats[key] = int(self.stats.get(key, 0)) + 1
+        per_pair = self.stats["per_pair"][pair_key]
+        per_pair[key] = int(per_pair.get(key, 0)) + 1

@@ -90,7 +90,7 @@ async def main() -> None:
         updated_pairs = ratio_engine.on_price_bar(bar)
         for pair_key in updated_pairs:
             state = ratio_engine.get_state(pair_key)
-            if state is None or not state.ready:
+            if state is None:
                 continue
             logger.log_ratio_tick(
                 {
@@ -100,9 +100,12 @@ async def main() -> None:
                     "zscore": state.current_zscore,
                     "rolling_mean": state.rolling_mean,
                     "rolling_std": state.rolling_std,
-                    "features": state.features,
+                    "ready": state.ready,
+                    "features": state.features if state.ready else {},
                 }
             )
+            if not state.ready:
+                continue
             decision = signal_engine.evaluate(
                 pair_key=pair_key,
                 zscore=state.current_zscore,
@@ -175,6 +178,7 @@ async def main() -> None:
         closed_trades=len(position_manager.closed_trades),
         daily_pnl_usd=position_manager.daily_pnl_usd,
         streamer_stats=streamer.stats,
+        ratio_engine_stats=ratio_engine.stats,
     )
     print(json.dumps({"session_root": str(session_root), "summary": logger.summary}, indent=2))
 
@@ -186,4 +190,3 @@ def resolve_path(raw: str) -> Path:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

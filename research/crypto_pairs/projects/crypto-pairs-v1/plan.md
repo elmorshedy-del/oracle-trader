@@ -79,3 +79,22 @@ Top tradeable pairs:
   - root `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
   - worker runtime `3900s`
   - status file shows supervisor and child both alive
+
+## Live Pipeline Fix
+
+- Status: `implemented and verified`
+- Change set:
+  - widened `max_leg_lag_ms` from `1500` to `10000`
+  - ratio now updates on every fresh bar using the last known opposite leg price
+  - added reject counters: `no_price_reject`, `lag_reject`, `warmup_reject`
+  - shadow runner now logs ratio updates even before warmup completes, with `ready` in the payload
+- Verified short live session:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T033639_v1/summary.json`
+  - `5` ratio ticks
+  - reject counters:
+    - `no_price_reject: 27`
+    - `lag_reject: 0`
+    - `warmup_reject: 5`
+- Read:
+  - the live pipeline is no longer dead
+  - the next live blocker is warmup depth, not pair synchronization

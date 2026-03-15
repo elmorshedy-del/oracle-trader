@@ -84,3 +84,27 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - supervisor id `crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
   - root `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
   - runtime `3900s`
+
+
+## 2026-03-15 - Live ratio pipeline unblocked
+
+- Runtime fix:
+  - widened live leg-lag tolerance from `1500ms` to `10000ms`
+  - compute ratio on every fresh leg bar using the last known opposite leg price
+  - added counters for:
+    - `no_price_reject`
+    - `lag_reject`
+    - `warmup_reject`
+  - shadow logger now records ratio updates even before warmup is complete
+- Verified live session:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T033639_v1/summary.json`
+  - `5` ratio ticks
+  - `283` websocket messages
+  - `33` emitted bars
+  - reject counts:
+    - `no_price_reject: 27`
+    - `lag_reject: 0`
+    - `warmup_reject: 5`
+- Read:
+  - pair synchronization is no longer the blocker
+  - warmup depth is now the reason there are still no live signals/trades in a short run

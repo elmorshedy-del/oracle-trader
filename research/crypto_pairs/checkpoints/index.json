@@ -72,5 +72,23 @@
       "smoke_runtime_seconds": 30,
       "smoke_stop_returncode": -15
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-live-ratio-unblocked-20260315T033800",
+    "created_at": "2026-03-15T03:37:38.393651+00:00",
+    "status": "live_pipeline_fixed",
+    "category": "live_runtime",
+    "summary": "Unblocked live crypto pairs ratio updates by widening leg lag tolerance, updating on every fresh bar, and adding reject counters.",
+    "artifacts": {
+      "session_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T033639_v1/summary.json"
+    },
+    "metrics": {
+      "ratio_ticks": 5,
+      "no_price_reject": 27,
+      "lag_reject": 0,
+      "warmup_reject": 5,
+      "streamer_messages": 283,
+      "streamer_bars": 33
+    }
   }
 ]

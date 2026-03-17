@@ -1,2 +1,2 @@
 [phases.setup]
-nixLibs = ["...", "gcc-unwrapped"]
+nixLibs = ["...", "stdenv.cc.cc.lib"]

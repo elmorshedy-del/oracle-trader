@@ -44,6 +44,7 @@ OVERLAY_SEED_CONFIDENCE = 0.55
 OVERLAY_SEED_MIN_SIZE_USD = 10.0
 OVERLAY_SEED_MAX_SIZE_USD = 50.0
 OVERLAY_SEED_POSITION_LIMIT = 20
+STATE_CACHE_TTL_SECONDS = 60
 
 COMPARISON_VIEW_CONFIG = {
     "all": {"label": "All", "strategy": None, "source": "all"},
@@ -281,6 +282,7 @@ class Pipeline:
         self._latest_diagnostics: dict = {}
         self._cached_state: dict | None = None
         self._cached_state_json: bytes | None = None
+        self._cached_state_updated_at: datetime | None = None
 
     async def start(self):
         """Start the main loop."""
@@ -905,7 +907,7 @@ class Pipeline:
 
     def get_state(self) -> dict:
         """Get full dashboard state."""
-        if self._cached_state is not None:
+        if self._cached_state is not None and not self._state_cache_stale():
             return self._cached_state
 
         state = self._build_state()
@@ -914,7 +916,7 @@ class Pipeline:
 
     def get_state_json(self) -> bytes:
         """Get the cached dashboard state as serialized JSON bytes."""
-        if self._cached_state_json is not None:
+        if self._cached_state_json is not None and not self._state_cache_stale():
             return self._cached_state_json
 
         state = self.get_state()
@@ -924,6 +926,14 @@ class Pipeline:
         """Store both dict and serialized forms of the dashboard state."""
         self._cached_state = state
         self._cached_state_json = json.dumps(state, separators=(",", ":"), default=str).encode("utf-8")
+        self._cached_state_updated_at = datetime.now(timezone.utc)
+
+    def _state_cache_stale(self) -> bool:
+        """Return whether the API state cache should be rebuilt."""
+        if self._cached_state_updated_at is None:
+            return True
+        age = datetime.now(timezone.utc) - self._cached_state_updated_at
+        return age.total_seconds() >= STATE_CACHE_TTL_SECONDS
 
     def _refresh_cached_state(self) -> dict:
         """Rebuild the dashboard state cache and return the latest dict snapshot."""

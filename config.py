@@ -8,6 +8,8 @@ import os
 from dataclasses import dataclass, field
 
 from engine.crypto_pairs.config import DEFAULT_BINANCE_SPOT_WS_URLS
+from engine.weather_edge_config import RULE_MIN_EDGE
+from engine.weather_edge_live_support import WEATHER_EDGE_LIVE_ALLOWED_LEAD_TIMES_HOURS
 
 
 @dataclass
@@ -271,6 +273,29 @@ class WeatherModelV2Config:
 
 
 @dataclass
+class WeatherEdgeLiveConfig:
+    """Standalone live weather-edge-v1 lane."""
+
+    enabled: bool = os.getenv("WEATHER_EDGE_LIVE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    model_dir: str = os.getenv(
+        "WEATHER_EDGE_LIVE_MODEL_DIR",
+        "models/weather_ml/external_only/frozen-legacy-weather-ml-v1",
+    )
+    starting_bankroll_usd: float = float(os.getenv("WEATHER_EDGE_LIVE_STARTING_BANKROLL_USD", "500"))
+    min_edge: float = float(os.getenv("WEATHER_EDGE_LIVE_MIN_EDGE", str(RULE_MIN_EDGE)))
+    max_position_fraction: float = float(os.getenv("WEATHER_EDGE_LIVE_MAX_POSITION_FRACTION", "0.02"))
+    daily_summary_hour_utc: int = int(os.getenv("WEATHER_EDGE_LIVE_DAILY_SUMMARY_HOUR_UTC", "0"))
+    allowed_lead_times_hours: tuple[int, ...] = field(
+        default_factory=lambda: tuple(WEATHER_EDGE_LIVE_ALLOWED_LEAD_TIMES_HOURS)
+    )
+    label: str = os.getenv("WEATHER_EDGE_LIVE_LABEL", "Weather Edge Live")
+    view_key: str = os.getenv("WEATHER_EDGE_LIVE_VIEW_KEY", "weather_edge_live")
+    source: str = os.getenv("WEATHER_EDGE_LIVE_SOURCE", "weather_edge_live")
+    session_label: str = os.getenv("WEATHER_EDGE_LIVE_SESSION_LABEL", "weather_edge_live")
+    audit_root: str = os.getenv("WEATHER_EDGE_LIVE_AUDIT_ROOT", "")
+
+
+@dataclass
 class BitcoinModelConfig:
     """Standalone BTC futures-impulse sleeve (comparison-book only)."""
     enabled: bool = os.getenv("BITCOIN_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
@@ -531,6 +556,7 @@ class PipelineConfig:
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
     weather_model: WeatherModelConfig = field(default_factory=WeatherModelConfig)
     weather_model_v2: WeatherModelV2Config = field(default_factory=WeatherModelV2Config)
+    weather_edge_live: WeatherEdgeLiveConfig = field(default_factory=WeatherEdgeLiveConfig)
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
     bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
     crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)

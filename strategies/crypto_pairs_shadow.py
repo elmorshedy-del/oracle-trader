@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import math
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -49,6 +51,35 @@ class LivePairPosition:
     entry_price_b: float
     position_size_per_leg_usdt: float
     entry_trade: dict[str, Any]
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "LivePairPosition":
+        return cls(
+            pair_key=str(payload["pair_key"]),
+            direction=str(payload["direction"]),
+            entry_timestamp=datetime.fromisoformat(str(payload["entry_timestamp"])).astimezone(UTC),
+            entry_timestamp_ms=int(payload["entry_timestamp_ms"]),
+            entry_zscore=float(payload["entry_zscore"]),
+            entry_ratio=float(payload["entry_ratio"]),
+            entry_price_a=float(payload["entry_price_a"]),
+            entry_price_b=float(payload["entry_price_b"]),
+            position_size_per_leg_usdt=float(payload["position_size_per_leg_usdt"]),
+            entry_trade=dict(payload.get("entry_trade") or {}),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "pair_key": self.pair_key,
+            "direction": self.direction,
+            "entry_timestamp": self.entry_timestamp.isoformat(),
+            "entry_timestamp_ms": self.entry_timestamp_ms,
+            "entry_zscore": self.entry_zscore,
+            "entry_ratio": self.entry_ratio,
+            "entry_price_a": self.entry_price_a,
+            "entry_price_b": self.entry_price_b,
+            "position_size_per_leg_usdt": self.position_size_per_leg_usdt,
+            "entry_trade": self.entry_trade,
+        }
 
 
 class CryptoPairsShadowStrategy(BaseStrategy):
@@ -149,6 +180,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         self._open_position: LivePairPosition | None = None
         self._daily_records: dict[str, dict[str, Any]] = {}
         self._daily_samples: dict[str, dict[str, list[float]]] = {}
+        self._loaded_ratio_sample_days: set[str] = set()
         self._stats.update(
             {
                 "pair_key": self.pair_config.pair_key,
@@ -196,6 +228,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "ratio_engine_stats": self.ratio_engine.stats,
             }
         )
+        self._load_runtime_state()
         self.enabled = bool(self.cfg.enabled)
         self.streamer.on_bar(self._on_bar)
 
@@ -350,6 +383,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         self._last_ratio_tick_at = now
         self._stats["ratio_updates"] = int(self._stats["ratio_updates"]) + 1
         self._stats["last_ratio_tick_at"] = now.isoformat()
+        self._maybe_refresh_live_cointegration(day_key)
         self.audit.log_ratio_tick(
             {
                 "timestamp": now.isoformat(),
@@ -732,6 +766,8 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         if coint is None:
             return None
         sample = self._daily_samples.get(day_key)
+        if not sample or len(sample.get("a") or []) < 50 or len(sample.get("b") or []) < 50:
+            sample = self._load_ratio_samples_from_log(day_key)
         if not sample:
             return None
         a = sample["a"]
@@ -744,7 +780,10 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             b = b[::step]
         try:
             _, pvalue, _ = coint(a, b)
-            return round(float(pvalue), 6)
+            pvalue = float(pvalue)
+            if not math.isfinite(pvalue):
+                return None
+            return round(pvalue, 6)
         except Exception as exc:
             logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to compute cointegration p-value: %s", exc)
             return None
@@ -752,6 +791,225 @@ class CryptoPairsShadowStrategy(BaseStrategy):
     def _current_day_record(self) -> dict[str, Any]:
         day_key = self._last_daily_day_key or datetime.now(UTC).strftime("%Y-%m-%d")
         return self._ensure_day_record(day_key)
+
+    def _maybe_refresh_live_cointegration(self, day_key: str) -> None:
+        record = self._daily_records.get(day_key)
+        if record is None:
+            return
+        ratio_tick_count = int(record["ratio_tick_count"])
+        if ratio_tick_count < 50:
+            return
+        current = self._stats.get("current_cointegration_pvalue")
+        if ratio_tick_count % 10 != 0 and current is not None:
+            return
+        self._stats["current_cointegration_pvalue"] = self._compute_cointegration_pvalue(day_key)
+
+    def _load_ratio_samples_from_log(self, day_key: str) -> dict[str, list[float]] | None:
+        if day_key in self._loaded_ratio_sample_days:
+            return self._daily_samples.get(day_key)
+        path = self.audit.paths["ratio_ticks_jsonl"]
+        if not path.exists():
+            return self._daily_samples.get(day_key)
+        sample = {"a": [], "b": [], "timestamps": []}
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    timestamp = str(row.get("timestamp") or "")
+                    if not timestamp.startswith(day_key):
+                        continue
+                    try:
+                        sample["a"].append(float(row["price_a"]))
+                        sample["b"].append(float(row["price_b"]))
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    sample["timestamps"].append(timestamp)
+        except Exception as exc:
+            logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to reload ratio samples from log: %s", exc)
+            return self._daily_samples.get(day_key)
+        self._loaded_ratio_sample_days.add(day_key)
+        if sample["a"]:
+            self._daily_samples[day_key] = sample
+        return self._daily_samples.get(day_key)
+
+    def _restore_day_record_from_logs(self, day_key: str) -> None:
+        if day_key in self._daily_records:
+            return
+        record = self._ensure_day_record(day_key)
+
+        ratio_path = self.audit.paths["ratio_ticks_jsonl"]
+        if ratio_path.exists():
+            try:
+                with ratio_path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            row = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        timestamp = str(row.get("timestamp") or "")
+                        if not timestamp.startswith(day_key):
+                            continue
+                        record["ratio_tick_count"] += 1
+                        record["last_ratio_tick_at"] = timestamp
+            except Exception as exc:
+                logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to restore ratio ticks from log: %s", exc)
+
+        signal_path = self.audit.paths["signals"]
+        if signal_path.exists():
+            try:
+                with signal_path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            row = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        timestamp = str(row.get("timestamp") or "")
+                        if not timestamp.startswith(day_key):
+                            continue
+                        record["signal_count"] += 1
+                        blocked = bool(row.get("blocked"))
+                        if blocked:
+                            record["blocked_signal_count"] += 1
+                        else:
+                            record["entries_taken"] += 1
+            except Exception as exc:
+                logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to restore signals from log: %s", exc)
+
+        ledger_path = self.audit.paths["trade_ledger_jsonl"]
+        if ledger_path.exists():
+            try:
+                with ledger_path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            row = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        exit_timestamp = str(row.get("exit_timestamp") or "")
+                        if not exit_timestamp.startswith(day_key):
+                            continue
+                        net_pnl_usdt = float(row.get("net_pnl_usdt") or 0.0)
+                        net_pnl_bps = float(row.get("net_pnl_bps") or 0.0)
+                        record["trade_count"] += 1
+                        if net_pnl_usdt > 0:
+                            record["win_count"] += 1
+                        else:
+                            record["loss_count"] += 1
+                        record["total_net_bps"] += net_pnl_bps
+                        record["total_net_usdt"] += net_pnl_usdt
+                        exit_reason = str(row.get("exit_reason") or "unknown")
+                        record["exit_reason_counts"][exit_reason] = record["exit_reason_counts"].get(exit_reason, 0) + 1
+                        record["last_trade_at"] = exit_timestamp
+            except Exception as exc:
+                logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to restore trade ledger from log: %s", exc)
+
+    def _load_runtime_state(self) -> None:
+        state_path = self.audit.paths["runtime_state"]
+        if not state_path.exists():
+            self._restore_day_record_from_logs(datetime.now(UTC).strftime("%Y-%m-%d"))
+            return
+        try:
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to load runtime state: %s", exc)
+            self._restore_day_record_from_logs(datetime.now(UTC).strftime("%Y-%m-%d"))
+            return
+
+        stats = payload.get("stats") or {}
+        restore_keys = [
+            "scans_completed",
+            "errors",
+            "ratio_updates",
+            "signals_generated",
+            "entry_signals",
+            "blocked_entry_signals",
+            "entries",
+            "closed_trades",
+            "wins",
+            "losses",
+            "win_rate",
+            "realized_net_bps",
+            "realized_pnl_usd",
+            "unrealized_net_bps",
+            "unrealized_pnl_usd",
+            "total_net_bps",
+            "total_pnl_usd",
+            "current_cointegration_pvalue",
+            "last_ratio_tick_at",
+            "last_trade_at",
+            "last_entry_reason",
+            "last_exit_reason",
+            "last_block_reason",
+            "last_hourly_check_at",
+            "last_daily_summary_at",
+            "open_position",
+            "open_direction",
+            "open_hold_seconds",
+        ]
+        for key in restore_keys:
+            if key in stats:
+                self._stats[key] = stats[key]
+
+        self._recent_trades = list(payload.get("recent_trades") or self._recent_trades)
+        self._recent_signals = list(payload.get("recent_signals") or self._recent_signals)
+        self._daily_records = dict(payload.get("daily_records") or {})
+        self._last_daily_day_key = payload.get("last_daily_day_key") or self._last_daily_day_key
+        self._last_trade_at = self._parse_dt(payload.get("last_trade_at"))
+        self._last_ratio_tick_at = self._parse_dt(payload.get("last_ratio_tick_at"))
+        self._last_hourly_check_at = self._parse_dt(payload.get("last_hourly_check_at"))
+        self.position_manager.daily_pnl_usd = float(payload.get("position_manager_daily_pnl_usd") or 0.0)
+        self.signal_engine.last_exit_timestamps_ms = {
+            str(key): int(value)
+            for key, value in (payload.get("signal_engine_last_exit_timestamps_ms") or {}).items()
+        }
+
+        open_position_payload = payload.get("open_position")
+        if isinstance(open_position_payload, dict):
+            try:
+                position = LivePairPosition.from_payload(open_position_payload)
+            except Exception as exc:
+                logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to restore open position: %s", exc)
+            else:
+                self._open_position = position
+                if position.entry_trade:
+                    self.position_manager.open_position(
+                        pair_key=position.pair_key,
+                        direction=position.direction,
+                        entry_trade=position.entry_trade,
+                        zscore=position.entry_zscore,
+                        max_hold_seconds=self.cfg.max_hold_seconds,
+                        entry_time_ms=position.entry_timestamp_ms,
+                    )
+                self.signal_engine.open_positions[position.pair_key] = {
+                    "direction": position.direction,
+                    "entry_time_ms": position.entry_timestamp_ms,
+                    "entry_zscore": position.entry_zscore,
+                }
+
+        self._restore_day_record_from_logs(datetime.now(UTC).strftime("%Y-%m-%d"))
+
+    @staticmethod
+    def _parse_dt(value: object) -> datetime | None:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(str(value)).astimezone(UTC)
+        except Exception:
+            return None
 
     def _write_runtime_state(self) -> None:
         self.audit.write_runtime_state(
@@ -765,6 +1023,14 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "stats": self.stats,
                 "recent_trades": self._recent_trades[:10],
                 "recent_signals": self._recent_signals[:10],
+                "open_position": self._open_position.to_payload() if self._open_position is not None else None,
+                "daily_records": self._daily_records,
+                "last_daily_day_key": self._last_daily_day_key,
+                "last_trade_at": self._last_trade_at.isoformat() if self._last_trade_at is not None else None,
+                "last_ratio_tick_at": self._last_ratio_tick_at.isoformat() if self._last_ratio_tick_at is not None else None,
+                "last_hourly_check_at": self._last_hourly_check_at.isoformat() if self._last_hourly_check_at is not None else None,
+                "position_manager_daily_pnl_usd": self.position_manager.daily_pnl_usd,
+                "signal_engine_last_exit_timestamps_ms": self.signal_engine.last_exit_timestamps_ms,
             }
         )
 

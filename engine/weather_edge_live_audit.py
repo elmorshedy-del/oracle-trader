@@ -1,5 +1,3 @@
-"""Durable audit logging for live crypto-pairs shadow sleeves."""
-
 from __future__ import annotations
 
 import csv
@@ -12,110 +10,91 @@ from engine.log_namespace import register_log_namespace
 
 UTC = timezone.utc
 
+WEATHER_EDGE_TRADE_LEDGER_FIELDS = [
+    "logged_at",
+    "trade_id",
+    "market_id",
+    "city",
+    "metric",
+    "lead_time_hours",
+    "model_probability",
+    "market_probability",
+    "edge",
+    "kelly_fraction",
+    "position_size_usdc",
+    "entry_timestamp",
+    "outcome",
+    "pnl_usdc",
+    "cumulative_bankroll",
+    "exit_timestamp",
+]
 
-class CryptoPairsAudit:
+WEATHER_EDGE_DAILY_SUMMARY_FIELDS = [
+    "logged_at",
+    "date",
+    "total_trades",
+    "wins",
+    "losses",
+    "win_rate",
+    "total_pnl_usdc",
+    "realized_pnl_usdc",
+    "unrealized_pnl_usdc",
+    "max_drawdown_pct",
+    "current_bankroll",
+    "pending_positions",
+]
+
+
+class WeatherEdgeLiveAudit:
     def __init__(self, root: Path):
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
         self.paths = {
             "metadata": self.root / "metadata.json",
             "runtime_state": self.root / "runtime_state.json",
-            "signals": self.root / "signals.jsonl",
             "trade_events": self.root / "trade_events.jsonl",
             "trade_ledger_jsonl": self.root / "trade_ledger.jsonl",
             "trade_ledger_csv": self.root / "trade_ledger.csv",
-            "ratio_ticks_jsonl": self.root / "ratio_ticks.jsonl",
-            "ratio_ticks_csv": self.root / "ratio_ticks.csv",
             "daily_summary_jsonl": self.root / "daily_summary.jsonl",
+            "daily_summary_csv": self.root / "daily_summary.csv",
             "daily_summary_latest": self.root / "daily_summary_latest.json",
-            "hourly_checks_jsonl": self.root / "hourly_checks.jsonl",
-            "hourly_checks_latest": self.root / "hourly_checks_latest.json",
+            "alerts_jsonl": self.root / "alerts.jsonl",
         }
 
     def write_metadata(self, payload: dict[str, object]) -> None:
         self.paths["metadata"].write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         register_log_namespace(
             root=self.root,
-            lane_key=str(payload.get("strategy") or payload.get("pair_key") or "crypto_pairs_shadow"),
-            label=str(payload.get("label") or payload.get("pair_key") or "Crypto Pairs Shadow"),
-            category="crypto_pairs",
-            source=str(payload.get("source") or payload.get("strategy") or "crypto_pairs_shadow"),
-            description="Live crypto-pairs shadow trade, ratio, summary, and runtime logs.",
+            lane_key=str(payload.get("strategy") or "weather_edge_live"),
+            label=str(payload.get("label") or payload.get("strategy") or "Weather Edge Live"),
+            category="weather_edge",
+            source=str(payload.get("strategy") or "weather_edge_live"),
+            description="Live weather-edge trade, summary, and runtime logs.",
             paths=self.paths,
             extra={
                 "view_key": payload.get("view_key"),
                 "pair_key": payload.get("pair_key"),
-                "token_a": payload.get("token_a"),
-                "token_b": payload.get("token_b"),
+                "session_label": payload.get("session_label"),
             },
         )
 
     def write_runtime_state(self, payload: dict[str, object]) -> None:
         self.paths["runtime_state"].write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
-    def log_signal(self, payload: dict[str, object]) -> None:
-        self._append_jsonl(self.paths["signals"], payload)
-
     def log_trade_event(self, payload: dict[str, object]) -> None:
         self._append_jsonl(self.paths["trade_events"], payload)
 
     def log_trade_ledger(self, payload: dict[str, object]) -> None:
         self._append_jsonl(self.paths["trade_ledger_jsonl"], payload)
-        self._append_csv(
-            self.paths["trade_ledger_csv"],
-            [
-                "logged_at",
-                "pair",
-                "entry_timestamp",
-                "entry_zscore",
-                "entry_price_a",
-                "entry_price_b",
-                "entry_ratio",
-                "direction",
-                "position_size_per_leg_usdt",
-                "exit_timestamp",
-                "exit_zscore",
-                "exit_price_a",
-                "exit_price_b",
-                "exit_ratio",
-                "exit_reason",
-                "gross_pnl_bps",
-                "fees_usd",
-                "slippage_usd",
-                "slippage_bps",
-                "net_pnl_bps",
-                "net_pnl_usdt",
-                "hold_seconds",
-            ],
-            payload,
-        )
-
-    def log_ratio_tick(self, payload: dict[str, object]) -> None:
-        self._append_jsonl(self.paths["ratio_ticks_jsonl"], payload)
-        self._append_csv(
-            self.paths["ratio_ticks_csv"],
-            [
-                "logged_at",
-                "timestamp",
-                "pair",
-                "price_a",
-                "price_b",
-                "ratio",
-                "zscore",
-                "rolling_mean",
-                "rolling_std",
-                "ready",
-            ],
-            payload,
-        )
+        self._append_csv(self.paths["trade_ledger_csv"], WEATHER_EDGE_TRADE_LEDGER_FIELDS, payload)
 
     def log_daily_summary(self, payload: dict[str, object]) -> None:
         self._append_jsonl(self.paths["daily_summary_jsonl"], payload)
+        self._append_csv(self.paths["daily_summary_csv"], WEATHER_EDGE_DAILY_SUMMARY_FIELDS, payload)
         self.paths["daily_summary_latest"].write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
-    def log_hourly_check(self, payload: dict[str, object]) -> None:
-        self._append_jsonl(self.paths["hourly_checks_jsonl"], payload)
-        self.paths["hourly_checks_latest"].write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    def log_alert(self, payload: dict[str, object]) -> None:
+        self._append_jsonl(self.paths["alerts_jsonl"], payload)
 
     @staticmethod
     def _append_jsonl(path: Path, payload: dict[str, object]) -> None:

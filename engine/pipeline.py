@@ -25,6 +25,7 @@ from strategies.bitcoin_model import BitcoinModelStrategy
 from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
 from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
+from strategies.weather_edge_live import WeatherEdgeLiveStrategy
 from strategies.weather_model import WeatherModelStrategy
 from strategies.weather_model_v2 import WeatherModelStrategyV2
 from strategies.bundle_arb import BundleArbitrageStrategy
@@ -98,6 +99,13 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.WEATHER_MODEL_V2_SIGNAL.value,
         "signal_sources": (SignalSource.WEATHER_MODEL_V2_SIGNAL.value,),
     },
+    "weather_edge_live": {
+        "label": "Weather Edge Live",
+        "strategy": "weather_edge_live",
+        "source": "weather_edge_live",
+        "signal_sources": (),
+        "self_managed": True,
+    },
     "news": {"label": "News", "strategy": "news", "source": "news_latency"},
     "news_whale": {"label": "News + Whale", "strategy": "news", "source": "news_whale"},
     "bitcoin": {"label": "Bitcoin", "strategy": "crypto_arb", "source": "crypto_temporal_arb"},
@@ -153,6 +161,11 @@ CRYPTO_PAIRS_SHADOW_VIEW_KEYS = (
     "crypto_pairs_comp_floki",
     "crypto_pairs_comp_link",
 )
+SELF_MANAGED_COMPARISON_VIEW_KEYS = (
+    "weather_edge_live",
+    "bitcoin_meanrev_shadow",
+    *CRYPTO_PAIRS_SHADOW_VIEW_KEYS,
+)
 
 
 class Pipeline:
@@ -195,6 +208,10 @@ class Pipeline:
                 self.config,
                 weather_strategy=self.strategies["weather"],
             ),
+            "weather_edge_live": WeatherEdgeLiveStrategy(
+                self.config,
+                weather_strategy=self.strategies["weather"],
+            ),
             "bitcoin_model": BitcoinModelStrategy(
                 self.config,
                 crypto_strategy=self.strategies["crypto_arb"],
@@ -225,7 +242,7 @@ class Pipeline:
                 state_path=str(STATE_PATH.with_name(f"{STATE_PATH.stem}-{view_key}{STATE_PATH.suffix}")),
             )
             for view_key, meta in COMPARISON_VIEW_CONFIG.items()
-            if meta["strategy"] is not None
+            if meta["strategy"] is not None and not meta.get("self_managed")
         }
 
         # Slippage model (self-calibrating)
@@ -426,6 +443,23 @@ class Pipeline:
                 strategy_signals["weather_model_v2_signal"] = []
                 self.health.record_strategy_error("weather_model_v2", str(e))
 
+            weather_edge_live: WeatherEdgeLiveStrategy = self.comparison_only_strategies["weather_edge_live"]
+            try:
+                _weather_edge_live_start = _time.time()
+                weather_edge_live_signals = await weather_edge_live.scan(self._markets, self._events)
+                _weather_edge_live_dur = (_time.time() - _weather_edge_live_start) * 1000
+                strategy_signals["weather_edge_live"] = weather_edge_live_signals
+                self.health.record_strategy_run(
+                    "weather_edge_live",
+                    len(weather_edge_live_signals),
+                    _weather_edge_live_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy weather_edge_live error: {e}")
+                weather_edge_live._stats["errors"] += 1
+                strategy_signals["weather_edge_live"] = []
+                self.health.record_strategy_error("weather_edge_live", str(e))
+
             bitcoin_model: BitcoinModelStrategy = self.comparison_only_strategies["bitcoin_model"]
             try:
                 _bitcoin_model_start = _time.time()
@@ -530,6 +564,10 @@ class Pipeline:
                     self._latest_comparison_signals[view_key] = all_signals[:30]
                     continue
 
+                if view_key in SELF_MANAGED_COMPARISON_VIEW_KEYS:
+                    self._latest_comparison_signals[view_key] = []
+                    continue
+
                 trader = self.comparison_traders[view_key]
                 view_signals = self._build_comparison_signals(
                     view_key=view_key,
@@ -540,8 +578,6 @@ class Pipeline:
                 view_signals.sort(key=lambda s: s.confidence, reverse=True)
                 view_signals, _ = trader.select_candidate_signals(view_signals)
                 self._latest_comparison_signals[view_key] = view_signals[:30]
-                if view_key in {"bitcoin_meanrev_shadow", *CRYPTO_PAIRS_SHADOW_VIEW_KEYS}:
-                    continue
                 for signal in view_signals:
                     trader.execute_signal(signal, current_prices)
                 trader.save_state()
@@ -760,6 +796,8 @@ class Pipeline:
             return self.config.weather_model_v2.trader_budget_usd
         if view_key == "weather_model_v2_signal":
             return self.config.weather_model_v2.signal_budget_usd
+        if view_key == "weather_edge_live":
+            return self.config.weather_edge_live.starting_bankroll_usd
         if view_key == "bitcoin_model":
             return self.config.bitcoin_model.budget_usd
         if view_key == "bitcoin_meanrev_shadow":
@@ -909,6 +947,9 @@ class Pipeline:
         for view_key, meta in COMPARISON_VIEW_CONFIG.items():
             if view_key == "all":
                 continue
+            if view_key == "weather_edge_live":
+                comparison_views[view_key] = self.comparison_only_strategies["weather_edge_live"].serialize_view()
+                continue
             if view_key == "bitcoin_meanrev_shadow":
                 comparison_views[view_key] = self.comparison_only_strategies["bitcoin_meanrev_shadow"].serialize_view()
                 continue
@@ -941,6 +982,7 @@ class Pipeline:
                 "bundle_arb": self.bundle_arb_strategy.stats,
                 "weather_model": self.comparison_only_strategies["weather_model"].stats,
                 "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
+                "weather_edge_live": self.comparison_only_strategies["weather_edge_live"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
@@ -1069,6 +1111,7 @@ class Pipeline:
                     "trader": self.config.weather_model_v2.trader_budget_usd,
                     "signal": self.config.weather_model_v2.signal_budget_usd,
                 },
+                "weather_edge_live_budget": self.config.weather_edge_live.starting_bankroll_usd,
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
                 "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
                 "crypto_pairs_shadow_budget": self.config.crypto_pairs_shadow.budget_usd,

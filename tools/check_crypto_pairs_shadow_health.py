@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from engine.log_namespace import register_log_namespace
 from runtime_paths import LOG_DIR
 
 
@@ -101,6 +102,18 @@ def main() -> None:
     args = parse_args()
     output_root = resolve_path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
+    register_log_namespace(
+        root=output_root,
+        lane_key="crypto_pairs_shadow_monitor",
+        label="Crypto Pairs Shadow Monitor",
+        category="monitoring",
+        source="crypto_pairs_shadow_monitor",
+        description="Hourly API-based monitoring snapshots for live crypto-pairs shadow sleeves.",
+        paths={
+            "latest": output_root / "latest.json",
+            "history": output_root / "history.jsonl",
+        },
+    )
 
     health_payload = fetch_json(f"{args.base_url.rstrip('/')}/api/health", timeout_seconds=args.timeout_seconds)
     state_payload = fetch_json(f"{args.base_url.rstrip('/')}/api/state", timeout_seconds=args.timeout_seconds)

@@ -14,6 +14,7 @@ from typing import Any
 
 from data.models import Event, Market
 from engine.crypto_pairs.audit import CryptoPairsAudit
+from engine.crypto_pairs.cointegration import compute_cointegration_result
 from engine.crypto_pairs.config import ExecutionConfig, PriceStreamerConfig, RiskConfig, SignalConfig
 from engine.crypto_pairs.discovery import build_runtime_configs, load_discovery_report, resolve_discovery_report_path
 from engine.crypto_pairs.execution_engine import ExecutionEngine
@@ -26,12 +27,6 @@ from strategies.base import BaseStrategy
 from config import CryptoPairsShadowProfileConfig
 
 logger = logging.getLogger(__name__)
-
-try:  # pragma: no cover - dependency gate for runtime
-    from statsmodels.tsa.stattools import coint
-except Exception:  # pragma: no cover - runtime dependency gate
-    coint = None
-
 
 UTC = timezone.utc
 MAX_RECENT_SIGNALS = 40
@@ -209,6 +204,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "total_net_bps": 0.0,
                 "total_pnl_usd": 0.0,
                 "current_cointegration_pvalue": None,
+                "current_cointegration_method": None,
                 "last_ratio_tick_at": None,
                 "last_trade_at": None,
                 "last_entry_reason": None,
@@ -704,7 +700,8 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         record = self._daily_records.get(day_key)
         if record is None:
             return
-        pvalue = self._compute_cointegration_pvalue(day_key)
+        result = self._compute_cointegration(day_key)
+        pvalue = result.pvalue if result is not None else None
         summary = {
             "date": day_key,
             "pair": self.pair_config.pair_key,
@@ -721,6 +718,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             "blocked_signals": int(record["blocked_signal_count"]),
             "ratio_tick_count": int(record["ratio_tick_count"]),
             "cointegration_pvalue": pvalue,
+            "cointegration_method": result.method if result is not None else None,
             "exit_reason_counts": record["exit_reason_counts"],
             "last_ratio_tick_at": record["last_ratio_tick_at"],
             "last_trade_at": record["last_trade_at"],
@@ -728,6 +726,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         }
         self.audit.log_daily_summary(summary)
         self._stats["current_cointegration_pvalue"] = pvalue
+        self._stats["current_cointegration_method"] = result.method if result is not None else None
         self._stats["last_daily_summary_at"] = datetime.now(UTC).isoformat()
 
     def _maybe_write_hourly_check(self, *, now: datetime) -> None:
@@ -735,7 +734,8 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             return
         current_day = now.strftime("%Y-%m-%d")
         current_record = self._ensure_day_record(current_day)
-        pvalue = self._compute_cointegration_pvalue(current_day)
+        result = self._compute_cointegration(current_day)
+        pvalue = result.pvalue if result is not None else None
         check = {
             "timestamp": now.isoformat(),
             "pair": self.pair_config.pair_key,
@@ -752,6 +752,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             "current_day_net_bps": round(float(current_record["total_net_bps"]), 4),
             "current_day_net_usdt": round(float(current_record["total_net_usdt"]), 6),
             "current_day_cointegration_pvalue": pvalue,
+            "current_day_cointegration_method": result.method if result is not None else None,
             "recording_alive": self._last_ratio_tick_at is not None,
             "streamer_messages": int(self.streamer.stats.get("messages") or 0),
             "bars_emitted": int(self.streamer.stats.get("bars_emitted") or 0),
@@ -760,11 +761,10 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         self._last_hourly_check_at = now
         self._stats["last_hourly_check_at"] = now.isoformat()
         self._stats["current_cointegration_pvalue"] = pvalue
+        self._stats["current_cointegration_method"] = result.method if result is not None else None
         self._write_daily_summary(current_day, finalize=False)
 
-    def _compute_cointegration_pvalue(self, day_key: str) -> float | None:
-        if coint is None:
-            return None
+    def _compute_cointegration(self, day_key: str):
         sample = self._daily_samples.get(day_key)
         if not sample or len(sample.get("a") or []) < 50 or len(sample.get("b") or []) < 50:
             sample = self._load_ratio_samples_from_log(day_key)
@@ -779,11 +779,12 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             a = a[::step]
             b = b[::step]
         try:
-            _, pvalue, _ = coint(a, b)
-            pvalue = float(pvalue)
-            if not math.isfinite(pvalue):
+            result = compute_cointegration_result(a, b)
+            if result is None or not math.isfinite(result.pvalue):
                 return None
-            return round(pvalue, 6)
+            result.pvalue = round(float(result.pvalue), 6)
+            result.statistic = round(float(result.statistic), 6)
+            return result
         except Exception as exc:
             logger.warning("[CRYPTO_PAIRS_SHADOW] Failed to compute cointegration p-value: %s", exc)
             return None
@@ -802,7 +803,9 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         current = self._stats.get("current_cointegration_pvalue")
         if ratio_tick_count % 10 != 0 and current is not None:
             return
-        self._stats["current_cointegration_pvalue"] = self._compute_cointegration_pvalue(day_key)
+        result = self._compute_cointegration(day_key)
+        self._stats["current_cointegration_pvalue"] = result.pvalue if result is not None else None
+        self._stats["current_cointegration_method"] = result.method if result is not None else None
 
     def _load_ratio_samples_from_log(self, day_key: str) -> dict[str, list[float]] | None:
         if day_key in self._loaded_ratio_sample_days:
@@ -949,6 +952,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             "total_net_bps",
             "total_pnl_usd",
             "current_cointegration_pvalue",
+            "current_cointegration_method",
             "last_ratio_tick_at",
             "last_trade_at",
             "last_entry_reason",

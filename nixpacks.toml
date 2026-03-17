@@ -1,2 +1,2 @@
 [phases.setup]
-nixLibs = ["...", "stdenv.cc.cc.lib"]
+aptPkgs = ["...", "libstdc++6"]

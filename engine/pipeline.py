@@ -140,6 +140,12 @@ COMPARISON_VIEW_CONFIG = {
         "source": "crypto_pairs_comp_link_shadow",
         "signal_sources": (),
     },
+    "crypto_pairs_bonk_grt": {
+        "label": "BONK/GRT Shadow",
+        "strategy": "crypto_pairs_shadow_bonk_grt",
+        "source": "crypto_pairs_bonk_grt_shadow",
+        "signal_sources": (),
+    },
     "sports": {
         "label": "Sports",
         "strategy": "sports_model",
@@ -161,6 +167,7 @@ CRYPTO_PAIRS_SHADOW_VIEW_KEYS = (
     "crypto_pairs_aave_doge",
     "crypto_pairs_comp_floki",
     "crypto_pairs_comp_link",
+    "crypto_pairs_bonk_grt",
 )
 SELF_MANAGED_COMPARISON_VIEW_KEYS = (
     "weather_edge_live",

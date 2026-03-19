@@ -415,6 +415,7 @@ CRYPTO_PAIRS_SHADOW_DEFAULT_PROFILE_SPECS = (
     ("crypto_pairs_shadow", "crypto_pairs_aave_doge", "AAVE/DOGE", "AAVE/DOGE Shadow", "crypto_pairs_aave_doge_shadow", "crypto_pairs_aave_doge_shadow", 3.0),
     ("crypto_pairs_shadow_comp_floki", "crypto_pairs_comp_floki", "COMP/FLOKI", "COMP/FLOKI Shadow", "crypto_pairs_comp_floki_shadow", "crypto_pairs_comp_floki_shadow", 1.0),
     ("crypto_pairs_shadow_comp_link", "crypto_pairs_comp_link", "COMP/LINK", "COMP/LINK Shadow", "crypto_pairs_comp_link_shadow", "crypto_pairs_comp_link_shadow", 1.0),
+    ("crypto_pairs_shadow_bonk_grt", "crypto_pairs_bonk_grt", "BONK/GRT", "BONK/GRT Shadow", "crypto_pairs_bonk_grt_shadow", "crypto_pairs_bonk_grt_shadow", 3.0),
 )
 
 

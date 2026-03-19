@@ -664,7 +664,7 @@ let legacyConsultLoading = false;
 let legacyConsultResponse = null;
 let stateFetchInFlight = false;
 let statePollTimer = null;
-const CRYPTO_PAIRS_VIEW_KEYS = ['crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link'];
+const CRYPTO_PAIRS_VIEW_KEYS = ['crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt'];
 
 function isCryptoPairsShadowView(viewKey) {
   return CRYPTO_PAIRS_VIEW_KEYS.includes(viewKey);
@@ -685,6 +685,7 @@ function stratBadge(source) {
     'crypto_pairs_aave_doge_shadow': ['PAIRS', 'strat-crypto'],
     'crypto_pairs_comp_floki_shadow': ['PAIRS', 'strat-crypto'],
     'crypto_pairs_comp_link_shadow': ['PAIRS', 'strat-crypto'],
+    'crypto_pairs_bonk_grt_shadow': ['PAIRS', 'strat-crypto'],
     'sports_nba_model': ['SPORTS', 'strat-sports'],
     'bitcoin_whale': ['B+W', 'strat-whale'],
     'crypto_structure': ['CSTR', 'strat-crypto'],
@@ -716,6 +717,7 @@ function normalizeStrategyKey(key) {
     crypto_pairs_shadow: 'crypto_pairs_aave_doge_shadow',
     crypto_pairs_shadow_comp_floki: 'crypto_pairs_comp_floki_shadow',
     crypto_pairs_shadow_comp_link: 'crypto_pairs_comp_link_shadow',
+    crypto_pairs_shadow_bonk_grt: 'crypto_pairs_bonk_grt_shadow',
     sports_model: 'sports_nba_model',
     weather: 'weather_forecast',
     weather_sniper: 'weather_sniper',
@@ -815,6 +817,7 @@ function renderViewTabs(d) {
     'crypto_pairs_aave_doge',
     'crypto_pairs_comp_floki',
     'crypto_pairs_comp_link',
+    'crypto_pairs_bonk_grt',
     'sports',
     'bitcoin_whale',
     'arbitrage',
@@ -954,7 +957,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'weather_edge_live', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'weather_edge_live', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const sportsIndex = order.indexOf('bitcoin_whale');
   order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
@@ -1197,6 +1200,7 @@ function renderSanity(d) {
       crypto_pairs_aave_doge: 'crypto_pairs_shadow',
       crypto_pairs_comp_floki: 'crypto_pairs_shadow_comp_floki',
       crypto_pairs_comp_link: 'crypto_pairs_shadow_comp_link',
+      crypto_pairs_bonk_grt: 'crypto_pairs_shadow_bonk_grt',
       sports: 'sports_model',
       arbitrage: 'arbitrage',
       momentum: 'mean_reversion',

@@ -55,6 +55,12 @@ DEFAULT_TARGETS = (
         view_key="crypto_pairs_comp_link",
         strategy_key="crypto_pairs_shadow_comp_link",
     ),
+    MonitorTarget(
+        slug="bonk_grt",
+        label="BONK/GRT",
+        view_key="crypto_pairs_bonk_grt",
+        strategy_key="crypto_pairs_shadow_bonk_grt",
+    ),
 )
 
 

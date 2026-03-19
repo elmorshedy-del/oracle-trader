@@ -174,7 +174,7 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
             now = datetime.now(UTC)
             self._roll_daily_summary(now)
             market_map = {market.condition_id: market for market in markets}
-            self._resolve_positions(market_map, now)
+            await self._resolve_positions(market_map, now)
             opportunities = self._build_live_opportunities(now)
             selected = self._select_best_opportunities(opportunities)
             self._stats["candidate_markets"] = len(opportunities)
@@ -459,10 +459,16 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
             )
         )
 
-    def _resolve_positions(self, market_map: dict[str, Market], now: datetime) -> None:
+    async def _resolve_positions(self, market_map: dict[str, Market], now: datetime) -> None:
         resolved_event_keys: list[str] = []
+        resolution_market_cache: dict[str, Market | None] = {}
         for event_key, position in self.open_positions.items():
             market = market_map.get(position.market_id)
+            if market is None:
+                market = await self._fetch_resolution_market(
+                    market_slug=position.market_slug,
+                    cache=resolution_market_cache,
+                )
             if market is None:
                 continue
             resolved_yes = best_resolution_yes_outcome(market)
@@ -527,6 +533,29 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
 
         for event_key in resolved_event_keys:
             self.open_positions.pop(event_key, None)
+
+    async def _fetch_resolution_market(
+        self,
+        *,
+        market_slug: str,
+        cache: dict[str, Market | None],
+    ) -> Market | None:
+        cached = cache.get(market_slug)
+        if market_slug in cache:
+            return cached
+
+        collector = getattr(self.weather_strategy, "collector", None)
+        if collector is None:
+            cache[market_slug] = None
+            return None
+
+        try:
+            market = await collector.get_market_by_slug(market_slug)
+        except Exception as exc:
+            logger.warning("[WEATHER_EDGE_LIVE] Failed resolution lookup for %s: %s", market_slug, exc)
+            market = None
+        cache[market_slug] = market
+        return market
 
     def _roll_daily_summary(self, now: datetime) -> None:
         current_date = now.date()

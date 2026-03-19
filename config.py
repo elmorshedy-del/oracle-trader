@@ -408,12 +408,13 @@ class CryptoPairsShadowProfileConfig:
     label: str
     source: str
     session_label: str
+    margin_multiple: float = 1.0
 
 
 CRYPTO_PAIRS_SHADOW_DEFAULT_PROFILE_SPECS = (
-    ("crypto_pairs_shadow", "crypto_pairs_aave_doge", "AAVE/DOGE", "AAVE/DOGE Shadow", "crypto_pairs_aave_doge_shadow", "crypto_pairs_aave_doge_shadow"),
-    ("crypto_pairs_shadow_comp_floki", "crypto_pairs_comp_floki", "COMP/FLOKI", "COMP/FLOKI Shadow", "crypto_pairs_comp_floki_shadow", "crypto_pairs_comp_floki_shadow"),
-    ("crypto_pairs_shadow_comp_link", "crypto_pairs_comp_link", "COMP/LINK", "COMP/LINK Shadow", "crypto_pairs_comp_link_shadow", "crypto_pairs_comp_link_shadow"),
+    ("crypto_pairs_shadow", "crypto_pairs_aave_doge", "AAVE/DOGE", "AAVE/DOGE Shadow", "crypto_pairs_aave_doge_shadow", "crypto_pairs_aave_doge_shadow", 3.0),
+    ("crypto_pairs_shadow_comp_floki", "crypto_pairs_comp_floki", "COMP/FLOKI", "COMP/FLOKI Shadow", "crypto_pairs_comp_floki_shadow", "crypto_pairs_comp_floki_shadow", 1.0),
+    ("crypto_pairs_shadow_comp_link", "crypto_pairs_comp_link", "COMP/LINK", "COMP/LINK Shadow", "crypto_pairs_comp_link_shadow", "crypto_pairs_comp_link_shadow", 1.0),
 )
 
 
@@ -423,11 +424,14 @@ def build_crypto_pairs_shadow_profiles() -> list[CryptoPairsShadowProfileConfig]
         profiles: list[CryptoPairsShadowProfileConfig] = []
         for raw_profile in raw_profiles.split(";"):
             parts = [part.strip() for part in raw_profile.split("|")]
-            if len(parts) != 6:
+            if len(parts) not in {6, 7}:
                 raise ValueError(
                     "CRYPTO_PAIRS_SHADOW_PROFILES entries must use "
-                    "strategy_key|view_key|pair_key|label|source|session_label"
+                    "strategy_key|view_key|pair_key|label|source|session_label[|margin_multiple]"
                 )
+            if len(parts) == 6:
+                parts.append("1.0")
+            parts[-1] = float(parts[-1])
             profiles.append(CryptoPairsShadowProfileConfig(*parts))
         return profiles
 
@@ -449,6 +453,7 @@ def build_crypto_pairs_shadow_profiles() -> list[CryptoPairsShadowProfileConfig]
                 label=legacy_label or f"{pair_key} Shadow",
                 source="crypto_pairs_aave_doge_shadow",
                 session_label=legacy_session_label or "crypto_pairs_aave_doge_shadow",
+                margin_multiple=3.0 if pair_key == "AAVE/DOGE" else 1.0,
             )
         ]
 

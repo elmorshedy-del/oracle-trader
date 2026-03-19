@@ -156,6 +156,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "max_hold_seconds": self.cfg.max_hold_seconds,
                 "cooldown_seconds": self.cfg.cooldown_seconds,
                 "budget_usd": self.cfg.budget_usd,
+                "margin_multiple": self.profile.margin_multiple,
                 "capital_per_pair_pct": self.cfg.capital_per_pair_pct,
                 "fee_bps": self.cfg.fee_bps,
                 "slippage_bps": self.cfg.slippage_bps,
@@ -184,6 +185,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
                 "token_a": self.pair_config.token_a,
                 "token_b": self.pair_config.token_b,
                 "budget_usd": self.cfg.budget_usd,
+                "margin_multiple": self.profile.margin_multiple,
                 "entry_z": self.cfg.entry_z,
                 "exit_z": self.cfg.exit_z,
                 "stop_z": self.cfg.stop_z,
@@ -430,7 +432,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             "market": state.pair_key,
             "confidence": round(min(abs(float(state.current_zscore)) / max(self.cfg.entry_z, 1e-6), 1.0), 2),
             "edge": round(abs(float(state.current_zscore)), 4),
-            "size": round(self.position_manager.get_position_size_per_leg() * 2.0, 2),
+            "size": round(self._capital_per_leg() * 2.0, 2),
             "whale": False,
             "reasoning": decision.reason,
         }
@@ -455,7 +457,7 @@ class CryptoPairsShadowStrategy(BaseStrategy):
             self._stats["last_block_reason"] = reason
             return
 
-        capital_per_leg = self.position_manager.get_position_size_per_leg()
+        capital_per_leg = self._capital_per_leg()
         entry_trade = self.executor.execute_entry(
             pair_key=state.pair_key,
             direction=decision.signal,
@@ -628,6 +630,9 @@ class CryptoPairsShadowStrategy(BaseStrategy):
         net = gross - fees
         net_bps = net / (capital_per_leg * 2.0) * 10_000 if capital_per_leg > 0 else 0.0
         return round(net, 6), round(net_bps, 4)
+
+    def _capital_per_leg(self) -> float:
+        return self.position_manager.get_position_size_per_leg() * float(self.profile.margin_multiple)
 
     def _update_mark_to_market(self, *, now: datetime, state: PairState) -> None:
         unrealized_usd, unrealized_bps = self._current_unrealized()

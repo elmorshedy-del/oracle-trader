@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import uuid
@@ -137,6 +138,7 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
             }
         )
         self._load_runtime_state()
+        self._restore_stats_from_audit()
         persisted_stats = {
             key: self._stats.get(key)
             for key in (
@@ -738,6 +740,57 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
         ):
             if key in stored_stats:
                 self._stats[key] = stored_stats[key]
+
+    def _restore_stats_from_audit(self) -> None:
+        trade_ledger_path = self.audit.paths["trade_ledger_csv"]
+        daily_summary_path = self.audit.paths["daily_summary_jsonl"]
+
+        if trade_ledger_path.exists():
+            try:
+                with trade_ledger_path.open(encoding="utf-8", newline="") as handle:
+                    rows = list(csv.DictReader(handle))
+            except Exception as exc:
+                logger.warning("[WEATHER_EDGE_LIVE] Failed to rebuild stats from trade ledger: %s", exc)
+            else:
+                entry_rows = [row for row in rows if row.get("outcome") == "PENDING" or not (row.get("exit_timestamp") or "").strip()]
+                resolved_rows = [row for row in rows if (row.get("exit_timestamp") or "").strip()]
+                wins = sum(1 for row in resolved_rows if (row.get("outcome") or "").upper() == "WIN")
+                losses = sum(1 for row in resolved_rows if (row.get("outcome") or "").upper() == "LOSS")
+                realized_pnl = 0.0
+                for row in resolved_rows:
+                    try:
+                        realized_pnl += float(row.get("pnl_usdc") or 0.0)
+                    except (TypeError, ValueError):
+                        continue
+                self._stats["entries"] = max(int(self._stats.get("entries") or 0), len(entry_rows))
+                self._stats["resolved_trades"] = max(int(self._stats.get("resolved_trades") or 0), len(resolved_rows))
+                self._stats["wins"] = max(int(self._stats.get("wins") or 0), wins)
+                self._stats["losses"] = max(int(self._stats.get("losses") or 0), losses)
+                self._stats["realized_pnl_usd"] = round(realized_pnl, 4)
+                resolved_total = int(self._stats["resolved_trades"] or 0)
+                self._stats["win_rate"] = (int(self._stats["wins"] or 0) / resolved_total) if resolved_total else 0.0
+                entry_timestamps = [str(row.get("entry_timestamp")) for row in rows if row.get("entry_timestamp")]
+                exit_timestamps = [str(row.get("exit_timestamp")) for row in resolved_rows if row.get("exit_timestamp")]
+                if entry_timestamps:
+                    self._stats["last_entry_at"] = max(entry_timestamps)
+                if exit_timestamps:
+                    self._stats["last_resolution_at"] = max(exit_timestamps)
+
+        if daily_summary_path.exists():
+            try:
+                lines = [line for line in daily_summary_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            except Exception as exc:
+                logger.warning("[WEATHER_EDGE_LIVE] Failed to rebuild daily summary timestamp: %s", exc)
+            else:
+                if lines:
+                    try:
+                        latest = json.loads(lines[-1])
+                    except Exception as exc:
+                        logger.warning("[WEATHER_EDGE_LIVE] Failed to parse latest daily summary line: %s", exc)
+                    else:
+                        logged_at = latest.get("logged_at")
+                        if logged_at:
+                            self._stats["last_daily_summary_at"] = logged_at
 
     def _write_runtime_state(self) -> None:
         self.audit.write_runtime_state(self._runtime_state_payload())

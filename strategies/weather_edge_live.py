@@ -137,6 +137,21 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
             }
         )
         self._load_runtime_state()
+        persisted_stats = {
+            key: self._stats.get(key)
+            for key in (
+                "entries",
+                "resolved_trades",
+                "wins",
+                "losses",
+                "win_rate",
+                "realized_pnl_usd",
+                "last_scan_at",
+                "last_entry_at",
+                "last_resolution_at",
+                "last_daily_summary_at",
+            )
+        }
         self._stats.update(
             {
                 "bundle_ready": self.bundle.ready,
@@ -148,16 +163,16 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
                 "candidate_markets": 0,
                 "eligible_markets": 0,
                 "selected_markets": 0,
-                "entries": 0,
-                "resolved_trades": 0,
-                "wins": 0,
-                "losses": 0,
-                "win_rate": 0.0,
-                "realized_pnl_usd": 0.0,
-                "last_scan_at": None,
-                "last_entry_at": None,
-                "last_resolution_at": None,
-                "last_daily_summary_at": None,
+                "entries": int(persisted_stats.get("entries") or 0),
+                "resolved_trades": int(persisted_stats.get("resolved_trades") or 0),
+                "wins": int(persisted_stats.get("wins") or 0),
+                "losses": int(persisted_stats.get("losses") or 0),
+                "win_rate": float(persisted_stats.get("win_rate") or 0.0),
+                "realized_pnl_usd": float(persisted_stats.get("realized_pnl_usd") or 0.0),
+                "last_scan_at": persisted_stats.get("last_scan_at"),
+                "last_entry_at": persisted_stats.get("last_entry_at"),
+                "last_resolution_at": persisted_stats.get("last_resolution_at"),
+                "last_daily_summary_at": persisted_stats.get("last_daily_summary_at"),
                 "telegram_enabled": self.notifier.enabled,
                 "trade_ledger_csv": str(self.audit.paths["trade_ledger_csv"]),
                 "daily_summary_path": str(self.audit.paths["daily_summary_jsonl"]),

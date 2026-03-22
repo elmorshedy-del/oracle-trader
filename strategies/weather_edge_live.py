@@ -711,7 +711,16 @@ class WeatherEdgeLiveStrategy(BaseStrategy):
             for key, value in (payload.get("last_position_prices") or {}).items()
         }
         stored_stats = payload.get("stats") or {}
-        for key in ("entries", "resolved_trades", "wins", "losses", "realized_pnl_usd"):
+        for key in (
+            "entries",
+            "resolved_trades",
+            "wins",
+            "losses",
+            "realized_pnl_usd",
+            "last_entry_at",
+            "last_resolution_at",
+            "last_daily_summary_at",
+        ):
             if key in stored_stats:
                 self._stats[key] = stored_stats[key]
 

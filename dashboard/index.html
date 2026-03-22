@@ -1549,6 +1549,7 @@ function renderSanity(d) {
     }
 
     if (activeView.key === 'weather_edge_live') {
+      const weatherHasHistoricalFlow = (runtime.entries || 0) > 0 || (runtime.resolved_trades || 0) > 0 || (runtime.pending_positions || 0) > 0;
       checks.splice(2, 0, {
         label: 'Frozen model loaded',
         ok: !!runtime.enabled && !!runtime.bundle_ready,
@@ -1558,8 +1559,11 @@ function renderSanity(d) {
       });
       checks.splice(3, 0, {
         label: 'Edge candidate flow',
-        ok: (runtime.candidate_markets || 0) > 0 || (runtime.selected_markets || 0) > 0 || (p.total_trades || 0) > 0,
-        note: `${runtime.candidate_markets || 0} candidates / ${runtime.selected_markets || 0} selected`,
+        state: ((runtime.candidate_markets || 0) > 0 || (runtime.selected_markets || 0) > 0)
+          ? 'ok'
+          : (weatherHasHistoricalFlow || !!runtime.last_scan_at ? 'warn' : 'bad'),
+        ok: (runtime.candidate_markets || 0) > 0 || (runtime.selected_markets || 0) > 0 || weatherHasHistoricalFlow,
+        note: `${runtime.candidate_markets || 0} candidates / ${runtime.selected_markets || 0} selected / ${runtime.resolved_trades || 0} resolved / ${runtime.pending_positions || 0} pending`,
       });
       checks.splice(4, 0, {
         label: 'Trade ledger live',

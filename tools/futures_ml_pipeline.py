@@ -8,6 +8,9 @@ The pipeline uses only official Binance public data archive files:
 - metrics
 - fundingRate
 
+Optional live enrichment can be joined from captured official Binance streams:
+- bookTicker
+
 It builds 5-second order-flow + depth + context features and trains two binary models:
 - long_60s_net: future return exceeds cost threshold
 - short_60s_net: future downside exceeds cost threshold
@@ -19,7 +22,7 @@ import argparse
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -41,6 +44,7 @@ DEFAULT_BUCKET_SECONDS = 5
 DEFAULT_HORIZON_SECONDS = 60
 DEFAULT_COST_BPS = 4.0
 DEFAULT_OUTPUT_ROOT = Path("output/futures_ml")
+UTC = timezone.utc
 DEFAULT_LABEL_MODE = "broad"
 DEFAULT_MIN_SOURCE_COMPLETENESS = 1.0
 DEFAULT_CANDIDATE_MIN_SIGNED_RATIO = 0.08
@@ -51,6 +55,7 @@ DEFAULT_MAX_DEPTH_AGE_BUCKETS = 12
 DEFAULT_MAX_METRICS_AGE_BUCKETS = 120
 DEFAULT_MAX_FUNDING_AGE_BUCKETS = 5760
 DEFAULT_PRICE_CONTEXT_INTERVAL = "1m"
+DEFAULT_LIVE_BOOK_TICKER_ROOT = ""
 
 RAW_DATASETS = ("aggTrades", "bookDepth", "metrics")
 KLINE_CONTEXT_DATASETS = ("markPriceKlines", "indexPriceKlines", "premiumIndexKlines")
@@ -107,6 +112,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-metrics-age-buckets", type=int, default=DEFAULT_MAX_METRICS_AGE_BUCKETS, help="Maximum metrics staleness in buckets")
     parser.add_argument("--max-funding-age-buckets", type=int, default=DEFAULT_MAX_FUNDING_AGE_BUCKETS, help="Maximum funding staleness in buckets")
     parser.add_argument("--price-context-interval", default=DEFAULT_PRICE_CONTEXT_INTERVAL, help="Interval for mark/index/premium price context klines")
+    parser.add_argument(
+        "--live-book-ticker-root",
+        default=DEFAULT_LIVE_BOOK_TICKER_ROOT,
+        help="Optional root containing captured live bookTicker JSONL files from binance_futures_live_capture.py",
+    )
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Local output directory")
     parser.add_argument("--skip-download", action="store_true", help="Reuse existing downloaded archives")
     parser.add_argument("--skip-train", action="store_true", help="Only download data")
@@ -125,9 +135,11 @@ def main() -> None:
 
     completeness_tag = int(round(args.min_source_completeness * 100))
     date_tag = f"{start_date:%Y%m%d}_{end_date:%Y%m%d}"
-    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_c{completeness_tag:03d}_{date_tag}_v1"
+    quote_tag = "_qtlive" if args.live_book_ticker_root else ""
+    run_name = f"binance_{symbol.lower()}_{args.bucket_seconds}s_{args.horizon_seconds}s_{args.label_mode}_c{completeness_tag:03d}_{date_tag}{quote_tag}_v1"
     run_root = output_root / run_name
     raw_root = resolve_raw_root(output_root=output_root, symbol=symbol, skip_download=args.skip_download)
+    live_book_ticker_root = Path(args.live_book_ticker_root).resolve() if args.live_book_ticker_root else None
     dataset_root = run_root / "dataset"
     model_root = run_root / "models"
     report_root = run_root / "reports"
@@ -144,6 +156,7 @@ def main() -> None:
         "cost_bps": args.cost_bps,
         "label_mode": args.label_mode,
         "price_context_interval": args.price_context_interval,
+        "live_book_ticker_root": str(live_book_ticker_root) if live_book_ticker_root else None,
         "run_root": str(run_root),
         "raw_root": str(raw_root),
         "downloaded_at": datetime.now(UTC).isoformat(),
@@ -185,6 +198,7 @@ def main() -> None:
         max_metrics_age_buckets=args.max_metrics_age_buckets,
         max_funding_age_buckets=args.max_funding_age_buckets,
         price_context_interval=args.price_context_interval,
+        live_book_ticker_root=live_book_ticker_root,
     )
     if dataset.empty:
         raise SystemExit("No dataset rows were built. Check downloaded archive coverage.")
@@ -216,6 +230,7 @@ def main() -> None:
         "cost_bps": args.cost_bps,
         "label_mode": args.label_mode,
         "price_context_interval": args.price_context_interval,
+        "live_book_ticker_root": str(live_book_ticker_root) if live_book_ticker_root else None,
         "candidate_thresholds": {
             "min_signed_ratio": args.candidate_min_signed_ratio,
             "min_depth_imbalance": args.candidate_min_depth_imbalance,
@@ -412,17 +427,26 @@ def build_feature_dataset(
     max_metrics_age_buckets: int,
     max_funding_age_buckets: int,
     price_context_interval: str,
+    live_book_ticker_root: Path | None = None,
 ) -> pd.DataFrame:
     trades = load_trades(raw_root / "aggTrades", symbol, start_date, end_date, bucket_seconds)
     depth = load_depth(raw_root / "bookDepth", symbol, start_date, end_date, bucket_seconds)
     metrics = load_metrics(raw_root / "metrics", symbol, start_date, end_date, bucket_seconds)
     funding = load_funding(raw_root / "fundingRate", symbol, start_date, end_date, bucket_seconds)
     price_context = load_price_context(raw_root, symbol, start_date, end_date, bucket_seconds, price_context_interval)
+    live_book_ticker = load_live_book_ticker(
+        live_book_ticker_root,
+        symbol,
+        start_date,
+        end_date,
+        bucket_seconds,
+    )
 
     combined = trades.join(depth, how="left")
     combined = combined.join(metrics, how="left")
     combined = combined.join(funding, how="left")
     combined = combined.join(price_context, how="left")
+    combined = combined.join(live_book_ticker, how="left")
     combined = combined.sort_index()
 
     combined = add_source_coverage(
@@ -447,6 +471,30 @@ def build_feature_dataset(
     ffill_columns = [column for column in combined.columns if column not in fill_zero_columns]
     if ffill_columns:
         combined[ffill_columns] = combined[ffill_columns].ffill()
+
+    if "book_bid_price" in combined.columns:
+        price_fallback_columns = [column for column in ("book_bid_price", "book_ask_price", "book_mid_price", "book_microprice") if column in combined.columns]
+        if price_fallback_columns:
+            combined[price_fallback_columns] = combined[price_fallback_columns].apply(
+                lambda series: series.fillna(combined["price_last"])
+            )
+        neutral_quote_columns = [
+            column
+            for column in (
+                "book_bid_qty",
+                "book_ask_qty",
+                "book_bid_notional",
+                "book_ask_notional",
+                "book_spread_abs",
+                "book_spread_bps",
+                "book_size_imbalance",
+                "book_notional_imbalance",
+                "book_micro_gap_bps",
+            )
+            if column in combined.columns
+        ]
+        if neutral_quote_columns:
+            combined[neutral_quote_columns] = combined[neutral_quote_columns].fillna(0.0)
 
     combined = combined.dropna(subset=["price_last"])
     combined = add_derived_features(
@@ -623,6 +671,100 @@ def load_funding(directory: Path, symbol: str, start_date: date, end_date: date,
     funding_columns = [column for column in combined.columns if column != "funding_observed"]
     combined[funding_columns] = combined[funding_columns].ffill()
     return combined
+
+
+def load_live_book_ticker(
+    root: Path | None,
+    symbol: str,
+    start_date: date,
+    end_date: date,
+    bucket_seconds: int,
+) -> pd.DataFrame:
+    if root is None:
+        return pd.DataFrame()
+
+    symbol_root = root / symbol
+    if not symbol_root.exists():
+        return pd.DataFrame()
+
+    records: list[dict[str, float | pd.Timestamp]] = []
+    for day in iter_days(start_date, end_date):
+        file_path = symbol_root / f"{day:%Y-%m-%d}" / "bookTicker.jsonl"
+        if not file_path.exists():
+            continue
+        with file_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                data = payload.get("data") or {}
+                bid_price = _float_or_none(data.get("b") or data.get("bidPrice"))
+                ask_price = _float_or_none(data.get("a") or data.get("askPrice"))
+                bid_qty = _float_or_none(data.get("B") or data.get("bidQty"))
+                ask_qty = _float_or_none(data.get("A") or data.get("askQty"))
+                if None in (bid_price, ask_price, bid_qty, ask_qty):
+                    continue
+
+                timestamp_ms = data.get("E") or data.get("T")
+                if timestamp_ms is not None:
+                    timestamp = pd.to_datetime(int(timestamp_ms), unit="ms", utc=True)
+                else:
+                    captured_at = payload.get("captured_at")
+                    if not captured_at:
+                        continue
+                    timestamp = pd.to_datetime(captured_at, utc=True)
+
+                bid_notional = bid_price * bid_qty
+                ask_notional = ask_price * ask_qty
+                mid_price = (bid_price + ask_price) / 2.0
+                spread_abs = max(ask_price - bid_price, 0.0)
+                spread_bps = ((spread_abs / mid_price) * 10000.0) if mid_price > 0.0 else 0.0
+                size_denom = bid_qty + ask_qty
+                size_imbalance = ((bid_qty - ask_qty) / size_denom) if size_denom > 0.0 else 0.0
+                notional_denom = bid_notional + ask_notional
+                notional_imbalance = ((bid_notional - ask_notional) / notional_denom) if notional_denom > 0.0 else 0.0
+                microprice = ((ask_price * bid_qty) + (bid_price * ask_qty)) / size_denom if size_denom > 0.0 else mid_price
+                micro_gap_bps = (((microprice - mid_price) / mid_price) * 10000.0) if mid_price > 0.0 else 0.0
+
+                records.append(
+                    {
+                        "bucket": timestamp.floor(f"{bucket_seconds}s"),
+                        "book_bid_price": bid_price,
+                        "book_ask_price": ask_price,
+                        "book_bid_qty": bid_qty,
+                        "book_ask_qty": ask_qty,
+                        "book_bid_notional": bid_notional,
+                        "book_ask_notional": ask_notional,
+                        "book_mid_price": mid_price,
+                        "book_spread_abs": spread_abs,
+                        "book_spread_bps": spread_bps,
+                        "book_size_imbalance": size_imbalance,
+                        "book_notional_imbalance": notional_imbalance,
+                        "book_microprice": microprice,
+                        "book_micro_gap_bps": micro_gap_bps,
+                        "book_ticker_observed": 1.0,
+                    }
+                )
+
+    if not records:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame.from_records(records)
+    combined = frame.groupby("bucket").last().sort_index()
+    return combined
+
+
+def _float_or_none(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def load_price_context(
@@ -851,6 +993,69 @@ def add_derived_features(
         out["funding_flow_align_12"] = out["last_funding_rate"] * out["signed_ratio_12"]
     if "count_long_short_ratio" in out.columns and "sum_taker_long_short_vol_ratio" in out.columns:
         out["crowding_pressure"] = out["count_long_short_ratio"] * out["sum_taker_long_short_vol_ratio"]
+    if "book_mid_price" in out.columns:
+        out["book_mid_trade_gap_bps"] = safe_divide(out["price_last"] - out["book_mid_price"], out["book_mid_price"]) * 10000.0
+        out["book_mid_ret_1"] = out["book_mid_price"].pct_change(1)
+        out["book_mid_ret_3"] = out["book_mid_price"].pct_change(3)
+        out["book_mid_ret_12"] = out["book_mid_price"].pct_change(12)
+    if "book_microprice" in out.columns:
+        out["book_micro_trade_gap_bps"] = safe_divide(out["price_last"] - out["book_microprice"], out["book_microprice"]) * 10000.0
+        out["book_micro_ret_1"] = out["book_microprice"].pct_change(1)
+        out["book_micro_ret_3"] = out["book_microprice"].pct_change(3)
+        out["book_micro_ret_12"] = out["book_microprice"].pct_change(12)
+    if "book_spread_bps" in out.columns:
+        out["book_spread_change_1"] = out["book_spread_bps"].diff(1)
+        out["book_spread_change_3"] = out["book_spread_bps"].diff(3)
+    if "book_size_imbalance" in out.columns:
+        out["book_size_imbalance_change_1"] = out["book_size_imbalance"].diff(1)
+        out["book_size_imbalance_change_3"] = out["book_size_imbalance"].diff(3)
+        out["book_flow_align_12"] = out["book_size_imbalance"] * out["signed_ratio_12"]
+    if "book_notional_imbalance" in out.columns:
+        out["book_notional_imbalance_change_1"] = out["book_notional_imbalance"].diff(1)
+        out["book_notional_imbalance_change_3"] = out["book_notional_imbalance"].diff(3)
+        out["book_notional_flow_align_12"] = out["book_notional_imbalance"] * out["signed_quote_ratio_1"]
+    if "book_bid_qty" in out.columns and "book_ask_qty" in out.columns:
+        out["book_bid_qty_change_1"] = out["book_bid_qty"].diff(1)
+        out["book_ask_qty_change_1"] = out["book_ask_qty"].diff(1)
+        out["book_bid_qty_change_3"] = out["book_bid_qty"].diff(3)
+        out["book_ask_qty_change_3"] = out["book_ask_qty"].diff(3)
+    if "book_bid_notional" in out.columns and "book_ask_notional" in out.columns:
+        out["book_bid_notional_change_1"] = out["book_bid_notional"].diff(1)
+        out["book_ask_notional_change_1"] = out["book_ask_notional"].diff(1)
+        out["book_bid_notional_change_3"] = out["book_bid_notional"].diff(3)
+        out["book_ask_notional_change_3"] = out["book_ask_notional"].diff(3)
+    book_fill_zero_columns = [
+        column
+        for column in (
+            "book_mid_trade_gap_bps",
+            "book_mid_ret_1",
+            "book_mid_ret_3",
+            "book_mid_ret_12",
+            "book_micro_trade_gap_bps",
+            "book_micro_ret_1",
+            "book_micro_ret_3",
+            "book_micro_ret_12",
+            "book_spread_change_1",
+            "book_spread_change_3",
+            "book_size_imbalance_change_1",
+            "book_size_imbalance_change_3",
+            "book_flow_align_12",
+            "book_notional_imbalance_change_1",
+            "book_notional_imbalance_change_3",
+            "book_notional_flow_align_12",
+            "book_bid_qty_change_1",
+            "book_ask_qty_change_1",
+            "book_bid_qty_change_3",
+            "book_ask_qty_change_3",
+            "book_bid_notional_change_1",
+            "book_ask_notional_change_1",
+            "book_bid_notional_change_3",
+            "book_ask_notional_change_3",
+        )
+        if column in out.columns
+    ]
+    if book_fill_zero_columns:
+        out[book_fill_zero_columns] = out[book_fill_zero_columns].fillna(0.0)
     if "mark_ctx_close" in out.columns and "index_ctx_close" in out.columns:
         out["mark_index_basis_bps"] = safe_divide(out["mark_ctx_close"] - out["index_ctx_close"], out["index_ctx_close"]) * 10000.0
         out["mark_index_basis_change_12"] = out["mark_index_basis_bps"].diff(12)

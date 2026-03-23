@@ -17,7 +17,7 @@ import asyncio
 import json
 import signal
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,9 @@ import websockets
 BASE_WS_URL = "wss://fstream.binance.com/stream?streams="
 DEFAULT_OUTPUT_ROOT = Path("output/futures_ml_live")
 DEFAULT_DURATION_SECONDS = 1800
+VALID_PARTIAL_DEPTH_LEVELS = (5, 10, 20)
+VALID_DEPTH_MODES = ("diff", "partial")
+UTC = timezone.utc
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,9 +40,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-agg-trade", action="store_true", default=True, help="Capture aggTrade stream")
     parser.add_argument("--include-book-ticker", action="store_true", default=True, help="Capture bookTicker stream")
     parser.add_argument("--include-depth", action="store_true", default=True, help="Capture diff depth stream at 100ms")
+    parser.add_argument(
+        "--depth-mode",
+        choices=VALID_DEPTH_MODES,
+        default="diff",
+        help="Choose raw diff depth or partial top-of-book snapshots for the depth stream",
+    )
+    parser.add_argument(
+        "--depth-levels",
+        type=int,
+        default=20,
+        help="When depth-mode=partial, capture this many top levels per side",
+    )
     parser.add_argument("--include-mark-price", action="store_true", default=True, help="Capture markPrice stream")
     parser.add_argument("--include-force-order", action="store_true", default=True, help="Capture liquidation stream")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.depth_mode == "partial" and args.depth_levels not in VALID_PARTIAL_DEPTH_LEVELS:
+        raise SystemExit(f"depth-levels must be one of {VALID_PARTIAL_DEPTH_LEVELS} when depth-mode=partial")
+    return args
 
 
 def selected_streams(args: argparse.Namespace, symbol: str) -> list[str]:
@@ -50,7 +68,10 @@ def selected_streams(args: argparse.Namespace, symbol: str) -> list[str]:
     if args.include_book_ticker:
         streams.append(f"{base}@bookTicker")
     if args.include_depth:
-        streams.append(f"{base}@depth@100ms")
+        if args.depth_mode == "partial":
+            streams.append(f"{base}@depth{args.depth_levels}@100ms")
+        else:
+            streams.append(f"{base}@depth@100ms")
     if args.include_mark_price:
         streams.append(f"{base}@markPrice@1s")
     if args.include_force_order:
@@ -139,6 +160,8 @@ async def capture(args: argparse.Namespace) -> None:
             "ended_at": ended_at.isoformat(),
             "duration_seconds": args.duration_seconds,
             "streams": streams,
+            "depth_mode": args.depth_mode if args.include_depth else None,
+            "depth_levels": args.depth_levels if args.include_depth and args.depth_mode == "partial" else None,
             "counts": dict(counts),
             "reconnects": reconnects,
             "last_error": last_error,

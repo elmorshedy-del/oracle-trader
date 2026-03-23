@@ -1,0 +1,35 @@
+{
+  "checkpoint_id": "weather-ops-cycle-oracle-20260316T134708",
+  "created_at": "2026-03-16T13:47:08Z",
+  "status": "weather_ops_cycle_oracle_deploy",
+  "category": "weather_edge",
+  "summary": "Replaced Codex automation with a Railway hourly ops cycle that records weather-edge live state and crypto-pairs shadow state while preserving the 6-hour weather snapshot cadence.",
+  "artifacts": {
+    "service_name": "weather-snapshot-recorder",
+    "deployment_id": "58e0abdf-c3c8-4cb3-b275-b079d7dc3d3c",
+    "railway_config_file": "/Users/ahmedelmorshedy/Downloads/oracle-trader/railway.weather-snapshot-recorder.json",
+    "weather_monitor_script": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_weather_edge_live_health.py",
+    "ops_cycle_script": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/run_weather_ops_cycle.py",
+    "weather_monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/weather_edge_live_monitor/latest.json",
+    "ops_cycle_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/ops_cycle_monitor/latest.json"
+  },
+  "metrics": {
+    "cron_schedule": "0 * * * *",
+    "snapshot_hours_utc": [
+      0,
+      6,
+      12,
+      18
+    ],
+    "weather_scans_completed": 58,
+    "weather_entries": 10,
+    "weather_resolved_trades": 0,
+    "weather_pending_positions": 10,
+    "aave_doge_closed_trades": 2,
+    "aave_doge_realized_net_bps": -43.3974,
+    "comp_floki_closed_trades": 13,
+    "comp_floki_realized_net_bps": -358.7667,
+    "comp_link_closed_trades": 4,
+    "comp_link_realized_net_bps": 14.0803
+  }
+}

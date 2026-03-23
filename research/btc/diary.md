@@ -377,3 +377,147 @@ Read:
   - using the full March 14 runtime day still did not reproduce the March 13 monster behavior
   - the main issue was not just trade-count filtering; under the frozen `0.35+` score floor the day simply did not produce enough qualifying trades
   - this full-day same-day result is stronger evidence than the single-block slice, but it is still same-day runtime evidence rather than a clean future independent validation day
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T182303`
+- Date range: `2026-03-01` to `2026-03-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260301_20260301_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T182259_v1`
+- Candidate events: `666`
+- Trades: `308`
+- Win rate: `0.3312`
+- Total net bps: `-1157.71`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T183513`
+- Date range: `2025-04-01` to `2025-04-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250401_20250401_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T183504_v1`
+- Candidate events: `60`
+- Trades: `49`
+- Win rate: `0.4286`
+- Total net bps: `-73.11`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T184329`
+- Date range: `2025-05-01` to `2025-05-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250501_20250501_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T184328_v1`
+- Candidate events: `18`
+- Trades: `16`
+- Win rate: `0.4375`
+- Total net bps: `-42.30`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T184537`
+- Date range: `2025-06-01` to `2025-06-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250601_20250601_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T184536_v1`
+- Candidate events: `2`
+- Trades: `1`
+- Win rate: `0.0000`
+- Total net bps: `-0.14`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T185030`
+- Date range: `2025-07-01` to `2025-07-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250701_20250701_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T185027_v1`
+- Candidate events: `15`
+- Trades: `13`
+- Win rate: `0.3077`
+- Total net bps: `-43.04`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T185838`
+- Date range: `2025-08-01` to `2025-08-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250801_20250801_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T185837_v1`
+- Candidate events: `85`
+- Trades: `63`
+- Win rate: `0.2540`
+- Total net bps: `-245.20`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T190433`
+- Date range: `2025-09-01` to `2025-09-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250901_20250901_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T190422_v1`
+- Candidate events: `11`
+- Trades: `9`
+- Win rate: `0.5556`
+- Total net bps: `9.99`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T191600`
+- Date range: `2025-10-01` to `2025-10-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251001_20251001_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T191552_v1`
+- Candidate events: `2`
+- Trades: `2`
+- Win rate: `0.5000`
+- Total net bps: `-0.20`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T192428`
+- Date range: `2025-11-01` to `2025-11-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251101_20251101_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T192420_v1`
+- Candidate events: `2`
+- Trades: `2`
+- Win rate: `0.0000`
+- Total net bps: `-3.31`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T193512`
+- Date range: `2025-12-01` to `2025-12-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251201_20251201_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T193511_v1`
+- Candidate events: `77`
+- Trades: `64`
+- Win rate: `0.4062`
+- Total net bps: `-166.66`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T193613`
+- Date range: `2026-01-01` to `2026-01-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260101_20260101_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T193611_v1`
+- Candidate events: `1`
+- Trades: `1`
+- Win rate: `1.0000`
+- Total net bps: `0.10`
+
+
+## 2026-03-14 - Tardis multivenue frozen validation
+
+- Checkpoint: `btc-tardis-multivenue-validation-20260314T193928`
+- Date range: `2026-02-01` to `2026-02-01`
+- Dataset: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260201_20260201_v1/dataset/features.csv.gz`
+- Validation run: `btc_meanrev_validation_20260314T193927_v1`
+- Candidate events: `78`
+- Trades: `66`
+- Win rate: `0.5000`
+- Total net bps: `-122.67`

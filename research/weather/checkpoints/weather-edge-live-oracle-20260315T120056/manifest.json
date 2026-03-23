@@ -1,0 +1,29 @@
+{
+  "checkpoint_id": "weather-edge-live-oracle-20260315T120056",
+  "created_at": "2026-03-15T12:00:56.130065+00:00",
+  "status": "weather_edge_live_oracle_deploy",
+  "category": "weather_edge",
+  "summary": "Standalone weather-edge-v1 live lane deployed to Railway inside oracle-trader without modifying the legacy weather sleeves.",
+  "artifacts": {
+    "service_name": "just-grace",
+    "service_id": "0a08cb0d-6042-4dfb-954f-077c01e114f2",
+    "deployment_id": "e100a0e7-9588-4165-abac-c43e33fb88ae",
+    "health_url": "https://just-grace-production-a401.up.railway.app/api/health",
+    "state_url": "https://just-grace-production-a401.up.railway.app/api/state",
+    "trade_ledger_csv": "/data/logs/comparison/weather_edge_live/trade_ledger.csv",
+    "daily_summary_jsonl": "/data/logs/comparison/weather_edge_live/daily_summary.jsonl",
+    "runtime_state_json": "/data/logs/comparison/weather_edge_live/runtime_state.json"
+  },
+  "metrics": {
+    "starting_bankroll_usd": 500.0,
+    "scans_completed": 1,
+    "candidate_markets": 26,
+    "eligible_markets": 26,
+    "selected_markets": 5,
+    "entries": 5,
+    "pending_positions": 5,
+    "cash_usd": 450.0,
+    "bankroll_usd": 500.0,
+    "telegram_enabled": false
+  }
+}

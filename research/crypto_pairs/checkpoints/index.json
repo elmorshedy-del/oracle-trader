@@ -267,5 +267,103 @@
       "total_entries": 0,
       "total_closed_trades": 0
     }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211735",
+    "created_at": "2026-03-19T21:17:35.678023+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260319T211735_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 41
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211750",
+    "created_at": "2026-03-19T21:17:50.743149+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-v1/crypto_pairs_discovery_20260319T211750_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 16,
+      "pairs_tested": 120,
+      "tradeable_pairs": 6
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211800",
+    "created_at": "2026-03-19T21:18:00.963665+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-v1/crypto_pairs_discovery_20260319T211800_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 16,
+      "pairs_tested": 120,
+      "tradeable_pairs": 3
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-bruteforce-20260319T211858",
+    "created_at": "2026-03-19T21:18:58.669155+00:00",
+    "status": "bruteforce_screen_complete",
+    "category": "pair_discovery",
+    "summary": "Brute-force crypto pairs discovery on a 40-token Binance spot universe with 60-day backtests and split filters on all cointegrated pairs.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260319T211735_v1/pair_discovery_results.json",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260319T211858_v1/summary.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "cointegrated_pairs": 41,
+      "survivors": 23
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211950",
+    "created_at": "2026-03-19T21:19:50.970474+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-wide-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-wide-v1/crypto_pairs_discovery_20260319T211950_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 41
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T212010",
+    "created_at": "2026-03-19T21:20:10.754566+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-wide-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-wide-v1/crypto_pairs_discovery_20260319T212010_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 22
+    }
   }
 ]

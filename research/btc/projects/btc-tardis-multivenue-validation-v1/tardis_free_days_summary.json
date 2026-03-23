@@ -1,0 +1,104 @@
+{
+  "day_count": 12,
+  "days": [
+    {
+      "day": "20260301",
+      "run_name": "btc_meanrev_validation_20260314T182259_v1",
+      "candidate_event_count": 666,
+      "trades": 308,
+      "win_rate": 0.33116883116883117,
+      "total_net_bps": -1157.71035292505
+    },
+    {
+      "day": "20250401",
+      "run_name": "btc_meanrev_validation_20260314T183504_v1",
+      "candidate_event_count": 60,
+      "trades": 49,
+      "win_rate": 0.42857142857142855,
+      "total_net_bps": -73.10611470395435
+    },
+    {
+      "day": "20250501",
+      "run_name": "btc_meanrev_validation_20260314T184328_v1",
+      "candidate_event_count": 18,
+      "trades": 16,
+      "win_rate": 0.4375,
+      "total_net_bps": -42.30000094030426
+    },
+    {
+      "day": "20250601",
+      "run_name": "btc_meanrev_validation_20260314T184536_v1",
+      "candidate_event_count": 2,
+      "trades": 1,
+      "win_rate": 0.0,
+      "total_net_bps": -0.14413468402385377
+    },
+    {
+      "day": "20250701",
+      "run_name": "btc_meanrev_validation_20260314T185027_v1",
+      "candidate_event_count": 15,
+      "trades": 13,
+      "win_rate": 0.3076923076923077,
+      "total_net_bps": -43.0428933280542
+    },
+    {
+      "day": "20250801",
+      "run_name": "btc_meanrev_validation_20260314T185837_v1",
+      "candidate_event_count": 85,
+      "trades": 63,
+      "win_rate": 0.25396825396825395,
+      "total_net_bps": -245.20055556367214
+    },
+    {
+      "day": "20250901",
+      "run_name": "btc_meanrev_validation_20260314T190422_v1",
+      "candidate_event_count": 11,
+      "trades": 9,
+      "win_rate": 0.5555555555555556,
+      "total_net_bps": 9.99005065805882
+    },
+    {
+      "day": "20251001",
+      "run_name": "btc_meanrev_validation_20260314T191552_v1",
+      "candidate_event_count": 2,
+      "trades": 2,
+      "win_rate": 0.5,
+      "total_net_bps": -0.19736183587570544
+    },
+    {
+      "day": "20251101",
+      "run_name": "btc_meanrev_validation_20260314T192420_v1",
+      "candidate_event_count": 2,
+      "trades": 2,
+      "win_rate": 0.0,
+      "total_net_bps": -3.3104652210917926
+    },
+    {
+      "day": "20251201",
+      "run_name": "btc_meanrev_validation_20260314T193511_v1",
+      "candidate_event_count": 77,
+      "trades": 64,
+      "win_rate": 0.40625,
+      "total_net_bps": -166.65658660495376
+    },
+    {
+      "day": "20260101",
+      "run_name": "btc_meanrev_validation_20260314T193611_v1",
+      "candidate_event_count": 1,
+      "trades": 1,
+      "win_rate": 1.0,
+      "total_net_bps": 0.09643812188797796
+    },
+    {
+      "day": "20260201",
+      "run_name": "btc_meanrev_validation_20260314T193927_v1",
+      "candidate_event_count": 78,
+      "trades": 66,
+      "win_rate": 0.5,
+      "total_net_bps": -122.67166464119529
+    }
+  ],
+  "total_trades": 594,
+  "total_net_bps": -1844.2536416682285,
+  "positive_days": 2
+}

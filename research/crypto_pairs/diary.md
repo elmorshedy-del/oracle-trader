@@ -326,3 +326,98 @@ Each new crypto pairs discovery, backtest, or execution experiment gets a new en
   - all three sleeves are running simultaneously
   - same ratio/trade/daily/hourly logging is active for each pair
   - the monitoring path is now multi-pair, so a 5-day paper comparison can be done from a single root plus the per-pair audit files
+
+
+## 2026-03-19 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260319T211735`
+- Date range: `2026-01-18` to `2026-03-18`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Tradeable pairs: `41`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260319T211735_v1/pair_discovery_results.json`
+- Top pairs:
+  - `LINK/TIA` score `4.7147` halflife `22.92h`
+  - `AVAX/TIA` score `4.7198` halflife `33.91h`
+  - `BONK/FLOKI` score `4.9117` halflife `27.2h`
+  - `BONK/GRT` score `4.992` halflife `37.43h`
+  - `AAVE/COMP` score `5.0656` halflife `20.77h`
+
+
+## 2026-03-19 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260319T211750`
+- Date range: `2026-01-18` to `2026-03-18`
+- Symbols loaded: `16`
+- Pairs tested: `120`
+- Tradeable pairs: `6`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-v1/crypto_pairs_discovery_20260319T211750_v1/pair_discovery_results.json`
+- Top pairs:
+  - `AAVE/DOGE` score `5.8888` halflife `41.18h`
+  - `AVAX/BTC` score `6.2376` halflife `35.51h`
+  - `AAVE/ADA` score `6.506` halflife `41.83h`
+  - `DOT/UNI` score `6.6067` halflife `26.5h`
+  - `SOL/SUI` score `8.6178` halflife `50.47h`
+
+
+## 2026-03-19 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260319T211800`
+- Date range: `2026-02-17` to `2026-03-18`
+- Symbols loaded: `16`
+- Pairs tested: `120`
+- Tradeable pairs: `3`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-v1/crypto_pairs_discovery_20260319T211800_v1/pair_discovery_results.json`
+- Top pairs:
+  - `LINK/SOL` score `3.4075` halflife `11.75h`
+  - `AVAX/SOL` score `8.0353` halflife `20.77h`
+  - `AVAX/BTC` score `10.52` halflife `32.49h`
+
+
+## 2026-03-19 - Brute-force crypto pairs screen
+
+- Checkpoint: `crypto-pairs-bruteforce-20260319T211858`
+- Date range: `2026-01-18` to `2026-03-18`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Cointegrated pairs: `41`
+- Survivors after 30-day split: `23`
+- Summary: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260319T211858_v1/summary.json`
+- Survivors:
+  - `LINK/TIA` full `488.8763 bps`
+  - `AVAX/TIA` full `1188.2444 bps`
+  - `BONK/FLOKI` full `436.6074 bps`
+  - `BONK/GRT` full `878.0367 bps`
+  - `RUNE/TIA` full `207.7521 bps`
+
+
+## 2026-03-19 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260319T211950`
+- Date range: `2026-01-18` to `2026-03-18`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Tradeable pairs: `41`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-wide-v1/crypto_pairs_discovery_20260319T211950_v1/pair_discovery_results.json`
+- Top pairs:
+  - `LINK/TIA` score `4.7147` halflife `22.92h`
+  - `AVAX/TIA` score `4.7198` halflife `33.91h`
+  - `BONK/FLOKI` score `4.9117` halflife `27.2h`
+  - `BONK/GRT` score `4.992` halflife `37.43h`
+  - `AAVE/COMP` score `5.0656` halflife `20.77h`
+
+
+## 2026-03-19 - Initial pair discovery
+
+- Checkpoint: `crypto-pairs-discovery-20260319T212010`
+- Date range: `2026-02-17` to `2026-03-18`
+- Symbols loaded: `37`
+- Pairs tested: `666`
+- Tradeable pairs: `22`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-wide-v1/crypto_pairs_discovery_20260319T212010_v1/pair_discovery_results.json`
+- Top pairs:
+  - `LINK/SOL` score `3.4075` halflife `11.75h`
+  - `BONK/DOGE` score `4.4479` halflife `13.59h`
+  - `BONK/GRT` score `4.6293` halflife `12.94h`
+  - `DOGE/GRT` score `5.1393` halflife `14.42h`
+  - `LINK/TIA` score `5.2637` halflife `20.59h`

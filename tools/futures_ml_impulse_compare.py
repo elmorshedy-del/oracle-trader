@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,7 @@ from futures_ml_pipeline import (
 
 
 DEFAULT_COMPARE_OUTPUT_ROOT = Path("output/futures_ml_impulse_compare")
+UTC = timezone.utc
 CORE_CONTEXT_PREFIXES = (
     "mark_ctx_",
     "index_ctx_",
@@ -79,6 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-depth-age-buckets", type=int, default=DEFAULT_MAX_DEPTH_AGE_BUCKETS, help="Maximum depth staleness in buckets")
     parser.add_argument("--max-metrics-age-buckets", type=int, default=DEFAULT_MAX_METRICS_AGE_BUCKETS, help="Maximum metrics staleness in buckets")
     parser.add_argument("--max-funding-age-buckets", type=int, default=DEFAULT_MAX_FUNDING_AGE_BUCKETS, help="Maximum funding staleness in buckets")
+    parser.add_argument("--live-book-ticker-root", default="", help="Optional root containing captured live bookTicker JSONL files")
     parser.add_argument(
         "--price-context-interval",
         default="",
@@ -114,6 +116,8 @@ def main() -> None:
         f"eff{value_tag(args.min_directional_efficiency)}_"
         f"ctx{context_tag(args.price_context_interval)}"
     )
+    if args.live_book_ticker_root:
+        setup_tag = f"{setup_tag}_qtlive"
     run_name = (
         f"binance_{symbol.lower()}_{args.bucket_seconds}s_impulse_{args.horizon_seconds}s_"
         f"tp{int(round(args.profit_bps))}_sl{int(round(args.stop_bps))}_{setup_tag}_{date_tag}_"
@@ -127,6 +131,7 @@ def main() -> None:
         path.mkdir(parents=True, exist_ok=True)
 
     raw_root = resolve_raw_root(output_root=raw_output_root, symbol=symbol, skip_download=args.skip_download)
+    live_book_ticker_root = Path(args.live_book_ticker_root).resolve() if args.live_book_ticker_root else None
     raw_root.mkdir(parents=True, exist_ok=True)
     if not args.skip_download:
         download_archives(
@@ -156,6 +161,7 @@ def main() -> None:
         max_metrics_age_buckets=args.max_metrics_age_buckets,
         max_funding_age_buckets=args.max_funding_age_buckets,
         price_context_interval=args.price_context_interval,
+        live_book_ticker_root=live_book_ticker_root,
     )
     if base_dataset.empty:
         raise SystemExit("Base dataset is empty. Check raw archive coverage.")
@@ -190,6 +196,7 @@ def main() -> None:
         "profit_bps": args.profit_bps,
         "stop_bps": args.stop_bps,
         "cost_bps": args.cost_bps,
+        "live_book_ticker_root": str(live_book_ticker_root) if live_book_ticker_root else None,
         "min_signed_ratio": args.min_signed_ratio,
         "min_depth_imbalance": args.min_depth_imbalance,
         "min_trade_z": args.min_trade_z,

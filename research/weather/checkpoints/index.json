@@ -1,0 +1,675 @@
+[
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T101413",
+    "created_at": "2026-03-15T10:14:13.106910+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T101412_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T101412_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T101412_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 10,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T102109",
+    "created_at": "2026-03-15T10:21:09.617247+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 5,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T102421",
+    "created_at": "2026-03-15T10:24:21.066458+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102416_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102416_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102416_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 5,
+      "market_horizon_rows": 25,
+      "scored_rows": 25,
+      "eligible_rows": 8,
+      "backtest_trades": 8,
+      "backtest_total_net_bps": 2517.8355
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T102629",
+    "created_at": "2026-03-15T10:26:29.650608+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102543_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102543_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102543_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 100,
+      "market_horizon_rows": 489,
+      "scored_rows": 489,
+      "eligible_rows": 124,
+      "backtest_trades": 124,
+      "backtest_total_net_bps": -7160.7615
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T103023",
+    "created_at": "2026-03-15T10:30:23.604638+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102935_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102935_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102935_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 100,
+      "market_horizon_rows": 489,
+      "scored_rows": 489,
+      "eligible_rows": 38,
+      "backtest_trades": 23,
+      "backtest_total_net_bps": 23548.7616
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T103159",
+    "created_at": "2026-03-15T10:31:59.945821+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103041_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103041_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103041_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 1215,
+      "scored_rows": 1215,
+      "eligible_rows": 104,
+      "backtest_trades": 48,
+      "backtest_total_net_bps": 969811.1213
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T103427",
+    "created_at": "2026-03-15T10:34:27.051835+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 1215,
+      "scored_rows": 1215,
+      "eligible_rows": 104,
+      "backtest_trades": 48,
+      "backtest_total_net_bps": 16217.3055
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T103701",
+    "created_at": "2026-03-15T10:37:01.737950+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 1205,
+      "scored_rows": 1205,
+      "eligible_rows": 104,
+      "backtest_trades": 46,
+      "backtest_total_net_bps": 14414.4727
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-combined-recent500-20260315T103800",
+    "created_at": "2026-03-15T10:38:21.437801+00:00",
+    "status": "weather_edge_combined_summary",
+    "category": "weather_edge",
+    "summary": "Combined standalone weather edge summary across the first two 250-market batches using capped Kelly and event-level contract selection.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_recent500_20260315T103800_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_recent500_20260315T103800_v1/weather_edge_report.md",
+      "source_runs": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 2420,
+      "rows_eligible": 208,
+      "trade_rows_selected": 85,
+      "trade_count": 85,
+      "win_rate": 0.894118,
+      "total_net_bps": 32213.7398,
+      "max_drawdown": 0.057499
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T105312",
+    "created_at": "2026-03-15T10:53:12.847000+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105141_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105141_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105141_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 1215,
+      "scored_rows": 1215,
+      "eligible_rows": 104,
+      "backtest_trades": 48,
+      "backtest_total_net_bps": 16217.3055
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260315T105431",
+    "created_at": "2026-03-15T10:54:31.096015+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105314_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105314_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105314_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 1205,
+      "scored_rows": 1205,
+      "eligible_rows": 104,
+      "backtest_trades": 46,
+      "backtest_total_net_bps": 14414.4727
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-batch-sweep-20260315T105431",
+    "created_at": "2026-03-15T10:54:31.548655+00:00",
+    "status": "weather_edge_batch_sweep",
+    "category": "weather_edge",
+    "summary": "Batch-swept standalone weather edge summary across multiple pipeline runs.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_full_sweep_20260315T105431_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_full_sweep_20260315T105431_v1/weather_edge_report.md",
+      "source_runs": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105141_v1",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105314_v1"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 2420,
+      "rows_eligible": 208,
+      "trade_rows_selected": 85,
+      "trade_count": 85,
+      "win_rate": 0.894118,
+      "total_net_bps": 32213.7398,
+      "max_drawdown": 0.057499
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-live-oracle-20260315T120056",
+    "created_at": "2026-03-15T12:00:56.130065+00:00",
+    "status": "weather_edge_live_oracle_deploy",
+    "category": "weather_edge",
+    "summary": "Standalone weather-edge-v1 live lane deployed to Railway inside oracle-trader.",
+    "artifacts": {
+      "service_name": "just-grace",
+      "deployment_id": "e100a0e7-9588-4165-abac-c43e33fb88ae",
+      "health_url": "https://just-grace-production-a401.up.railway.app/api/health",
+      "state_url": "https://just-grace-production-a401.up.railway.app/api/state",
+      "trade_ledger_csv": "/data/logs/comparison/weather_edge_live/trade_ledger.csv",
+      "daily_summary_jsonl": "/data/logs/comparison/weather_edge_live/daily_summary.jsonl"
+    },
+    "metrics": {
+      "starting_bankroll_usd": 500.0,
+      "scans_completed": 1,
+      "candidate_markets": 26,
+      "eligible_markets": 26,
+      "selected_markets": 5,
+      "entries": 5,
+      "pending_positions": 5,
+      "cash_usd": 450.0,
+      "bankroll_usd": 500.0,
+      "telegram_enabled": false
+    }
+  },
+  {
+    "checkpoint_id": "weather-snapshot-recorder-oracle-20260315T120056",
+    "created_at": "2026-03-15T12:00:56.130065+00:00",
+    "status": "weather_snapshot_recorder_oracle_deploy",
+    "category": "weather_edge",
+    "summary": "Open-Meteo forecast snapshot recorder deployed as a separate Railway cron service.",
+    "artifacts": {
+      "service_name": "weather-snapshot-recorder",
+      "deployment_id": "35bada33-c73d-48b4-b846-287d1270d7da",
+      "railway_config_file": "/Users/ahmedelmorshedy/Downloads/oracle-trader/railway.weather-snapshot-recorder.json",
+      "storage_root": "/data/weather_snapshots"
+    },
+    "metrics": {
+      "cron_schedule": "0 0,6,12,18 * * *",
+      "first_scheduled_run_confirmed": true,
+      "next_cron_run_at": "2026-03-15T18:00:00.000Z",
+      "local_smoke_rows_written": 149,
+      "local_smoke_total_fetches": 150,
+      "local_smoke_failed_fetches": 1,
+      "local_smoke_failure_ratio": 0.006667
+    }
+  },
+  {
+    "checkpoint_id": "weather-ops-cycle-oracle-20260316T134708",
+    "created_at": "2026-03-16T13:47:08Z",
+    "status": "weather_ops_cycle_oracle_deploy",
+    "category": "weather_edge",
+    "summary": "Hourly Railway ops cycle now records weather-edge live state and crypto-pairs shadow state without using Codex automation, while preserving 6-hour weather snapshots inside the wrapper.",
+    "artifacts": {
+      "service_name": "weather-snapshot-recorder",
+      "deployment_id": "58e0abdf-c3c8-4cb3-b275-b079d7dc3d3c",
+      "railway_config_file": "/Users/ahmedelmorshedy/Downloads/oracle-trader/railway.weather-snapshot-recorder.json",
+      "weather_monitor_script": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_weather_edge_live_health.py",
+      "ops_cycle_script": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/run_weather_ops_cycle.py",
+      "weather_monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/weather_edge_live_monitor/latest.json",
+      "ops_cycle_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/ops_cycle_monitor/latest.json"
+    },
+    "metrics": {
+      "cron_schedule": "0 * * * *",
+      "weather_scans_completed": 58,
+      "weather_entries": 10,
+      "weather_resolved_trades": 0,
+      "weather_pending_positions": 10,
+      "aave_doge_closed_trades": 2,
+      "aave_doge_realized_net_bps": -43.3974,
+      "comp_floki_closed_trades": 13,
+      "comp_floki_realized_net_bps": -358.7667,
+      "comp_link_closed_trades": 4,
+      "comp_link_realized_net_bps": 14.0803
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220628",
+    "created_at": "2026-03-19T22:06:28.702834+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_probe/runs/weather_edge_pipeline_20260319T220628_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_probe/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_probe/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 1,
+      "market_horizon_rows": 3,
+      "scored_rows": 3,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220730",
+    "created_at": "2026-03-19T22:07:30.273891+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 280,
+      "scored_rows": 280,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220749",
+    "created_at": "2026-03-19T22:07:49.390699+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220730_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220730_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220730_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-batch-sweep-20260319T220749",
+    "created_at": "2026-03-19T22:07:49.476199+00:00",
+    "status": "weather_edge_batch_sweep",
+    "category": "weather_edge",
+    "summary": "Batch-swept standalone weather edge summary across multiple pipeline runs.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/aggregates/weather_edge_full_sweep_20260319T220749_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/aggregates/weather_edge_full_sweep_20260319T220749_v1/weather_edge_report.md",
+      "source_runs": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 280,
+      "rows_eligible": 0,
+      "trade_rows_selected": 0,
+      "trade_count": 0,
+      "win_rate": null,
+      "total_net_bps": 0.0,
+      "max_drawdown": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220857",
+    "created_at": "2026-03-19T22:08:57.738624+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220857",
+    "created_at": "2026-03-19T22:08:57.881208+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260319T220936",
+    "created_at": "2026-03-19T22:09:36.318707+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset500/runs/weather_edge_pipeline_20260319T220915_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset500/runs/weather_edge_pipeline_20260319T220915_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset500/runs/weather_edge_pipeline_20260319T220915_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-20260319T230044",
+    "created_at": "2026-03-19T23:00:44.156486+00:00",
+    "status": "weather_edge_current_regime",
+    "category": "weather_edge",
+    "summary": "Separate current-regime weather-edge backtest lane using the frozen legacy model and updated lead-time rules.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1/runs/weather_edge_current_regime_20260319T230044_v1/weather_edge_current_regime_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1/runs/weather_edge_current_regime_20260319T230044_v1/weather_edge_current_regime_report.md",
+      "source_report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.json"
+    },
+    "metrics": {
+      "rows_scored": 280,
+      "rows_eligible": 3,
+      "trade_rows_selected": 3,
+      "trade_count": 3,
+      "win_rate": 1.0,
+      "total_net_bps": 126.6097,
+      "max_drawdown": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-20260321T192830",
+    "created_at": "2026-03-21T19:28:30.492664+00:00",
+    "status": "weather_edge_current_regime",
+    "category": "weather_edge",
+    "summary": "Separate current-regime weather-edge backtest lane using the frozen legacy model and updated lead-time rules.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_oldslice/runs/weather_edge_current_regime_20260321T192830_v1/weather_edge_current_regime_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_oldslice/runs/weather_edge_current_regime_20260321T192830_v1/weather_edge_current_regime_report.md",
+      "source_report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json"
+    },
+    "metrics": {
+      "rows_scored": 1215,
+      "rows_eligible": 18,
+      "trade_rows_selected": 12,
+      "trade_count": 12,
+      "win_rate": 0.5,
+      "total_net_bps": -623.7512,
+      "max_drawdown": 0.080562
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-20260321T192842",
+    "created_at": "2026-03-21T19:28:42.187537+00:00",
+    "status": "weather_edge_current_regime",
+    "category": "weather_edge",
+    "summary": "Separate current-regime weather-edge backtest lane using the frozen legacy model and updated lead-time rules.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch0/runs/weather_edge_current_regime_20260321T192842_v1/weather_edge_current_regime_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch0/runs/weather_edge_current_regime_20260321T192842_v1/weather_edge_current_regime_report.md",
+      "source_report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json"
+    },
+    "metrics": {
+      "rows_scored": 1215,
+      "rows_eligible": 18,
+      "trade_rows_selected": 12,
+      "trade_count": 12,
+      "win_rate": 0.5,
+      "total_net_bps": -623.7512,
+      "max_drawdown": 0.080562
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-20260321T192844",
+    "created_at": "2026-03-21T19:28:44.371591+00:00",
+    "status": "weather_edge_current_regime",
+    "category": "weather_edge",
+    "summary": "Separate current-regime weather-edge backtest lane using the frozen legacy model and updated lead-time rules.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch250/runs/weather_edge_current_regime_20260321T192844_v1/weather_edge_current_regime_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch250/runs/weather_edge_current_regime_20260321T192844_v1/weather_edge_current_regime_report.md",
+      "source_report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.json"
+    },
+    "metrics": {
+      "rows_scored": 1205,
+      "rows_eligible": 17,
+      "trade_rows_selected": 10,
+      "trade_count": 10,
+      "win_rate": 0.5,
+      "total_net_bps": -606.4852,
+      "max_drawdown": 0.07797
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260321T193003",
+    "created_at": "2026-03-21T19:30:03.558787+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset1500/runs/weather_edge_pipeline_20260321T192944_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset1500/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset1500/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-v1-20260321T193003",
+    "created_at": "2026-03-21T19:30:03.793172+00:00",
+    "status": "standalone_weather_edge",
+    "category": "weather_edge",
+    "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+    "artifacts": {
+      "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset2000/runs/weather_edge_pipeline_20260321T192944_v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset2000/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset2000/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.md"
+    },
+    "metrics": {
+      "markets_loaded": 250,
+      "market_horizon_rows": 0,
+      "scored_rows": 0,
+      "eligible_rows": 0,
+      "backtest_trades": 0,
+      "backtest_total_net_bps": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-multislice-20260321T193315",
+    "created_at": "2026-03-21T19:33:15.500628+00:00",
+    "status": "weather_edge_current_regime_multislice",
+    "category": "weather_edge",
+    "summary": "Aggregate current-regime weather-edge backtest across multiple scored report slices using the frozen current-regime filter.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_similar_recent500_20260321T193315_v1/weather_edge_current_regime_multislice_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_similar_recent500_20260321T193315_v1/weather_edge_current_regime_multislice_report.md",
+      "source_report_jsons": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.json"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 2420,
+      "rows_eligible": 35,
+      "trade_rows_selected": 21,
+      "trade_count": 21,
+      "win_rate": 0.52381,
+      "total_net_bps": -1028.6711,
+      "max_drawdown": 0.131185
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-multislice-20260321T193317",
+    "created_at": "2026-03-21T19:33:17.568931+00:00",
+    "status": "weather_edge_current_regime_multislice",
+    "category": "weather_edge",
+    "summary": "Aggregate current-regime weather-edge backtest across multiple scored report slices using the frozen current-regime filter.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_different_newer_20260321T193317_v1/weather_edge_current_regime_multislice_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_different_newer_20260321T193317_v1/weather_edge_current_regime_multislice_report.md",
+      "source_report_jsons": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset500/runs/weather_edge_pipeline_20260319T220915_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset1500/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset2000/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 280,
+      "rows_eligible": 3,
+      "trade_rows_selected": 3,
+      "trade_count": 3,
+      "win_rate": 1.0,
+      "total_net_bps": 126.6097,
+      "max_drawdown": 0.0
+    }
+  },
+  {
+    "checkpoint_id": "weather-edge-current-regime-multislice-20260321T193331",
+    "created_at": "2026-03-21T19:33:31.711661+00:00",
+    "status": "weather_edge_current_regime_multislice",
+    "category": "weather_edge",
+    "summary": "Aggregate current-regime weather-edge backtest across multiple scored report slices using the frozen current-regime filter.",
+    "artifacts": {
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_all_distinct_sources_20260321T193331_v1/weather_edge_current_regime_multislice_report.json",
+      "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_all_distinct_sources_20260321T193331_v1/weather_edge_current_regime_multislice_report.md",
+      "source_report_jsons": [
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_full90/runs/weather_edge_pipeline_20260319T220628_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset500/runs/weather_edge_pipeline_20260319T220915_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offsets/runs/weather_edge_pipeline_20260319T220838_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset1500/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json",
+        "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1_offset2000/runs/weather_edge_pipeline_20260321T192944_v1/weather_edge_report.json"
+      ]
+    },
+    "metrics": {
+      "rows_scored": 2700,
+      "rows_eligible": 38,
+      "trade_rows_selected": 23,
+      "trade_count": 23,
+      "win_rate": 0.565217,
+      "total_net_bps": -970.5604,
+      "max_drawdown": 0.131185
+    }
+  }
+]

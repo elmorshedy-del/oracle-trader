@@ -307,5 +307,250 @@
       "surviving_core_configs": 0,
       "sparse_surviving_core_configs": 0
     }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T182303",
+    "created_at": "2026-03-14T18:23:03.429005+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260301_20260301_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T182259_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86397,
+      "candidate_events": 666,
+      "total_net_bps": -1157.71035292505,
+      "trade_count": 308
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T183513",
+    "created_at": "2026-03-14T18:35:13.568661+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250401_20250401_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T183504_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86395,
+      "candidate_events": 60,
+      "total_net_bps": -73.10611470395435,
+      "trade_count": 49
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T184329",
+    "created_at": "2026-03-14T18:43:29.608464+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250501_20250501_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T184328_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86394,
+      "candidate_events": 18,
+      "total_net_bps": -42.30000094030426,
+      "trade_count": 16
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T184537",
+    "created_at": "2026-03-14T18:45:37.849971+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250601_20250601_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T184536_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86392,
+      "candidate_events": 2,
+      "total_net_bps": -0.14413468402385377,
+      "trade_count": 1
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T185030",
+    "created_at": "2026-03-14T18:50:30.407253+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250701_20250701_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T185027_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86393,
+      "candidate_events": 15,
+      "total_net_bps": -43.0428933280542,
+      "trade_count": 13
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T185838",
+    "created_at": "2026-03-14T18:58:38.523903+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250801_20250801_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T185837_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86400,
+      "candidate_events": 85,
+      "total_net_bps": -245.20055556367214,
+      "trade_count": 63
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T190433",
+    "created_at": "2026-03-14T19:04:33.332209+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20250901_20250901_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T190422_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86399,
+      "candidate_events": 11,
+      "total_net_bps": 9.99005065805882,
+      "trade_count": 9
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T191600",
+    "created_at": "2026-03-14T19:16:00.372625+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251001_20251001_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T191552_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86399,
+      "candidate_events": 2,
+      "total_net_bps": -0.19736183587570544,
+      "trade_count": 2
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T192428",
+    "created_at": "2026-03-14T19:24:28.476937+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251101_20251101_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T192420_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86399,
+      "candidate_events": 2,
+      "total_net_bps": -3.3104652210917926,
+      "trade_count": 2
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T193512",
+    "created_at": "2026-03-14T19:35:12.680133+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20251201_20251201_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T193511_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86398,
+      "candidate_events": 77,
+      "total_net_bps": -166.65658660495376,
+      "trade_count": 64
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T193613",
+    "created_at": "2026-03-14T19:36:13.088105+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260101_20260101_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T193611_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86395,
+      "candidate_events": 1,
+      "total_net_bps": 0.09643812188797796,
+      "trade_count": 1
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-validation-20260314T193928",
+    "created_at": "2026-03-14T19:39:28.518695+00:00",
+    "status": "historical_multivenue_validation",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model validated on historical multivenue Tardis data with no new features.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/datasets/btc_tardis_multivenue_1s_20260201_20260201_v1/dataset/features.csv.gz",
+      "spec_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json",
+      "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_tardis_multivenue/validation/btc_meanrev_validation_20260314T193927_v1/reports/metadata.json"
+    },
+    "metrics": {
+      "row_count": 86400,
+      "candidate_events": 78,
+      "total_net_bps": -122.67166464119529,
+      "trade_count": 66
+    }
+  },
+  {
+    "checkpoint_id": "btc-tardis-multivenue-free-days-summary-20260314T194500",
+    "created_at": "2026-03-14T22:08:44.323272+00:00",
+    "status": "historical_multivenue_postmortem",
+    "category": "tardis_multivenue_validation",
+    "summary": "Frozen March 13 BTC mean-reversion model failed on 12 Tardis free first-of-month multivenue days; keep frozen and do not promote.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1/tardis_free_days_summary.json"
+    },
+    "metrics": {
+      "day_count": 12,
+      "total_trades": 594,
+      "total_net_bps": -1844.2536416682283,
+      "positive_days": 2
+    }
   }
 ]

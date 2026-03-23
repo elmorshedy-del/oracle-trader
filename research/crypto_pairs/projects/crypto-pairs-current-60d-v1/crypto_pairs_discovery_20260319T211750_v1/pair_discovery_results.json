@@ -1,0 +1,1463 @@
+{
+  "run_name": "crypto_pairs_discovery_20260319T211750_v1",
+  "started_at": "2026-03-19T21:17:50.697802+00:00",
+  "start_date": "2026-01-18",
+  "end_date": "2026-03-18",
+  "interval": "1h",
+  "symbols_requested": [
+    "ETHUSDT",
+    "BTCUSDT",
+    "SOLUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "DOTUSDT",
+    "ATOMUSDT",
+    "ADAUSDT",
+    "MATICUSDT",
+    "SUIUSDT",
+    "UNIUSDT",
+    "AAVEUSDT",
+    "LINKUSDT",
+    "MKRUSDT",
+    "ARBUSDT",
+    "OPUSDT",
+    "DOGEUSDT",
+    "SHIBUSDT"
+  ],
+  "symbols_loaded": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "ARBUSDT",
+    "ATOMUSDT",
+    "AVAXUSDT",
+    "BTCUSDT",
+    "DOGEUSDT",
+    "DOTUSDT",
+    "ETHUSDT",
+    "LINKUSDT",
+    "NEARUSDT",
+    "OPUSDT",
+    "SHIBUSDT",
+    "SOLUSDT",
+    "SUIUSDT",
+    "UNIUSDT"
+  ],
+  "download_report": {
+    "start_date": "2026-01-18",
+    "end_date": "2026-03-18",
+    "interval": "1h",
+    "symbols": [
+      "ETHUSDT",
+      "BTCUSDT",
+      "SOLUSDT",
+      "AVAXUSDT",
+      "NEARUSDT",
+      "DOTUSDT",
+      "ATOMUSDT",
+      "ADAUSDT",
+      "MATICUSDT",
+      "SUIUSDT",
+      "UNIUSDT",
+      "AAVEUSDT",
+      "LINKUSDT",
+      "MKRUSDT",
+      "ARBUSDT",
+      "OPUSDT",
+      "DOGEUSDT",
+      "SHIBUSDT"
+    ],
+    "download_count": 962,
+    "output_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h",
+    "downloads_preview": [
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-18",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-18.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-18.zip",
+        "bytes": 1309,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-19",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-19.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-19.zip",
+        "bytes": 1305,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-20",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-20.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-20.zip",
+        "bytes": 1334,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-21",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-21.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-21.zip",
+        "bytes": 1359,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-22",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-22.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-22.zip",
+        "bytes": 1306,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-23",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-23.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-23.zip",
+        "bytes": 1319,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-24",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-24.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-24.zip",
+        "bytes": 1257,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-25",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-25.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-25.zip",
+        "bytes": 1305,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-26",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-26.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-26.zip",
+        "bytes": 1343,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-27",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-27.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-27.zip",
+        "bytes": 1310,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-28",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-28.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-28.zip",
+        "bytes": 1340,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-29",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-29.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-29.zip",
+        "bytes": 1345,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-30",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-30.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-30.zip",
+        "bytes": 1377,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-31",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-31.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-31.zip",
+        "bytes": 1365,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-01",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-01.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-01.zip",
+        "bytes": 1357,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-02",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-02.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-02.zip",
+        "bytes": 1350,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-03",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-03.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-03.zip",
+        "bytes": 1347,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-04",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-04.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-04.zip",
+        "bytes": 1350,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-05",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-05.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-05.zip",
+        "bytes": 1412,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-06",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-06.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-06.zip",
+        "bytes": 1378,
+        "status": "cached"
+      }
+    ]
+  },
+  "tradeable_pairs": [
+    {
+      "pair": "AAVE/DOGE",
+      "token_a": "AAVE",
+      "token_b": "DOGE",
+      "tradeable": true,
+      "correlation": 0.9812,
+      "coint_score": -5.867536,
+      "coint_pvalue": 3e-06,
+      "halflife_hours": 41.18,
+      "hurst": 0.3985,
+      "adf_stat": -3.92578,
+      "adf_pvalue": 0.001853,
+      "spread_mean": 7.102739,
+      "spread_std": 0.032559,
+      "spread_z_range": 4.99,
+      "score": 5.8888
+    },
+    {
+      "pair": "AVAX/BTC",
+      "token_a": "AVAX",
+      "token_b": "BTC",
+      "tradeable": true,
+      "correlation": 0.9806,
+      "coint_score": -4.033239,
+      "coint_pvalue": 0.006435,
+      "halflife_hours": 35.51,
+      "hurst": 0.392,
+      "adf_stat": -4.040836,
+      "adf_pvalue": 0.001211,
+      "spread_mean": -8.918619,
+      "spread_std": 0.02515,
+      "spread_z_range": 6.17,
+      "score": 6.2376
+    },
+    {
+      "pair": "AAVE/ADA",
+      "token_a": "AAVE",
+      "token_b": "ADA",
+      "tradeable": true,
+      "correlation": 0.9833,
+      "coint_score": -4.132389,
+      "coint_pvalue": 0.004608,
+      "halflife_hours": 41.83,
+      "hurst": 0.4135,
+      "adf_stat": -3.535857,
+      "adf_pvalue": 0.007113,
+      "spread_mean": 6.060646,
+      "spread_std": 0.030161,
+      "spread_z_range": 5.45,
+      "score": 6.506
+    },
+    {
+      "pair": "DOT/UNI",
+      "token_a": "DOT",
+      "token_b": "UNI",
+      "tradeable": true,
+      "correlation": 0.9768,
+      "coint_score": -3.744889,
+      "coint_pvalue": 0.016028,
+      "halflife_hours": 26.5,
+      "hurst": 0.3668,
+      "adf_stat": -3.500828,
+      "adf_pvalue": 0.007966,
+      "spread_mean": -0.943243,
+      "spread_std": 0.033591,
+      "spread_z_range": 10.09,
+      "score": 6.6067
+    },
+    {
+      "pair": "SOL/SUI",
+      "token_a": "SOL",
+      "token_b": "SUI",
+      "tradeable": true,
+      "correlation": 0.9886,
+      "coint_score": -3.585771,
+      "coint_pvalue": 0.025512,
+      "halflife_hours": 50.47,
+      "hurst": 0.385,
+      "adf_stat": -3.46367,
+      "adf_pvalue": 0.008971,
+      "spread_mean": 4.490174,
+      "spread_std": 0.034069,
+      "spread_z_range": 5.54,
+      "score": 8.6178
+    },
+    {
+      "pair": "ETH/SUI",
+      "token_a": "ETH",
+      "token_b": "SUI",
+      "tradeable": true,
+      "correlation": 0.9862,
+      "coint_score": -3.460877,
+      "coint_pvalue": 0.036025,
+      "halflife_hours": 53.67,
+      "hurst": 0.4322,
+      "adf_stat": -3.360547,
+      "adf_pvalue": 0.01238,
+      "spread_mean": 7.650174,
+      "spread_std": 0.03754,
+      "spread_z_range": 5.6,
+      "score": 10.2988
+    }
+  ],
+  "rejected_pairs": [
+    {
+      "pair": "AAVE/ARB",
+      "token_a": "AAVE",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.9497,
+      "coint_score": -2.562165,
+      "coint_pvalue": 0.252362,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/ATOM",
+      "token_a": "AAVE",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.7943,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/AVAX",
+      "token_a": "AAVE",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.9407,
+      "coint_score": -1.836195,
+      "coint_pvalue": 0.61198,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/BTC",
+      "token_a": "AAVE",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.9393,
+      "coint_score": -2.277682,
+      "coint_pvalue": 0.38474,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/DOT",
+      "token_a": "AAVE",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.862,
+      "coint_score": -1.667366,
+      "coint_pvalue": 0.691638,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/ETH",
+      "token_a": "AAVE",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9482,
+      "coint_score": -2.159038,
+      "coint_pvalue": 0.445576,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/LINK",
+      "token_a": "AAVE",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.955,
+      "coint_score": -2.117613,
+      "coint_pvalue": 0.467165,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/NEAR",
+      "token_a": "AAVE",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7162,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/OP",
+      "token_a": "AAVE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9049,
+      "coint_score": -2.354811,
+      "coint_pvalue": 0.346545,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SHIB",
+      "token_a": "AAVE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9587,
+      "coint_score": -2.82652,
+      "coint_pvalue": 0.157392,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SOL",
+      "token_a": "AAVE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9538,
+      "coint_score": -2.30559,
+      "coint_pvalue": 0.370767,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SUI",
+      "token_a": "AAVE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9604,
+      "coint_score": -2.611853,
+      "coint_pvalue": 0.232081,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/UNI",
+      "token_a": "AAVE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.874,
+      "coint_score": -1.886473,
+      "coint_pvalue": 0.586852,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/ARB",
+      "token_a": "ADA",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.9547,
+      "coint_score": -2.628563,
+      "coint_pvalue": 0.226316,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/ATOM",
+      "token_a": "ADA",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.745,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/AVAX",
+      "token_a": "ADA",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.9588,
+      "coint_score": -1.249623,
+      "coint_pvalue": 0.844423,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/BTC",
+      "token_a": "ADA",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.9507,
+      "coint_score": -2.768063,
+      "coint_pvalue": 0.176058,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/DOGE",
+      "token_a": "ADA",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.9842,
+      "coint_score": -3.320636,
+      "coint_pvalue": 0.051962,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/DOT",
+      "token_a": "ADA",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.9086,
+      "coint_score": -1.417982,
+      "coint_pvalue": 0.791283,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/ETH",
+      "token_a": "ADA",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9626,
+      "coint_score": -2.836635,
+      "coint_pvalue": 0.154306,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/LINK",
+      "token_a": "ADA",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9733,
+      "coint_score": -2.171068,
+      "coint_pvalue": 0.43933,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/NEAR",
+      "token_a": "ADA",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7463,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/OP",
+      "token_a": "ADA",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.8988,
+      "coint_score": -2.479733,
+      "coint_pvalue": 0.28808,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/SHIB",
+      "token_a": "ADA",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9521,
+      "coint_score": -2.131012,
+      "coint_pvalue": 0.460171,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/SOL",
+      "token_a": "ADA",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9681,
+      "coint_score": -2.697178,
+      "coint_pvalue": 0.200595,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/SUI",
+      "token_a": "ADA",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9712,
+      "coint_score": -2.735118,
+      "coint_pvalue": 0.187203,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/UNI",
+      "token_a": "ADA",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9047,
+      "coint_score": -1.901685,
+      "coint_pvalue": 0.579152,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/ATOM",
+      "token_a": "ARB",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.6838,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/AVAX",
+      "token_a": "ARB",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.9429,
+      "coint_score": -1.638917,
+      "coint_pvalue": 0.704188,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/BTC",
+      "token_a": "ARB",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.9638,
+      "coint_score": -2.776712,
+      "coint_pvalue": 0.173207,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/DOGE",
+      "token_a": "ARB",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.9606,
+      "coint_score": -4.124722,
+      "coint_pvalue": 0.00473,
+      "halflife_hours": 247.87,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "ARB/DOT",
+      "token_a": "ARB",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.8558,
+      "coint_score": -1.080669,
+      "coint_pvalue": 0.886449,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/ETH",
+      "token_a": "ARB",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9651,
+      "coint_score": -1.935361,
+      "coint_pvalue": 0.561971,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/LINK",
+      "token_a": "ARB",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9539,
+      "coint_score": -1.646514,
+      "coint_pvalue": 0.700864,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/NEAR",
+      "token_a": "ARB",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7096,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/OP",
+      "token_a": "ARB",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9716,
+      "coint_score": -3.234091,
+      "coint_pvalue": 0.064409,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SHIB",
+      "token_a": "ARB",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9469,
+      "coint_score": -2.564629,
+      "coint_pvalue": 0.251333,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SOL",
+      "token_a": "ARB",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9698,
+      "coint_score": -2.150614,
+      "coint_pvalue": 0.449957,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SUI",
+      "token_a": "ARB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9813,
+      "coint_score": -2.083878,
+      "coint_pvalue": 0.484797,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/UNI",
+      "token_a": "ARB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8635,
+      "coint_score": -1.748555,
+      "coint_pvalue": 0.654357,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ATOM/AVAX",
+      "token_a": "ATOM",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.6237,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/BTC",
+      "token_a": "ATOM",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.6127,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/DOGE",
+      "token_a": "ATOM",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.7668,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/DOT",
+      "token_a": "ATOM",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.4673,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/ETH",
+      "token_a": "ATOM",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.6277,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/LINK",
+      "token_a": "ATOM",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6496,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/NEAR",
+      "token_a": "ATOM",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.2911,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/OP",
+      "token_a": "ATOM",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.6952,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SHIB",
+      "token_a": "ATOM",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8284,
+      "coint_score": -1.925201,
+      "coint_pvalue": 0.567173,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ATOM/SOL",
+      "token_a": "ATOM",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6319,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SUI",
+      "token_a": "ATOM",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6836,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/UNI",
+      "token_a": "ATOM",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.4863,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/DOGE",
+      "token_a": "AVAX",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.9527,
+      "coint_score": -2.220377,
+      "coint_pvalue": 0.413882,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/DOT",
+      "token_a": "AVAX",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.9447,
+      "coint_score": -1.958021,
+      "coint_pvalue": 0.550318,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/ETH",
+      "token_a": "AVAX",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9837,
+      "coint_score": -4.071392,
+      "coint_pvalue": 0.005666,
+      "halflife_hours": 187.94,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "AVAX/LINK",
+      "token_a": "AVAX",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9925,
+      "coint_score": -2.976923,
+      "coint_pvalue": 0.115793,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/NEAR",
+      "token_a": "AVAX",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.875,
+      "coint_score": -1.406862,
+      "coint_pvalue": 0.795151,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/OP",
+      "token_a": "AVAX",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.8572,
+      "coint_score": -2.159175,
+      "coint_pvalue": 0.445505,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/SHIB",
+      "token_a": "AVAX",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.894,
+      "coint_score": -1.773938,
+      "coint_pvalue": 0.642293,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/SOL",
+      "token_a": "AVAX",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9817,
+      "coint_score": -3.694013,
+      "coint_pvalue": 0.018653,
+      "halflife_hours": 190.64,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "AVAX/SUI",
+      "token_a": "AVAX",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9828,
+      "coint_score": -3.132946,
+      "coint_pvalue": 0.081875,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/UNI",
+      "token_a": "AVAX",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9616,
+      "coint_score": -2.345376,
+      "coint_pvalue": 0.351142,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/DOGE",
+      "token_a": "BTC",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.9527,
+      "coint_score": -2.952704,
+      "coint_pvalue": 0.12188,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/DOT",
+      "token_a": "BTC",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.9089,
+      "coint_score": -1.74028,
+      "coint_pvalue": 0.658251,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/ETH",
+      "token_a": "BTC",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9928,
+      "coint_score": -3.415342,
+      "coint_pvalue": 0.040675,
+      "halflife_hours": 166.02,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "BTC/LINK",
+      "token_a": "BTC",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9826,
+      "coint_score": -3.295203,
+      "coint_pvalue": 0.055396,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/NEAR",
+      "token_a": "BTC",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8268,
+      "coint_score": -0.781603,
+      "coint_pvalue": 0.937079,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/OP",
+      "token_a": "BTC",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9056,
+      "coint_score": -1.583039,
+      "coint_pvalue": 0.727995,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/SHIB",
+      "token_a": "BTC",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9089,
+      "coint_score": -1.53466,
+      "coint_pvalue": 0.747663,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/SOL",
+      "token_a": "BTC",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9944,
+      "coint_score": -4.302351,
+      "coint_pvalue": 0.002539,
+      "halflife_hours": 130.92,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "BTC/SUI",
+      "token_a": "BTC",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9843,
+      "coint_score": -4.319418,
+      "coint_pvalue": 0.002388,
+      "halflife_hours": 111.32,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "BTC/UNI",
+      "token_a": "BTC",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9328,
+      "coint_score": -2.285586,
+      "coint_pvalue": 0.380767,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/DOT",
+      "token_a": "DOGE",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.8614,
+      "coint_score": -1.798166,
+      "coint_pvalue": 0.630612,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/ETH",
+      "token_a": "DOGE",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9552,
+      "coint_score": -3.41556,
+      "coint_pvalue": 0.040651,
+      "halflife_hours": 238.22,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/LINK",
+      "token_a": "DOGE",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9583,
+      "coint_score": -3.305422,
+      "coint_pvalue": 0.053995,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/NEAR",
+      "token_a": "DOGE",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7149,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/OP",
+      "token_a": "DOGE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9219,
+      "coint_score": -3.529028,
+      "coint_pvalue": 0.029907,
+      "halflife_hours": 893.25,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/SHIB",
+      "token_a": "DOGE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9762,
+      "coint_score": -3.512993,
+      "coint_pvalue": 0.031261,
+      "halflife_hours": 76.59,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/SOL",
+      "token_a": "DOGE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9625,
+      "coint_score": -3.513777,
+      "coint_pvalue": 0.031194,
+      "halflife_hours": 201.51,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/SUI",
+      "token_a": "DOGE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9725,
+      "coint_score": -4.363567,
+      "coint_pvalue": 0.002034,
+      "halflife_hours": 160.62,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/UNI",
+      "token_a": "DOGE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8728,
+      "coint_score": -2.021382,
+      "coint_pvalue": 0.517447,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/ETH",
+      "token_a": "DOT",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9222,
+      "coint_score": -2.191193,
+      "coint_pvalue": 0.42891,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/LINK",
+      "token_a": "DOT",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9489,
+      "coint_score": -1.857705,
+      "coint_pvalue": 0.601294,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/NEAR",
+      "token_a": "DOT",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.9105,
+      "coint_score": -2.182851,
+      "coint_pvalue": 0.433223,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/OP",
+      "token_a": "DOT",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.731,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SHIB",
+      "token_a": "DOT",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.7636,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SOL",
+      "token_a": "DOT",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9257,
+      "coint_score": -1.993075,
+      "coint_pvalue": 0.532176,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/SUI",
+      "token_a": "DOT",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9059,
+      "coint_score": -1.654993,
+      "coint_pvalue": 0.69713,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/LINK",
+      "token_a": "ETH",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9902,
+      "coint_score": -2.995052,
+      "coint_pvalue": 0.111386,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/NEAR",
+      "token_a": "ETH",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8282,
+      "coint_score": -1.023201,
+      "coint_pvalue": 0.898358,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/OP",
+      "token_a": "ETH",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9003,
+      "coint_score": -1.175595,
+      "coint_pvalue": 0.864176,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/SHIB",
+      "token_a": "ETH",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9091,
+      "coint_score": -1.3231,
+      "coint_pvalue": 0.822657,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/SOL",
+      "token_a": "ETH",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9936,
+      "coint_score": -3.11676,
+      "coint_pvalue": 0.084986,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/UNI",
+      "token_a": "ETH",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9367,
+      "coint_score": -2.208035,
+      "coint_pvalue": 0.420224,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/NEAR",
+      "token_a": "LINK",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8531,
+      "coint_score": -1.053296,
+      "coint_pvalue": 0.892264,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/OP",
+      "token_a": "LINK",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.871,
+      "coint_score": -1.873593,
+      "coint_pvalue": 0.593338,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/SHIB",
+      "token_a": "LINK",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9026,
+      "coint_score": -1.628571,
+      "coint_pvalue": 0.708681,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/SOL",
+      "token_a": "LINK",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.989,
+      "coint_score": -3.164347,
+      "coint_pvalue": 0.076095,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/SUI",
+      "token_a": "LINK",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9877,
+      "coint_score": -2.756643,
+      "coint_pvalue": 0.17987,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/UNI",
+      "token_a": "LINK",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9608,
+      "coint_score": -2.602007,
+      "coint_pvalue": 0.236022,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "NEAR/OP",
+      "token_a": "NEAR",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.5578,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SHIB",
+      "token_a": "NEAR",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.5865,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SOL",
+      "token_a": "NEAR",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.8204,
+      "coint_score": -0.882806,
+      "coint_pvalue": 0.922917,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "NEAR/SUI",
+      "token_a": "NEAR",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.7963,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/UNI",
+      "token_a": "NEAR",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9307,
+      "coint_score": -0.908158,
+      "coint_pvalue": 0.918928,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SHIB",
+      "token_a": "OP",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9455,
+      "coint_score": -2.467546,
+      "coint_pvalue": 0.293566,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SOL",
+      "token_a": "OP",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9071,
+      "coint_score": -0.898983,
+      "coint_pvalue": 0.920393,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SUI",
+      "token_a": "OP",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9227,
+      "coint_score": -1.425515,
+      "coint_pvalue": 0.788634,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/UNI",
+      "token_a": "OP",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7423,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/SOL",
+      "token_a": "SHIB",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9176,
+      "coint_score": -1.712046,
+      "coint_pvalue": 0.671379,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SHIB/SUI",
+      "token_a": "SHIB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9398,
+      "coint_score": -1.930354,
+      "coint_pvalue": 0.564536,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SHIB/UNI",
+      "token_a": "SHIB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7785,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/UNI",
+      "token_a": "SOL",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9396,
+      "coint_score": -1.950236,
+      "coint_pvalue": 0.554329,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SUI/UNI",
+      "token_a": "SUI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9225,
+      "coint_score": -2.384989,
+      "coint_pvalue": 0.331997,
+      "reject_reason": "not_cointegrated"
+    }
+  ],
+  "total_pairs_tested": 120,
+  "tradeable_pair_count": 6
+}

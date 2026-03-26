@@ -56,6 +56,7 @@ runtime_loop: asyncio.AbstractEventLoop | None = None
 runtime_thread: threading.Thread | None = None
 pipeline_future = None
 multiagent_future = None
+OPUS_RUNTIME_ENABLED = os.getenv("OPUS_RUNTIME_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
 
 
 class MultiagentConsultRequest(BaseModel):
@@ -166,7 +167,7 @@ async def lifespan(app: FastAPI):
     global pipeline, multiagent_runtime, runtime_loop, runtime_thread, pipeline_future, multiagent_future
     config = PipelineConfig()
     pipeline = Pipeline(config)
-    multiagent_runtime = MultiagentRuntime(pipeline_config=config)
+    multiagent_runtime = MultiagentRuntime(pipeline_config=config) if OPUS_RUNTIME_ENABLED else None
 
     runtime_loop = asyncio.new_event_loop()
     runtime_thread = threading.Thread(
@@ -178,11 +179,15 @@ async def lifespan(app: FastAPI):
     runtime_thread.start()
 
     pipeline_future = asyncio.run_coroutine_threadsafe(pipeline.start(), runtime_loop)
-    multiagent_future = asyncio.run_coroutine_threadsafe(multiagent_runtime.start(), runtime_loop)
     pipeline_future.add_done_callback(lambda future: _log_runtime_future("Pipeline", future))
-    multiagent_future.add_done_callback(lambda future: _log_runtime_future("Multi-agent runtime", future))
     logger.info("Pipeline background task started on dedicated runtime loop")
-    logger.info("Multi-agent runtime background task started on dedicated runtime loop")
+    if multiagent_runtime is not None:
+        multiagent_future = asyncio.run_coroutine_threadsafe(multiagent_runtime.start(), runtime_loop)
+        multiagent_future.add_done_callback(lambda future: _log_runtime_future("Multi-agent runtime", future))
+        logger.info("Multi-agent runtime background task started on dedicated runtime loop")
+    else:
+        multiagent_future = None
+        logger.info("Multi-agent runtime disabled by OPUS_RUNTIME_ENABLED=0")
 
     yield
 
@@ -388,14 +393,14 @@ async def multiagent_status():
             {
                 "bridge": {
                     "mode": "isolated_runtime",
-                    "state": "booting",
-                    "next_step": "wait_for_multiagent_startup",
+                    "state": "disabled",
+                    "next_step": "set_OPUS_RUNTIME_ENABLED=1_to_resume",
                 },
                 "summary": {
                     "scan_count": 0,
                     "active_markets": 0,
                     "open_positions": 0,
-                    "top_blocker": "Multi-agent runtime is still starting",
+                    "top_blocker": "Multi-agent runtime is disabled",
                 },
                 "defaults": dataclass_to_dict(config),
                 "portfolio": {},
@@ -419,7 +424,7 @@ async def multiagent_logs_export():
         return JSONResponse(
             {
                 "ok": False,
-                "error": "multiagent runtime not initialized",
+                "error": "multiagent runtime disabled",
             },
             status_code=503,
         )
@@ -483,7 +488,7 @@ async def multiagent_consult(payload: MultiagentConsultRequest):
         return JSONResponse(
             {
                 "ok": False,
-                "answer": "The isolated Opus runtime is not running yet.",
+                "answer": "The isolated Opus runtime is disabled.",
                 "model": None,
             },
             status_code=503,

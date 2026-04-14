@@ -13,6 +13,7 @@ update any model weights.
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import logging
 from collections import defaultdict, deque
@@ -62,17 +63,27 @@ class MultiVenueFeedSnapshot:
 class SessionArchiveWriter:
     def __init__(self, *, capture_root: Path, session_label: str):
         self.capture_root = capture_root.resolve()
-        self.capture_root.mkdir(parents=True, exist_ok=True)
         self.started_at = datetime.now(UTC)
         self.session_root = self.capture_root / "sessions" / f"{self.started_at.strftime('%Y%m%d_%H%M%S')}_{session_label}"
-        self.session_root.mkdir(parents=True, exist_ok=False)
         self._handles: dict[Path, TextIO] = {}
         self._counts: defaultdict[str, int] = defaultdict(int)
         self._last_write_at: str | None = None
+        self.enabled = True
+        self.disabled_reason: str | None = None
+        self._disable_warned = False
+        try:
+            self.capture_root.mkdir(parents=True, exist_ok=True)
+            self.session_root.mkdir(parents=True, exist_ok=False)
+        except OSError as exc:
+            if exc.errno != errno.ENOSPC:
+                raise
+            self._disable_archiving("no_space_left_on_device")
 
     @property
     def stats(self) -> dict[str, Any]:
         return {
+            "enabled": bool(self.enabled),
+            "disabled_reason": self.disabled_reason,
             "session_root": str(self.session_root),
             "archive_counts": dict(self._counts),
             "archive_entries": int(sum(self._counts.values())),
@@ -86,32 +97,67 @@ class SessionArchiveWriter:
         self._write_record(relative_path=self._relative_path(venue="coinbase", symbol=product_id, bucket=bucket, captured_at=record["captured_at"]), record=record)
 
     def close(self) -> None:
+        if not self.enabled:
+            for handle in self._handles.values():
+                handle.close()
+            self._handles.clear()
+            return
         ended_at = datetime.now(UTC).isoformat()
         summary = {
             "started_at": self.started_at.isoformat(),
             "ended_at": ended_at,
             "session_root": str(self.session_root),
+            "enabled": bool(self.enabled),
+            "disabled_reason": self.disabled_reason,
             "archive_counts": dict(self._counts),
             "archive_entries": int(sum(self._counts.values())),
             "last_archive_write_at": self._last_write_at,
         }
-        (self.session_root / "session_manifest.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        try:
+            (self.session_root / "session_manifest.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        except OSError as exc:
+            if exc.errno == errno.ENOSPC:
+                self._disable_archiving("no_space_left_on_device")
+            else:
+                raise
         for handle in self._handles.values():
             handle.close()
         self._handles.clear()
 
     def _write_record(self, *, relative_path: Path, record: dict[str, Any]) -> None:
+        if not self.enabled:
+            return
         path = self.session_root / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        handle = self._handles.get(path)
-        if handle is None:
-            handle = path.open("a", encoding="utf-8")
-            self._handles[path] = handle
-        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
-        handle.flush()
-        key = str(relative_path)
-        self._counts[key] += 1
-        self._last_write_at = record.get("captured_at")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handle = self._handles.get(path)
+            if handle is None:
+                handle = path.open("a", encoding="utf-8")
+                self._handles[path] = handle
+            handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+            handle.flush()
+            key = str(relative_path)
+            self._counts[key] += 1
+            self._last_write_at = record.get("captured_at")
+        except OSError as exc:
+            if exc.errno == errno.ENOSPC:
+                self._disable_archiving("no_space_left_on_device")
+                return
+            raise
+
+    def _disable_archiving(self, reason: str) -> None:
+        self.enabled = False
+        self.disabled_reason = reason
+        for handle in self._handles.values():
+            handle.close()
+        self._handles.clear()
+        if not self._disable_warned:
+            logger.warning(
+                "[BTC_SHADOW] Disabled multivenue archive capture for session %s: %s",
+                self.session_root,
+                reason,
+            )
+            self._disable_warned = True
 
     @staticmethod
     def _relative_path(*, venue: str, symbol: str, bucket: str, captured_at: str) -> Path:

@@ -389,8 +389,17 @@ class CopyTraderShadowStrategy(BaseStrategy):
         self._stats["entries"] = int(self._stats.get("entries") or 0) + 1
         self._stats["last_entry_at"] = now.isoformat()
         signal_view = {
+            "id": trade_id,
+            "time": now.isoformat(),
             "timestamp": now.isoformat(),
+            "source": self.cfg.source,
+            "action": "copy_buy",
             "market": market.slug,
+            "confidence": 0.5,
+            "edge": 0.0,
+            "size": round(size_usd, 2),
+            "whale": True,
+            "reasoning": f"Copied {wallet.name} into {outcome_label} at ${entry_price:.3f}",
             "wallet": wallet.name,
             "outcome": outcome_label,
             "price": round(entry_price, 4),
@@ -398,6 +407,23 @@ class CopyTraderShadowStrategy(BaseStrategy):
         }
         self._recent_signals.insert(0, signal_view)
         self._recent_signals = self._recent_signals[:MAX_RECENT_ITEMS]
+        self._recent_trades.insert(
+            0,
+            {
+                "id": trade_id,
+                "time": now.isoformat(),
+                "timestamp": now.isoformat(),
+                "source": self.cfg.source,
+                "market": market.slug,
+                "side": outcome_label,
+                "price": round(entry_price, 4),
+                "usd": round(size_usd, 2),
+                "pnl": None,
+                "wallet": wallet.name,
+                "event": "entry",
+            },
+        )
+        self._recent_trades = self._recent_trades[:MAX_RECENT_ITEMS]
         self.audit.log_signal(signal_view)
         self.audit.log_trade_event(
             {
@@ -493,13 +519,19 @@ class CopyTraderShadowStrategy(BaseStrategy):
         self._recent_trades.insert(
             0,
             {
+                "id": position.trade_id,
+                "time": now.isoformat(),
                 "timestamp": now.isoformat(),
+                "source": self.cfg.source,
                 "market": position.market_slug,
                 "wallet": position.wallet_name,
                 "side": position.outcome_label,
+                "price": round(exit_price, 4),
+                "usd": round(position.entry_size_usd, 2),
+                "pnl": round(realized_pnl, 2),
                 "entry": round(position.entry_price, 4),
                 "exit": round(exit_price, 4),
-                "pnl": round(realized_pnl, 2),
+                "event": "exit",
             },
         )
         self._recent_trades = self._recent_trades[:MAX_RECENT_ITEMS]

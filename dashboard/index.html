@@ -930,13 +930,13 @@ function render(d) {
   document.getElementById('signal-badge').textContent = signals.length;
   document.getElementById('signals-table').innerHTML = signals.map(s => `
     <tr>
-      <td>${stratBadge(s.source)}</td>
-      <td title="${s.market}">${truncate(s.market, 25)}</td>
-      <td>${s.action.replace('_', ' ')}</td>
-      <td>${confBar(s.confidence)}</td>
-      <td>${s.edge.toFixed(1)}¢</td>
-      <td>$${s.size.toFixed(0)}</td>
-      <td>${s.whale ? '✓' : ''}</td>
+      <td>${stratBadge(s.source || activeView.source)}</td>
+      <td title="${s.market || '—'}">${truncate(s.market || '—', 25)}</td>
+      <td>${String(s.action || s.event || 'signal').replace('_', ' ')}</td>
+      <td>${confBar(Number.isFinite(s.confidence) ? s.confidence : 0.5)}</td>
+      <td>${(Number.isFinite(s.edge) ? s.edge : 0).toFixed(1)}¢</td>
+      <td>$${(Number.isFinite(s.size) ? s.size : (Number.isFinite(s.size_usd) ? s.size_usd : 0)).toFixed(0)}</td>
+      <td>${s.whale || s.wallet ? '✓' : ''}</td>
     </tr>
   `).join('');
 
@@ -945,12 +945,12 @@ function render(d) {
   document.getElementById('trade-badge').textContent = trades.length;
   document.getElementById('trades-table').innerHTML = trades.slice().reverse().map(t => `
     <tr>
-      <td>${timeAgo(t.time)}</td>
-      <td>${stratBadge(t.source)}</td>
-      <td title="${t.market}">${truncate(t.market, 20)}</td>
-      <td>${t.side}</td>
-      <td>$${t.price.toFixed(3)}</td>
-      <td>$${t.usd.toFixed(2)}</td>
+      <td>${timeAgo(t.time || t.timestamp)}</td>
+      <td>${stratBadge(t.source || activeView.source)}</td>
+      <td title="${t.market || '—'}">${truncate(t.market || '—', 20)}</td>
+      <td>${t.side || t.outcome || t.event || '—'}</td>
+      <td>$${(Number.isFinite(t.price) ? t.price : (Number.isFinite(t.exit) ? t.exit : (Number.isFinite(t.entry) ? t.entry : 0))).toFixed(3)}</td>
+      <td>$${(Number.isFinite(t.usd) ? t.usd : (Number.isFinite(t.size_usd) ? t.size_usd : 0)).toFixed(2)}</td>
       <td class="${pnlColor(t.pnl)}">${t.pnl != null ? '$' + t.pnl.toFixed(2) : '—'}</td>
     </tr>
   `).join('');

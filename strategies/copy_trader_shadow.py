@@ -649,6 +649,54 @@ class CopyTraderShadowStrategy(BaseStrategy):
             "last_activity_refresh_at": self._last_activity_refresh_at.isoformat() if self._last_activity_refresh_at else None,
         }
 
+    def _normalize_signal_view(self, row: dict[str, Any]) -> dict[str, Any]:
+        price = float(row.get("price") or 0.0)
+        size_usd = float(row.get("size") or row.get("size_usd") or 0.0)
+        wallet = str(row.get("wallet") or row.get("wallet_name") or "")
+        outcome = str(row.get("outcome") or row.get("side") or "Outcome")
+        signal_id = str(row.get("id") or row.get("trade_id") or "")
+        when = str(row.get("time") or row.get("timestamp") or datetime.now(UTC).isoformat())
+        market = str(row.get("market") or row.get("market_slug") or "")
+        return {
+            "id": signal_id,
+            "time": when,
+            "timestamp": when,
+            "source": str(row.get("source") or self.cfg.source),
+            "action": str(row.get("action") or "copy_buy"),
+            "market": market,
+            "confidence": float(row.get("confidence") or 0.5),
+            "edge": float(row.get("edge") or 0.0),
+            "size": round(size_usd, 2),
+            "whale": bool(row.get("whale", True)),
+            "reasoning": str(row.get("reasoning") or f"Copied {wallet or 'wallet'} into {outcome} at ${price:.3f}"),
+            "wallet": wallet,
+            "outcome": outcome,
+            "price": round(price, 4),
+            "size_usd": round(size_usd, 2),
+        }
+
+    def _normalize_trade_view(self, row: dict[str, Any]) -> dict[str, Any]:
+        entry = float(row.get("entry") or row.get("entry_price") or 0.0)
+        exit_price = float(row.get("exit") or row.get("exit_price") or 0.0)
+        price = float(row.get("price") or exit_price or entry)
+        size_usd = float(row.get("usd") or row.get("size_usd") or row.get("entry_size_usd") or 0.0)
+        when = str(row.get("time") or row.get("timestamp") or row.get("exit_timestamp") or row.get("entry_timestamp") or datetime.now(UTC).isoformat())
+        return {
+            "id": str(row.get("id") or row.get("trade_id") or ""),
+            "time": when,
+            "timestamp": when,
+            "source": str(row.get("source") or self.cfg.source),
+            "market": str(row.get("market") or row.get("market_slug") or ""),
+            "wallet": str(row.get("wallet") or row.get("wallet_name") or ""),
+            "side": str(row.get("side") or row.get("outcome") or "Outcome"),
+            "price": round(price, 4),
+            "usd": round(size_usd, 2),
+            "pnl": row.get("pnl") if row.get("pnl") is not None else row.get("realized_pnl_usd"),
+            "entry": round(entry, 4) if entry else 0.0,
+            "exit": round(exit_price, 4) if exit_price else 0.0,
+            "event": str(row.get("event") or ("exit" if row.get("pnl") is not None or row.get("realized_pnl_usd") is not None else "entry")),
+        }
+
     def _load_runtime_state(self) -> None:
         path = self.audit.paths["runtime_state"]
         if not path.exists():
@@ -677,8 +725,8 @@ class CopyTraderShadowStrategy(BaseStrategy):
         }
         self.seen_trade_keys = list(payload.get("seen_trade_keys") or [])
         self._seen_trade_key_set = set(self.seen_trade_keys)
-        self._recent_signals = list(payload.get("recent_signals") or [])
-        self._recent_trades = list(payload.get("recent_trades") or [])
+        self._recent_signals = [self._normalize_signal_view(row) for row in (payload.get("recent_signals") or [])]
+        self._recent_trades = [self._normalize_trade_view(row) for row in (payload.get("recent_trades") or [])]
         if payload.get("last_wallet_refresh_at"):
             self._last_wallet_refresh_at = datetime.fromisoformat(payload["last_wallet_refresh_at"]).astimezone(UTC)
         if payload.get("last_activity_refresh_at"):

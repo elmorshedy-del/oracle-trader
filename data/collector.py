@@ -115,6 +115,18 @@ class PolymarketCollector:
             logger.error(f"Failed to fetch market {slug}: {e}")
         return None
 
+    async def get_gamma_market_payload_by_slug(self, slug: str) -> Optional[dict]:
+        """Get the raw Gamma payload for a specific market slug."""
+        try:
+            resp = await self.client.get(f"{self.gamma}/markets", params={"slug": slug})
+            resp.raise_for_status()
+            data = resp.json()
+            if data and len(data) > 0 and isinstance(data[0], dict):
+                return data[0]
+        except Exception as e:
+            logger.error(f"Failed to fetch raw market payload {slug}: {e}")
+        return None
+
     # ------------------------------------------------------------------
     # CLOB API — Order Book & Prices
     # ------------------------------------------------------------------

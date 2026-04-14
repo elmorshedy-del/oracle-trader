@@ -43,6 +43,7 @@ STALE_DIRECTIONAL_ROTATION_HOURS = {
     SignalSource.CRYPTO_ARB: 18.0,
     SignalSource.CRYPTO_STRUCTURE: 8.0,
     SignalSource.BITCOIN_MODEL: BITCOIN_MODEL_STALE_ROTATION_HOURS,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 6.0,
     SignalSource.WEATHER: 12.0,
     SignalSource.WEATHER_SNIPER: 8.0,
     SignalSource.WEATHER_LATENCY: 6.0,
@@ -113,6 +114,7 @@ STRATEGY_EXPOSURE_CAPS = {
     SignalSource.WEATHER_MODEL_V2_TRADER: 1.00,
     SignalSource.WEATHER_MODEL_V2_SIGNAL: 1.00,
     SignalSource.BITCOIN_MODEL: 1.00,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 1.00,
     SignalSource.SPORTS_MODEL: 1.00,
     SignalSource.WHALE: 0.35,
 }
@@ -127,6 +129,7 @@ SOURCE_POSITION_LIMITS = {
     SignalSource.WEATHER_MODEL_V2_TRADER: 20,
     SignalSource.WEATHER_MODEL_V2_SIGNAL: 14,
     SignalSource.BITCOIN_MODEL: 12,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 8,
     SignalSource.SPORTS_MODEL: 16,
     SignalSource.WHALE: 16,
 }
@@ -141,6 +144,7 @@ SOURCE_SCAN_LIMITS = {
     SignalSource.WEATHER_MODEL_V2_TRADER: 8,
     SignalSource.WEATHER_MODEL_V2_SIGNAL: 5,
     SignalSource.BITCOIN_MODEL: 4,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 4,
     SignalSource.SPORTS_MODEL: 6,
     SignalSource.WHALE: 6,
 }
@@ -148,6 +152,7 @@ CRYPTO_SOURCES = {
     SignalSource.CRYPTO_ARB,
     SignalSource.CRYPTO_STRUCTURE,
     SignalSource.BITCOIN_MODEL,
+    SignalSource.BITCOIN_LATENCY_SHADOW,
 }
 WEATHER_SOURCES = {
     SignalSource.WEATHER,

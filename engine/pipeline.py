@@ -22,7 +22,10 @@ from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.crypto_pairs_shadow import CryptoPairsShadowStrategy
 from strategies.bitcoin_model import BitcoinModelStrategy
+from strategies.bitcoin_latency_shadow import BitcoinLatencyShadowStrategy
 from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
+from strategies.copy_trader_shadow import CopyTraderShadowStrategy
+from strategies.kalshi_btc_arb_shadow import KalshiBtcArbShadowStrategy
 from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_edge_live import WeatherEdgeLiveStrategy
@@ -116,35 +119,60 @@ COMPARISON_VIEW_CONFIG = {
         "source": SignalSource.BITCOIN_MODEL.value,
         "signal_sources": (SignalSource.BITCOIN_MODEL.value,),
     },
+    "bitcoin_latency_shadow": {
+        "label": "BTC Latency Shadow",
+        "strategy": "bitcoin_latency_shadow",
+        "source": SignalSource.BITCOIN_LATENCY_SHADOW.value,
+        "signal_sources": (SignalSource.BITCOIN_LATENCY_SHADOW.value,),
+    },
     "bitcoin_meanrev_shadow": {
         "label": "BTC MeanRev Shadow",
         "strategy": "bitcoin_meanrev_shadow",
         "source": SignalSource.BITCOIN_MEANREV_SHADOW.value,
         "signal_sources": (),
+        "self_managed": True,
+    },
+    "copy_trader_shadow": {
+        "label": "Copy Trader Shadow",
+        "strategy": "copy_trader_shadow",
+        "source": "copy_trader_shadow",
+        "signal_sources": (),
+        "self_managed": True,
+    },
+    "kalshi_btc_arb_shadow": {
+        "label": "Poly/Kalshi BTC Arb",
+        "strategy": "kalshi_btc_arb_shadow",
+        "source": "kalshi_btc_arb_shadow",
+        "signal_sources": (),
+        "self_managed": True,
     },
     "crypto_pairs_aave_doge": {
         "label": "AAVE/DOGE Shadow",
         "strategy": "crypto_pairs_shadow",
         "source": SignalSource.CRYPTO_PAIRS_AAVE_DOGE_SHADOW.value,
         "signal_sources": (),
+        "self_managed": True,
     },
     "crypto_pairs_comp_floki": {
         "label": "COMP/FLOKI Shadow",
         "strategy": "crypto_pairs_shadow_comp_floki",
         "source": "crypto_pairs_comp_floki_shadow",
         "signal_sources": (),
+        "self_managed": True,
     },
     "crypto_pairs_comp_link": {
         "label": "COMP/LINK Shadow",
         "strategy": "crypto_pairs_shadow_comp_link",
         "source": "crypto_pairs_comp_link_shadow",
         "signal_sources": (),
+        "self_managed": True,
     },
     "crypto_pairs_bonk_grt": {
         "label": "BONK/GRT Shadow",
         "strategy": "crypto_pairs_shadow_bonk_grt",
         "source": "crypto_pairs_bonk_grt_shadow",
         "signal_sources": (),
+        "self_managed": True,
     },
     "sports": {
         "label": "Sports",
@@ -169,9 +197,14 @@ CRYPTO_PAIRS_SHADOW_VIEW_KEYS = (
     "crypto_pairs_comp_link",
     "crypto_pairs_bonk_grt",
 )
-SELF_MANAGED_COMPARISON_VIEW_KEYS = (
+SELF_MANAGED_LANE_VIEW_KEYS = (
     "weather_edge_live",
+    "copy_trader_shadow",
+    "kalshi_btc_arb_shadow",
     "bitcoin_meanrev_shadow",
+)
+SELF_MANAGED_COMPARISON_VIEW_KEYS = (
+    *SELF_MANAGED_LANE_VIEW_KEYS,
     *CRYPTO_PAIRS_SHADOW_VIEW_KEYS,
 )
 
@@ -223,6 +256,15 @@ class Pipeline:
             "bitcoin_model": BitcoinModelStrategy(
                 self.config,
                 crypto_strategy=self.strategies["crypto_arb"],
+            ),
+            "bitcoin_latency_shadow": BitcoinLatencyShadowStrategy(self.config),
+            "copy_trader_shadow": CopyTraderShadowStrategy(
+                self.config,
+                collector=self.collector,
+            ),
+            "kalshi_btc_arb_shadow": KalshiBtcArbShadowStrategy(
+                self.config,
+                collector=self.collector,
             ),
             "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
@@ -486,6 +528,57 @@ class Pipeline:
                 strategy_signals["bitcoin_model"] = []
                 self.health.record_strategy_error("bitcoin_model", str(e))
 
+            bitcoin_latency_shadow: BitcoinLatencyShadowStrategy = self.comparison_only_strategies["bitcoin_latency_shadow"]
+            try:
+                _bitcoin_latency_shadow_start = _time.time()
+                bitcoin_latency_shadow_signals = await bitcoin_latency_shadow.scan(self._markets, self._events)
+                _bitcoin_latency_shadow_dur = (_time.time() - _bitcoin_latency_shadow_start) * 1000
+                strategy_signals["bitcoin_latency_shadow"] = bitcoin_latency_shadow_signals
+                self.health.record_strategy_run(
+                    "bitcoin_latency_shadow",
+                    len(bitcoin_latency_shadow_signals),
+                    _bitcoin_latency_shadow_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy bitcoin_latency_shadow error: {e}")
+                bitcoin_latency_shadow._stats["errors"] += 1
+                strategy_signals["bitcoin_latency_shadow"] = []
+                self.health.record_strategy_error("bitcoin_latency_shadow", str(e))
+
+            copy_trader_shadow: CopyTraderShadowStrategy = self.comparison_only_strategies["copy_trader_shadow"]
+            try:
+                _copy_trader_shadow_start = _time.time()
+                copy_trader_shadow_signals = await copy_trader_shadow.scan(self._markets, self._events)
+                _copy_trader_shadow_dur = (_time.time() - _copy_trader_shadow_start) * 1000
+                strategy_signals["copy_trader_shadow"] = copy_trader_shadow_signals
+                self.health.record_strategy_run(
+                    "copy_trader_shadow",
+                    len(copy_trader_shadow_signals),
+                    _copy_trader_shadow_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy copy_trader_shadow error: {e}")
+                copy_trader_shadow._stats["errors"] += 1
+                strategy_signals["copy_trader_shadow"] = []
+                self.health.record_strategy_error("copy_trader_shadow", str(e))
+
+            kalshi_btc_arb_shadow: KalshiBtcArbShadowStrategy = self.comparison_only_strategies["kalshi_btc_arb_shadow"]
+            try:
+                _kalshi_btc_arb_shadow_start = _time.time()
+                kalshi_btc_arb_shadow_signals = await kalshi_btc_arb_shadow.scan(self._markets, self._events)
+                _kalshi_btc_arb_shadow_dur = (_time.time() - _kalshi_btc_arb_shadow_start) * 1000
+                strategy_signals["kalshi_btc_arb_shadow"] = kalshi_btc_arb_shadow_signals
+                self.health.record_strategy_run(
+                    "kalshi_btc_arb_shadow",
+                    len(kalshi_btc_arb_shadow_signals),
+                    _kalshi_btc_arb_shadow_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy kalshi_btc_arb_shadow error: {e}")
+                kalshi_btc_arb_shadow._stats["errors"] += 1
+                strategy_signals["kalshi_btc_arb_shadow"] = []
+                self.health.record_strategy_error("kalshi_btc_arb_shadow", str(e))
+
             bitcoin_meanrev_shadow: BitcoinMeanRevShadowStrategy = self.comparison_only_strategies["bitcoin_meanrev_shadow"]
             try:
                 _bitcoin_shadow_start = _time.time()
@@ -661,6 +754,10 @@ class Pipeline:
 
             weather: WeatherForecastStrategy = self.strategies["weather"]
             weather.reset_state()
+            for strategy in self.comparison_only_strategies.values():
+                reset = getattr(strategy, "reset_state", None)
+                if callable(reset):
+                    reset()
 
             self.health = HealthMonitor(log_dir=str(LOG_DIR))
             await self._refresh_data()
@@ -809,6 +906,8 @@ class Pipeline:
             return self.config.weather_edge_live.starting_bankroll_usd
         if view_key == "bitcoin_model":
             return self.config.bitcoin_model.budget_usd
+        if view_key == "bitcoin_latency_shadow":
+            return self.config.bitcoin_latency_shadow.budget_usd
         if view_key == "bitcoin_meanrev_shadow":
             return self.config.bitcoin_meanrev_shadow.budget_usd
         if view_key in CRYPTO_PAIRS_SHADOW_VIEW_KEYS:
@@ -964,13 +1063,7 @@ class Pipeline:
         for view_key, meta in COMPARISON_VIEW_CONFIG.items():
             if view_key == "all":
                 continue
-            if view_key == "weather_edge_live":
-                comparison_views[view_key] = self.comparison_only_strategies["weather_edge_live"].serialize_view()
-                continue
-            if view_key == "bitcoin_meanrev_shadow":
-                comparison_views[view_key] = self.comparison_only_strategies["bitcoin_meanrev_shadow"].serialize_view()
-                continue
-            if view_key in CRYPTO_PAIRS_SHADOW_VIEW_KEYS:
+            if view_key in SELF_MANAGED_COMPARISON_VIEW_KEYS:
                 strategy = self.comparison_only_strategies.get(meta["strategy"])
                 if strategy is None:
                     continue
@@ -1001,6 +1094,9 @@ class Pipeline:
                 "weather_model_v2": self.comparison_only_strategies["weather_model_v2"].stats,
                 "weather_edge_live": self.comparison_only_strategies["weather_edge_live"].stats,
                 "bitcoin_model": self.comparison_only_strategies["bitcoin_model"].stats,
+                "bitcoin_latency_shadow": self.comparison_only_strategies["bitcoin_latency_shadow"].stats,
+                "copy_trader_shadow": self.comparison_only_strategies["copy_trader_shadow"].stats,
+                "kalshi_btc_arb_shadow": self.comparison_only_strategies["kalshi_btc_arb_shadow"].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
             } | {
@@ -1130,6 +1226,9 @@ class Pipeline:
                 },
                 "weather_edge_live_budget": self.config.weather_edge_live.starting_bankroll_usd,
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
+                "bitcoin_latency_shadow_budget": self.config.bitcoin_latency_shadow.budget_usd,
+                "copy_trader_shadow_budget": self.config.copy_trader_shadow.budget_usd,
+                "kalshi_btc_arb_shadow_budget": self.config.kalshi_btc_arb_shadow.budget_usd,
                 "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
                 "crypto_pairs_shadow_budget": self.config.crypto_pairs_shadow.budget_usd,
             },

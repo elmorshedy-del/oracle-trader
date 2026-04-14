@@ -498,6 +498,73 @@ class CryptoPairsShadowConfig:
 
 
 @dataclass
+class CopyTraderShadowConfig:
+    """Live paper copy-trader sleeve driven by top-wallet activity."""
+
+    enabled: bool = os.getenv("COPY_TRADER_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    budget_usd: float = float(os.getenv("COPY_TRADER_SHADOW_BUDGET_USD", "1000"))
+    top_wallets: int = int(os.getenv("COPY_TRADER_SHADOW_TOP_WALLETS", "3"))
+    leaderboard_limit: int = int(os.getenv("COPY_TRADER_SHADOW_LEADERBOARD_LIMIT", "20"))
+    min_wallet_pnl_usd: float = float(os.getenv("COPY_TRADER_SHADOW_MIN_WALLET_PNL_USD", "100000"))
+    leaderboard_refresh_minutes: int = int(os.getenv("COPY_TRADER_SHADOW_LEADERBOARD_REFRESH_MINUTES", "60"))
+    activity_refresh_seconds: int = int(os.getenv("COPY_TRADER_SHADOW_ACTIVITY_REFRESH_SECONDS", "45"))
+    activity_trades_per_wallet: int = int(os.getenv("COPY_TRADER_SHADOW_ACTIVITY_TRADES_PER_WALLET", "12"))
+    copy_size_multiplier: float = float(os.getenv("COPY_TRADER_SHADOW_COPY_SIZE_MULTIPLIER", "0.20"))
+    min_trade_usd: float = float(os.getenv("COPY_TRADER_SHADOW_MIN_TRADE_USD", "10"))
+    max_trade_usd: float = float(os.getenv("COPY_TRADER_SHADOW_MAX_TRADE_USD", "80"))
+    max_entry_price: float = float(os.getenv("COPY_TRADER_SHADOW_MAX_ENTRY_PRICE", "0.90"))
+    min_wallet_sell_usd: float = float(os.getenv("COPY_TRADER_SHADOW_MIN_WALLET_SELL_USD", "5"))
+    tracked_wallets: list[str] = field(
+        default_factory=lambda: [
+            wallet.strip()
+            for wallet in os.getenv("COPY_TRADER_SHADOW_WALLETS", "").split(",")
+            if wallet.strip()
+        ]
+    )
+    label: str = os.getenv("COPY_TRADER_SHADOW_LABEL", "Copy Trader Shadow")
+    view_key: str = os.getenv("COPY_TRADER_SHADOW_VIEW_KEY", "copy_trader_shadow")
+    source: str = os.getenv("COPY_TRADER_SHADOW_SOURCE", "copy_trader_shadow")
+    session_label: str = os.getenv("COPY_TRADER_SHADOW_SESSION_LABEL", "copy_trader_shadow")
+    audit_root: str = os.getenv("COPY_TRADER_SHADOW_AUDIT_ROOT", "")
+
+
+@dataclass
+class KalshiBtcArbShadowConfig:
+    """Cross-venue BTC hourly overlap arbitrage paper sleeve."""
+
+    enabled: bool = os.getenv("KALSHI_BTC_ARB_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    budget_usd: float = float(os.getenv("KALSHI_BTC_ARB_SHADOW_BUDGET_USD", "1200"))
+    max_trade_usd: float = float(os.getenv("KALSHI_BTC_ARB_SHADOW_MAX_TRADE_USD", "180"))
+    min_trade_usd: float = float(os.getenv("KALSHI_BTC_ARB_SHADOW_MIN_TRADE_USD", "20"))
+    min_net_margin_dollars: float = float(os.getenv("KALSHI_BTC_ARB_SHADOW_MIN_NET_MARGIN_DOLLARS", "0.02"))
+    trade_fee_buffer_dollars: float = float(os.getenv("KALSHI_BTC_ARB_SHADOW_FEE_BUFFER_DOLLARS", "0.02"))
+    kalshi_neighbor_count: int = int(os.getenv("KALSHI_BTC_ARB_SHADOW_NEIGHBOR_COUNT", "4"))
+    max_open_positions: int = int(os.getenv("KALSHI_BTC_ARB_SHADOW_MAX_OPEN_POSITIONS", "3"))
+    resolution_grace_minutes: int = int(os.getenv("KALSHI_BTC_ARB_SHADOW_RESOLUTION_GRACE_MINUTES", "15"))
+    label: str = os.getenv("KALSHI_BTC_ARB_SHADOW_LABEL", "Poly/Kalshi BTC Arb")
+    view_key: str = os.getenv("KALSHI_BTC_ARB_SHADOW_VIEW_KEY", "kalshi_btc_arb_shadow")
+    source: str = os.getenv("KALSHI_BTC_ARB_SHADOW_SOURCE", "kalshi_btc_arb_shadow")
+    session_label: str = os.getenv("KALSHI_BTC_ARB_SHADOW_SESSION_LABEL", "kalshi_btc_arb_shadow")
+    audit_root: str = os.getenv("KALSHI_BTC_ARB_SHADOW_AUDIT_ROOT", "")
+
+
+@dataclass
+class BitcoinLatencyShadowConfig:
+    """Dedicated BTC-only latency/dislocation shadow sleeve."""
+
+    enabled: bool = os.getenv("BITCOIN_LATENCY_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    budget_usd: float = float(os.getenv("BITCOIN_LATENCY_SHADOW_BUDGET_USD", "600"))
+    min_move_pct: float = float(os.getenv("BITCOIN_LATENCY_SHADOW_MIN_MOVE_PCT", "0.003"))
+    lookback_seconds: int = int(os.getenv("BITCOIN_LATENCY_SHADOW_LOOKBACK_SECONDS", "120"))
+    max_entry_price: float = float(os.getenv("BITCOIN_LATENCY_SHADOW_MAX_ENTRY_PRICE", "0.75"))
+    min_trade_usd: float = float(os.getenv("BITCOIN_LATENCY_SHADOW_MIN_TRADE_USD", "12"))
+    max_trade_usd: float = float(os.getenv("BITCOIN_LATENCY_SHADOW_MAX_TRADE_USD", "90"))
+    label: str = os.getenv("BITCOIN_LATENCY_SHADOW_LABEL", "BTC Latency Shadow")
+    view_key: str = os.getenv("BITCOIN_LATENCY_SHADOW_VIEW_KEY", "bitcoin_latency_shadow")
+    source: str = os.getenv("BITCOIN_LATENCY_SHADOW_SOURCE", "bitcoin_latency_shadow")
+
+
+@dataclass
 class SportsModelConfig:
     """Standalone NBA sportsbook-anchor sleeve (comparison-book only)."""
     enabled: bool = os.getenv("SPORTS_MODEL_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
@@ -566,6 +633,9 @@ class PipelineConfig:
     bitcoin_model: BitcoinModelConfig = field(default_factory=BitcoinModelConfig)
     bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
     crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)
+    copy_trader_shadow: CopyTraderShadowConfig = field(default_factory=CopyTraderShadowConfig)
+    kalshi_btc_arb_shadow: KalshiBtcArbShadowConfig = field(default_factory=KalshiBtcArbShadowConfig)
+    bitcoin_latency_shadow: BitcoinLatencyShadowConfig = field(default_factory=BitcoinLatencyShadowConfig)
     sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 

@@ -51,6 +51,9 @@ COPY_TRADER_DAILY_SUMMARY_FIELDS = [
     "cash_balance_usd",
     "portfolio_value_usd",
 ]
+COPY_TRADER_CANDIDATE_BUY_KEY = "candidate_buys"
+COPY_TRADER_WALLET_SELL_EVENT_KEY = "wallet_sell_events"
+COPY_TRADER_CANDIDATE_LABEL_KEY = "candidate_labels"
 
 
 @dataclass(slots=True)
@@ -58,6 +61,7 @@ class CopyTradeWallet:
     address: str
     name: str
     pnl_usd: float
+    rank: int = 0
 
 
 @dataclass(slots=True)
@@ -142,6 +146,11 @@ class CopyTraderShadowStrategy(BaseStrategy):
             description="Top-wallet copy trading paper sleeve logs.",
             trade_ledger_fields=COPY_TRADER_TRADE_LEDGER_FIELDS,
             daily_summary_fields=COPY_TRADER_DAILY_SUMMARY_FIELDS,
+            extra_jsonl_keys=(
+                COPY_TRADER_CANDIDATE_BUY_KEY,
+                COPY_TRADER_WALLET_SELL_EVENT_KEY,
+                COPY_TRADER_CANDIDATE_LABEL_KEY,
+            ),
         )
         self.audit.write_metadata(
             {
@@ -279,8 +288,8 @@ class CopyTraderShadowStrategy(BaseStrategy):
     async def _refresh_wallets_if_needed(self, now: datetime) -> None:
         if self.cfg.tracked_wallets:
             self.target_wallets = [
-                CopyTradeWallet(address=address, name=address[:10], pnl_usd=0.0)
-                for address in self.cfg.tracked_wallets
+                CopyTradeWallet(address=address, name=address[:10], pnl_usd=0.0, rank=index + 1)
+                for index, address in enumerate(self.cfg.tracked_wallets)
             ]
             self._stats["target_wallets"] = len(self.target_wallets)
             return
@@ -299,7 +308,7 @@ class CopyTraderShadowStrategy(BaseStrategy):
             if pnl_usd < self.cfg.min_wallet_pnl_usd:
                 continue
             name = str(row.get("userName") or row.get("name") or address[:10])
-            wallets.append(CopyTradeWallet(address=address, name=name, pnl_usd=pnl_usd))
+            wallets.append(CopyTradeWallet(address=address, name=name, pnl_usd=pnl_usd, rank=len(wallets) + 1))
             if len(wallets) >= self.cfg.top_wallets:
                 break
         self.target_wallets = wallets
@@ -348,60 +357,118 @@ class CopyTraderShadowStrategy(BaseStrategy):
             if market is None:
                 continue
             if wallet_side == "BUY":
-                self._handle_buy(wallet, row, market, now)
+                candidate = self._evaluate_buy_candidate(wallet, row, market, now)
+                self.audit.log_extra(COPY_TRADER_CANDIDATE_BUY_KEY, candidate)
+                if candidate["would_current_rules_take"]:
+                    self._open_position_from_candidate(candidate, now)
             elif wallet_side == "SELL":
+                self.audit.log_extra(
+                    COPY_TRADER_WALLET_SELL_EVENT_KEY,
+                    self._build_wallet_sell_event(wallet, row, market, now),
+                )
                 self._handle_sell(wallet, row, market, now)
 
         self._last_activity_refresh_at = now
         self._stats["last_activity_refresh_at"] = now.isoformat()
 
-    def _handle_buy(self, wallet: CopyTradeWallet, row: dict[str, Any], market: Market, now: datetime) -> None:
+    def _evaluate_buy_candidate(self, wallet: CopyTradeWallet, row: dict[str, Any], market: Market, now: datetime) -> dict[str, Any]:
         wallet_usd = float(row.get("usdcSize") or row.get("size") or 0.0)
-        if wallet_usd < self.cfg.min_trade_usd:
-            return
         token_id = str(row.get("asset") or "")
         outcome_label = str(row.get("outcome") or self._outcome_label(market, token_id))
         entry_price = float(row.get("price") or self._token_price(market, token_id) or 0.0)
-        if not token_id or entry_price <= 0 or entry_price > self.cfg.max_entry_price:
-            return
-
         size_usd = min(wallet_usd * self.cfg.copy_size_multiplier, self.cfg.max_trade_usd, self.cash_balance)
-        if size_usd < self.cfg.min_trade_usd:
-            return
-        shares = size_usd / entry_price
+        activity_at = self._parse_timestamp(row.get("timestamp"), now)
         trade_id = f"copy:{wallet.address[-6:]}:{row.get('transactionHash') or row.get('timestamp')}"
+        token_price = self._token_price(market, token_id)
+        token_bid, token_ask = self._token_book(market, token_id)
+        blocked_reason = "eligible"
+        if wallet_usd < self.cfg.min_trade_usd:
+            blocked_reason = "below_min_wallet_trade_usd"
+        elif not token_id:
+            blocked_reason = "missing_token_id"
+        elif entry_price <= 0:
+            blocked_reason = "invalid_entry_price"
+        elif entry_price > self.cfg.max_entry_price:
+            blocked_reason = "above_max_entry_price"
+        elif size_usd < self.cfg.min_trade_usd:
+            blocked_reason = "sized_below_min_trade_usd"
+        time_to_close_hours = self._time_to_close_hours(market, now)
+        return {
+            "candidate_id": self._build_candidate_id(wallet.address, row),
+            "observed_at": now.isoformat(),
+            "activity_timestamp": activity_at.isoformat(),
+            "wallet_address": wallet.address,
+            "wallet_name": wallet.name,
+            "wallet_rank": wallet.rank,
+            "wallet_pnl_usd": round(wallet.pnl_usd, 4),
+            "tx_hash": str(row.get("transactionHash") or ""),
+            "condition_id": str(row.get("conditionId") or ""),
+            "market_slug": market.slug,
+            "market_question": market.question,
+            "market_primary_tag": market.tags[0] if market.tags else "",
+            "market_tag_count": len(market.tags),
+            "market_volume_24h": round(float(market.volume_24h or 0.0), 4),
+            "market_volume_total": round(float(market.volume_total or 0.0), 4),
+            "market_liquidity": round(float(market.liquidity or 0.0), 4),
+            "market_spread": round(float(market.spread or 0.0), 6),
+            "market_midpoint": round(float(market.midpoint or 0.0), 6),
+            "market_reward_pool": round(float(market.reward_pool or 0.0), 4),
+            "market_active": bool(market.active),
+            "market_closed": bool(market.closed),
+            "time_to_close_hours": round(time_to_close_hours, 4) if time_to_close_hours is not None else None,
+            "token_id": token_id,
+            "outcome": outcome_label,
+            "wallet_side": "BUY",
+            "wallet_trade_usd": round(wallet_usd, 4),
+            "wallet_trade_price": round(entry_price, 6),
+            "token_price": round(float(token_price or 0.0), 6),
+            "token_book_bid": round(float(token_bid or 0.0), 6) if token_bid is not None else None,
+            "token_book_ask": round(float(token_ask or 0.0), 6) if token_ask is not None else None,
+            "copy_size_multiplier": self.cfg.copy_size_multiplier,
+            "available_cash_usd": round(self.cash_balance, 4),
+            "copy_size_usd": round(size_usd, 4),
+            "would_current_rules_take": blocked_reason == "eligible",
+            "blocked_reason": blocked_reason,
+            "copied_trade_id": trade_id if blocked_reason == "eligible" else None,
+        }
+
+    def _open_position_from_candidate(self, candidate: dict[str, Any], now: datetime) -> None:
+        trade_id = str(candidate["copied_trade_id"])
+        entry_price = float(candidate["wallet_trade_price"])
+        size_usd = float(candidate["copy_size_usd"])
+        shares = size_usd / entry_price
         position = CopyTradePosition(
             trade_id=trade_id,
-            wallet_address=wallet.address,
-            wallet_name=wallet.name,
-            tx_hash=str(row.get("transactionHash") or ""),
-            condition_id=str(row.get("conditionId") or ""),
-            market_slug=market.slug,
-            token_id=token_id,
-            outcome_label=outcome_label,
+            wallet_address=str(candidate["wallet_address"]),
+            wallet_name=str(candidate["wallet_name"]),
+            tx_hash=str(candidate["tx_hash"]),
+            condition_id=str(candidate["condition_id"]),
+            market_slug=str(candidate["market_slug"]),
+            token_id=str(candidate["token_id"]),
+            outcome_label=str(candidate["outcome"]),
             shares=shares,
             entry_price=entry_price,
             entry_size_usd=size_usd,
-            entry_timestamp=self._parse_timestamp(row.get("timestamp"), now),
+            entry_timestamp=datetime.fromisoformat(str(candidate["activity_timestamp"])).astimezone(UTC),
         )
         self.open_positions[trade_id] = position
         self.cash_balance -= size_usd
         self._stats["entries"] = int(self._stats.get("entries") or 0) + 1
         self._stats["last_entry_at"] = now.isoformat()
         signal_view = {
-            "id": trade_id,
+            "id": str(candidate["copied_trade_id"]),
             "time": now.isoformat(),
             "timestamp": now.isoformat(),
             "source": self.cfg.source,
             "action": "copy_buy",
-            "market": market.slug,
+            "market": str(candidate["market_slug"]),
             "confidence": 0.5,
             "edge": 0.0,
             "size": round(size_usd, 2),
             "whale": True,
-            "reasoning": f"Copied {wallet.name} into {outcome_label} at ${entry_price:.3f}",
-            "wallet": wallet.name,
-            "outcome": outcome_label,
+            "reasoning": f"Copied {candidate['wallet_name']} into {candidate['outcome']} at ${entry_price:.3f}",
+            "wallet": str(candidate["wallet_name"]),
+            "outcome": str(candidate["outcome"]),
             "price": round(entry_price, 4),
             "size_usd": round(size_usd, 2),
         }
@@ -410,16 +477,16 @@ class CopyTraderShadowStrategy(BaseStrategy):
         self._recent_trades.insert(
             0,
             {
-                "id": trade_id,
+                "id": str(candidate["copied_trade_id"]),
                 "time": now.isoformat(),
                 "timestamp": now.isoformat(),
                 "source": self.cfg.source,
-                "market": market.slug,
-                "side": outcome_label,
+                "market": str(candidate["market_slug"]),
+                "side": str(candidate["outcome"]),
                 "price": round(entry_price, 4),
                 "usd": round(size_usd, 2),
                 "pnl": None,
-                "wallet": wallet.name,
+                "wallet": str(candidate["wallet_name"]),
                 "event": "entry",
             },
         )
@@ -428,10 +495,10 @@ class CopyTraderShadowStrategy(BaseStrategy):
         self.audit.log_trade_event(
             {
                 "event_type": "entry",
-                "trade_id": trade_id,
-                "wallet_address": wallet.address,
-                "market_slug": market.slug,
-                "outcome": outcome_label,
+                "trade_id": str(candidate["copied_trade_id"]),
+                "wallet_address": str(candidate["wallet_address"]),
+                "market_slug": str(candidate["market_slug"]),
+                "outcome": str(candidate["outcome"]),
                 "price": entry_price,
                 "size_usd": size_usd,
             }
@@ -452,6 +519,36 @@ class CopyTraderShadowStrategy(BaseStrategy):
         if exit_price <= 0:
             return
         self._close_position(position, exit_price=exit_price, close_reason="wallet_sell", now=now)
+
+    def _build_wallet_sell_event(self, wallet: CopyTradeWallet, row: dict[str, Any], market: Market, now: datetime) -> dict[str, Any]:
+        token_id = str(row.get("asset") or "")
+        activity_at = self._parse_timestamp(row.get("timestamp"), now)
+        matching_positions = [
+            position.trade_id
+            for position in self.open_positions.values()
+            if position.wallet_address == wallet.address
+            and position.condition_id == str(row.get("conditionId") or "")
+            and position.token_id == token_id
+        ]
+        return {
+            "event_id": self._build_candidate_id(wallet.address, row),
+            "observed_at": now.isoformat(),
+            "activity_timestamp": activity_at.isoformat(),
+            "wallet_address": wallet.address,
+            "wallet_name": wallet.name,
+            "wallet_rank": wallet.rank,
+            "wallet_pnl_usd": round(wallet.pnl_usd, 4),
+            "tx_hash": str(row.get("transactionHash") or ""),
+            "condition_id": str(row.get("conditionId") or ""),
+            "market_slug": market.slug,
+            "token_id": token_id,
+            "outcome": str(row.get("outcome") or self._outcome_label(market, token_id)),
+            "wallet_side": "SELL",
+            "wallet_trade_usd": round(float(row.get("usdcSize") or row.get("size") or 0.0), 4),
+            "wallet_trade_price": round(float(row.get("price") or self._token_price(market, token_id) or 0.0), 6),
+            "matched_open_trade_ids": matching_positions,
+            "matched_open_trade_count": len(matching_positions),
+        }
 
     async def _resolve_positions(self, now: datetime) -> None:
         if not self.open_positions:
@@ -586,6 +683,22 @@ class CopyTraderShadowStrategy(BaseStrategy):
                 return outcome.price
         return None
 
+    def _token_book(self, market: Market, token_id: str) -> tuple[float | None, float | None]:
+        for outcome in market.outcomes:
+            if outcome.token_id == token_id:
+                return outcome.book_bid, outcome.book_ask
+        return None, None
+
+    @staticmethod
+    def _time_to_close_hours(market: Market, now: datetime) -> float | None:
+        if not market.end_date:
+            return None
+        try:
+            end_at = datetime.fromisoformat(str(market.end_date).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return (end_at.astimezone(UTC) - now).total_seconds() / 3600.0
+
     @staticmethod
     def _parse_timestamp(raw_timestamp: Any, fallback: datetime) -> datetime:
         try:
@@ -604,6 +717,20 @@ class CopyTraderShadowStrategy(BaseStrategy):
                 str(row.get("side") or ""),
                 str(row.get("timestamp") or ""),
                 str(row.get("type") or ""),
+            ]
+        )
+
+    @staticmethod
+    def _build_candidate_id(wallet_address: str, row: dict[str, Any]) -> str:
+        return "|".join(
+            [
+                "copy_candidate",
+                wallet_address,
+                str(row.get("transactionHash") or ""),
+                str(row.get("conditionId") or ""),
+                str(row.get("asset") or ""),
+                str(row.get("side") or ""),
+                str(row.get("timestamp") or ""),
             ]
         )
 
@@ -715,6 +842,7 @@ class CopyTraderShadowStrategy(BaseStrategy):
                 address=str(row.get("address") or ""),
                 name=str(row.get("name") or ""),
                 pnl_usd=float(row.get("pnl_usd") or 0.0),
+                rank=int(row.get("rank") or 0),
             )
             for row in (payload.get("target_wallets") or [])
             if row.get("address")

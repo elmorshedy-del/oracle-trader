@@ -105,26 +105,46 @@ class PolymarketCollector:
 
     async def get_market_by_slug(self, slug: str) -> Optional[Market]:
         """Get a specific market by slug."""
-        try:
-            resp = await self.client.get(f"{self.gamma}/markets", params={"slug": slug})
-            resp.raise_for_status()
-            data = resp.json()
-            if data and len(data) > 0:
-                return self._parse_gamma_market(data[0])
-        except Exception as e:
-            logger.error(f"Failed to fetch market {slug}: {e}")
+        query_variants = (
+            {"slug": slug},
+            {"slug": slug, "closed": "true"},
+            {"slug": slug, "archived": "true"},
+            {"slug": slug, "closed": "true", "archived": "true"},
+        )
+        last_error: Exception | None = None
+        for params in query_variants:
+            try:
+                resp = await self.client.get(f"{self.gamma}/markets", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if data and len(data) > 0:
+                    return self._parse_gamma_market(data[0])
+            except Exception as e:
+                last_error = e
+        if last_error is not None:
+            logger.error(f"Failed to fetch market {slug}: {last_error}")
         return None
 
     async def get_market_by_condition_id(self, condition_id: str) -> Optional[Market]:
         """Get a specific market by condition id."""
-        try:
-            resp = await self.client.get(f"{self.gamma}/markets", params={"condition_ids": condition_id})
-            resp.raise_for_status()
-            data = resp.json()
-            if data and len(data) > 0:
-                return self._parse_gamma_market(data[0])
-        except Exception as e:
-            logger.error(f"Failed to fetch market for condition %s: %s", condition_id, e)
+        query_variants = (
+            {"condition_ids": condition_id},
+            {"condition_ids": condition_id, "closed": "true"},
+            {"condition_ids": condition_id, "archived": "true"},
+            {"condition_ids": condition_id, "closed": "true", "archived": "true"},
+        )
+        last_error: Exception | None = None
+        for params in query_variants:
+            try:
+                resp = await self.client.get(f"{self.gamma}/markets", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if data and len(data) > 0:
+                    return self._parse_gamma_market(data[0])
+            except Exception as e:
+                last_error = e
+        if last_error is not None:
+            logger.error(f"Failed to fetch market for condition %s: %s", condition_id, last_error)
         return None
 
     async def get_gamma_market_payload_by_slug(self, slug: str) -> Optional[dict]:

@@ -503,7 +503,6 @@ class CopyTraderShadowConfig:
 
     enabled: bool = os.getenv("COPY_TRADER_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
     budget_usd: float = float(os.getenv("COPY_TRADER_SHADOW_BUDGET_USD", "1000"))
-    max_open_positions: int = int(os.getenv("COPY_TRADER_SHADOW_MAX_OPEN_POSITIONS", "8"))
     top_wallets: int = int(os.getenv("COPY_TRADER_SHADOW_TOP_WALLETS", "3"))
     leaderboard_limit: int = int(os.getenv("COPY_TRADER_SHADOW_LEADERBOARD_LIMIT", "20"))
     min_wallet_pnl_usd: float = float(os.getenv("COPY_TRADER_SHADOW_MIN_WALLET_PNL_USD", "100000"))

@@ -21,6 +21,7 @@ UTC = timezone.utc
 CATEGORY_VERSION = "wallet_copy_category_v1"
 MAX_RECENT_TRADE_KEYS = 20000
 TOKEN_DEPTH_BAND_PCT = 0.02
+HEARTBEAT_PROGRESS_INTERVAL = 5
 
 
 class WalletTrackerService:
@@ -182,7 +183,10 @@ class WalletTrackerService:
                 rows = await self.collector.get_wallet_positions(wallet["address"])
                 return wallet["address"], rows
 
-        for address, rows in await asyncio.gather(*(fetch(wallet) for wallet in self._tracked_wallets)):
+        for index, (address, rows) in enumerate(
+            await asyncio.gather(*(fetch(wallet) for wallet in self._tracked_wallets)),
+            start=1,
+        ):
             held_condition_ids = sorted({str(row.get("conditionId") or "") for row in rows if row.get("conditionId")})
             held_asset_ids = sorted({str(row.get("asset") or "") for row in rows if row.get("asset")})
             snapshot = {
@@ -202,6 +206,8 @@ class WalletTrackerService:
                 held_asset_ids=held_asset_ids,
                 raw_positions=rows,
             )
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("tracker", time.time())
         self._last_positions_refresh_at = now_ts
         self.store.set_meta("positions_last_refreshed_at", now_ts, updated_at=now_ts)
 
@@ -220,9 +226,11 @@ class WalletTrackerService:
                 return wallet, rows
 
         results = await asyncio.gather(*(fetch(wallet) for wallet in self._tracked_wallets), return_exceptions=True)
-        for result in results:
+        for index, result in enumerate(results, start=1):
             if isinstance(result, Exception):
                 logger.warning("[WALLET_COPY] activity fetch error: %s", result)
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("tracker", time.time())
                 continue
             wallet, rows = result
             rows_sorted = sorted(rows or [], key=lambda item: int(item.get("timestamp") or 0))
@@ -245,6 +253,8 @@ class WalletTrackerService:
                     latest_ts = max(latest_ts, event_ts)
             if latest_ts:
                 self._latest_trade_timestamp_by_wallet[wallet["address"]] = latest_ts
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("tracker", time.time())
 
     async def _build_trade_row(self, *, wallet: dict[str, Any], row: dict[str, Any], now_ts: float) -> dict[str, Any] | None:
         condition_id = str(row.get("conditionId") or "")

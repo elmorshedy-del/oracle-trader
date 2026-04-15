@@ -1134,6 +1134,9 @@ class WalletCopyResearchStore:
             return isinstance(last_seen, (int, float)) and (now_ts - float(last_seen)) <= threshold
 
         progress_pct = min(100.0, (labeled_buys / self.target_labeled_buys) * 100.0) if self.target_labeled_buys > 0 else 0.0
+        tracker_threshold = max(float(tracker_poll_seconds * 3), 180.0)
+        labeler_threshold = max(float(labeler_poll_seconds * 3), 180.0)
+        positions_threshold = max(float(positions_refresh_seconds * 3), 900.0)
         return {
             "target_labeled_buys": self.target_labeled_buys,
             "progress_pct": round(progress_pct, 2),
@@ -1156,10 +1159,10 @@ class WalletCopyResearchStore:
                 "eta_days_to_target": round(eta_days, 3) if eta_days is not None else None,
             },
             "health": {
-                "tracker_alive": alive(tracker_heartbeat, tracker_poll_seconds * 3),
-                "labeler_alive": alive(labeler_heartbeat, labeler_poll_seconds * 3),
+                "tracker_alive": alive(tracker_heartbeat, tracker_threshold),
+                "labeler_alive": alive(labeler_heartbeat, labeler_threshold),
                 "leaderboard_fresh": alive(leaderboard_heartbeat, leaderboard_refresh_seconds * 1.5),
-                "positions_fresh": alive(positions_heartbeat, positions_refresh_seconds * 2),
+                "positions_fresh": alive(positions_heartbeat, positions_threshold),
                 "db_writable": db_writable,
                 "last_tracker_heartbeat": tracker_heartbeat,
                 "last_labeler_heartbeat": labeler_heartbeat,

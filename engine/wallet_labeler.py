@@ -15,6 +15,7 @@ from .wallet_copy_store import WalletCopyResearchStore
 logger = logging.getLogger(__name__)
 
 UTC = timezone.utc
+HEARTBEAT_PROGRESS_INTERVAL = 25
 
 
 class WalletLabelerService:
@@ -56,9 +57,11 @@ class WalletLabelerService:
 
     async def _apply_wallet_sell_labels(self, now_ts: float) -> None:
         labeled = 0
-        for buy_row in self.store.get_unlabeled_buy_trades(limit=250):
+        for index, buy_row in enumerate(self.store.get_unlabeled_buy_trades(limit=250), start=1):
             sell_row = self.store.find_first_later_sell(buy_row)
             if sell_row is None:
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("labeler", time.time())
                 continue
             self.store.apply_wallet_sell_label(
                 buy_trade_id=int(buy_row["id"]),
@@ -66,15 +69,19 @@ class WalletLabelerService:
                 match_quality="first_later_sell",
             )
             labeled += 1
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("labeler", time.time())
         if labeled:
             self.store.set_meta("labeler_last_wallet_sell_label_at", now_ts, updated_at=now_ts)
             logger.info("[WALLET_COPY] applied %s wallet-sell labels", labeled)
 
     async def _apply_market_resolution_labels(self, now_ts: float) -> None:
         updated_total = 0
-        for market_row in self.store.unresolved_markets(limit=250):
+        for index, market_row in enumerate(self.store.unresolved_markets(limit=250), start=1):
             market = await self.collector.get_market_by_condition_id(str(market_row["market_condition_id"]))
             if market is None or not market.closed:
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("labeler", time.time())
                 continue
             outcome_prices = {str(outcome.name): float(outcome.price or 0.0) for outcome in market.outcomes}
             winning_outcome = None
@@ -89,6 +96,8 @@ class WalletLabelerService:
                 outcome_prices=outcome_prices,
                 resolution_source="gamma_market_closed",
             )
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("labeler", time.time())
         if updated_total:
             self.store.set_meta("labeler_last_resolution_label_at", now_ts, updated_at=now_ts)
             logger.info("[WALLET_COPY] applied %s resolution labels", updated_total)
@@ -96,9 +105,11 @@ class WalletLabelerService:
     async def _backfill_price_checkpoints(self, now_ts: float) -> None:
         updated = 0
         cache: dict[str, list[dict[str, float]]] = {}
-        for trade_row in self.store.trades_missing_price_checkpoints(limit=250):
+        for index, trade_row in enumerate(self.store.trades_missing_price_checkpoints(limit=250), start=1):
             trade_ts = float(trade_row["timestamp"] or 0.0)
             if now_ts - trade_ts < 1800:
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("labeler", time.time())
                 continue
             asset_token_id = str(trade_row["asset_token_id"])
             history = cache.get(asset_token_id)
@@ -121,6 +132,8 @@ class WalletLabelerService:
                 price_30min_after=p30,
             )
             updated += 1
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("labeler", time.time())
         if updated:
             self.store.set_meta("labeler_last_price_backfill_at", now_ts, updated_at=now_ts)
             logger.info("[WALLET_COPY] backfilled price checkpoints for %s trades", updated)

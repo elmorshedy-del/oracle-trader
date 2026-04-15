@@ -282,22 +282,47 @@ class PolymarketCollector:
         sort_by: str = "profit",
     ) -> list[dict]:
         """Get top traders from Polymarket leaderboard."""
-        try:
-            resp = await self.client.get(
+        window = "all" if period == "all" else "month"
+        attempts = [
+            (
                 f"{self.data}/leaderboard",
-                params={"period": period, "limit": limit, "sortBy": sort_by},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # Handle different response formats (list vs paginated dict)
-            if isinstance(data, list):
-                return data
-            if isinstance(data, dict):
-                return data.get("results", data.get("data", data.get("leaderboard", [])))
-            return []
-        except Exception as e:
-            logger.error(f"Failed to fetch leaderboard: {e}")
-            return []
+                {"period": period, "limit": limit, "sortBy": sort_by},
+            ),
+            (
+                f"{self.data}/v1/leaderboard",
+                {"limit": limit, "window": window},
+            ),
+        ]
+        last_error: Exception | None = None
+        for url, params in attempts:
+            try:
+                resp = await self.client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                rows: list[dict]
+                if isinstance(data, list):
+                    rows = data
+                elif isinstance(data, dict):
+                    rows = data.get("results", data.get("data", data.get("leaderboard", [])))
+                else:
+                    rows = []
+                if sort_by == "volume":
+                    rows = sorted(
+                        rows,
+                        key=lambda row: float(row.get("vol") or row.get("volume") or 0.0),
+                        reverse=True,
+                    )
+                elif sort_by == "profit":
+                    rows = sorted(
+                        rows,
+                        key=lambda row: float(row.get("pnl") or row.get("profit") or 0.0),
+                        reverse=True,
+                    )
+                return rows[:limit]
+            except Exception as exc:
+                last_error = exc
+        logger.error(f"Failed to fetch leaderboard: {last_error}")
+        return []
 
     # ------------------------------------------------------------------
     # Price History

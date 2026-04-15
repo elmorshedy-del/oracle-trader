@@ -1275,7 +1275,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_latency_shadow' ? 8 : ((activeView.key === 'copy_trader_shadow') ? 8 : ((COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) ? (runtime.max_open_positions || 6) : ((activeView.key === 'kalshi_btc_arb_shadow' || activeView.key === 'bitcoin_meanrev_shadow' || isCryptoPairsShadowView(activeView.key)) ? 1 : 10))))))));
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_latency_shadow' ? 8 : ((activeView.key === 'copy_trader_shadow') ? (runtime.max_open_positions || 8) : ((COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) ? (runtime.max_open_positions || 6) : ((activeView.key === 'kalshi_btc_arb_shadow' || activeView.key === 'bitcoin_meanrev_shadow' || isCryptoPairsShadowView(activeView.key)) ? 1 : 10))))))));
     const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const checks = [
       {
@@ -1311,7 +1311,7 @@ function renderSanity(d) {
           : `${signals.length} live / ${p.total_trades || 0} trades`,
       },
       {
-        label: 'Capacity available',
+        label: 'Capacity headroom',
         ok: (p.cash || 0) > 25 || positions.length < resolvedOpenCap,
         note: `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
       },

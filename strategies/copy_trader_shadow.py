@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 UTC = timezone.utc
 MAX_RECENT_ITEMS = 40
 MAX_SEEN_TRADE_KEYS = 5000
+COPY_TRADER_BLOCKED_MAX_OPEN_POSITIONS = "max_open_positions_reached"
 COPY_TRADER_TRADE_LEDGER_FIELDS = [
     "logged_at",
     "trade_id",
@@ -164,6 +165,7 @@ class CopyTraderShadowStrategy(BaseStrategy):
                 "min_trade_usd": self.cfg.min_trade_usd,
                 "max_trade_usd": self.cfg.max_trade_usd,
                 "max_entry_price": self.cfg.max_entry_price,
+                "max_open_positions": self.cfg.max_open_positions,
                 "tracked_wallets": self.cfg.tracked_wallets,
             },
             extra={"view_key": self.cfg.view_key, "session_label": self.cfg.session_label},
@@ -173,6 +175,7 @@ class CopyTraderShadowStrategy(BaseStrategy):
                 "view_key": self.cfg.view_key,
                 "source": self.cfg.source,
                 "budget_usd": self.cfg.budget_usd,
+                "max_open_positions": self.cfg.max_open_positions,
                 "cash_balance_usd": self.cash_balance,
                 "portfolio_value_usd": self.cash_balance,
                 "target_wallets": 0,
@@ -390,6 +393,8 @@ class CopyTraderShadowStrategy(BaseStrategy):
             blocked_reason = "invalid_entry_price"
         elif entry_price > self.cfg.max_entry_price:
             blocked_reason = "above_max_entry_price"
+        elif len(self.open_positions) >= self.cfg.max_open_positions:
+            blocked_reason = COPY_TRADER_BLOCKED_MAX_OPEN_POSITIONS
         elif size_usd < self.cfg.min_trade_usd:
             blocked_reason = "sized_below_min_trade_usd"
         time_to_close_hours = self._time_to_close_hours(market, now)
@@ -433,6 +438,8 @@ class CopyTraderShadowStrategy(BaseStrategy):
         }
 
     def _open_position_from_candidate(self, candidate: dict[str, Any], now: datetime) -> None:
+        if len(self.open_positions) >= self.cfg.max_open_positions:
+            return
         trade_id = str(candidate["copied_trade_id"])
         entry_price = float(candidate["wallet_trade_price"])
         size_usd = float(candidate["copy_size_usd"])

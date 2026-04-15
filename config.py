@@ -529,6 +529,41 @@ class CopyTraderShadowConfig:
 
 
 @dataclass
+class WalletCopyResearchConfig:
+    """Collection-only wallet-copy research subsystem."""
+
+    enabled: bool = os.getenv("WALLET_COPY_RESEARCH_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    db_path: str = os.getenv("WALLET_COPY_RESEARCH_DB_PATH", "")
+    db_filename: str = os.getenv("WALLET_COPY_RESEARCH_DB_FILENAME", "wallet_copy_research.sqlite")
+    schema_version: str = os.getenv("WALLET_COPY_RESEARCH_SCHEMA_VERSION", "v1")
+    collector_version: str = os.getenv("WALLET_COPY_RESEARCH_COLLECTOR_VERSION", "wallet-copy-v1")
+    target_labeled_buys: int = int(os.getenv("WALLET_COPY_RESEARCH_TARGET_LABELED_BUYS", "2000"))
+
+    leaderboard_refresh_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_REFRESH_SECONDS", "86400"))
+    leaderboard_all_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_ALL_LIMIT", "50"))
+    leaderboard_30d_profit_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_30D_PROFIT_LIMIT", "30"))
+    leaderboard_30d_volume_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_30D_VOLUME_LIMIT", "20"))
+    tracked_wallet_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_TRACKED_WALLET_LIMIT", "50"))
+
+    wallet_activity_poll_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_WALLET_ACTIVITY_POLL_SECONDS", "10"))
+    wallet_activity_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_WALLET_ACTIVITY_LIMIT", "20"))
+    positions_refresh_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_POSITIONS_REFRESH_SECONDS", "300"))
+    labeler_poll_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_LABELER_POLL_SECONDS", "60"))
+
+    market_cache_ttl_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_MARKET_CACHE_TTL_SECONDS", "30"))
+    orderbook_cache_ttl_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_ORDERBOOK_CACHE_TTL_SECONDS", "10"))
+    activity_concurrency: int = int(os.getenv("WALLET_COPY_RESEARCH_ACTIVITY_CONCURRENCY", "6"))
+    positions_concurrency: int = int(os.getenv("WALLET_COPY_RESEARCH_POSITIONS_CONCURRENCY", "4"))
+
+    btc_context_enabled: bool = os.getenv("WALLET_COPY_RESEARCH_BTC_CONTEXT_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    btc_price_poll_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_BTC_PRICE_POLL_SECONDS", "10"))
+    btc_price_source: str = os.getenv("WALLET_COPY_RESEARCH_BTC_PRICE_SOURCE", "coinbase")
+
+    price_history_interval: str = os.getenv("WALLET_COPY_RESEARCH_PRICE_HISTORY_INTERVAL", "1m")
+    price_history_fidelity: int = int(os.getenv("WALLET_COPY_RESEARCH_PRICE_HISTORY_FIDELITY", "10"))
+
+
+@dataclass
 class KalshiBtcArbShadowConfig:
     """Cross-venue BTC hourly overlap arbitrage paper sleeve."""
 
@@ -634,6 +669,7 @@ class PipelineConfig:
     bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
     crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)
     copy_trader_shadow: CopyTraderShadowConfig = field(default_factory=CopyTraderShadowConfig)
+    wallet_copy_research: WalletCopyResearchConfig = field(default_factory=WalletCopyResearchConfig)
     kalshi_btc_arb_shadow: KalshiBtcArbShadowConfig = field(default_factory=KalshiBtcArbShadowConfig)
     bitcoin_latency_shadow: BitcoinLatencyShadowConfig = field(default_factory=BitcoinLatencyShadowConfig)
     sports_model: SportsModelConfig = field(default_factory=SportsModelConfig)

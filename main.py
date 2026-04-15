@@ -13,6 +13,7 @@ import os
 import threading
 import zipfile
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -25,6 +26,9 @@ from fastapi.staticfiles import StaticFiles
 
 from config import PipelineConfig
 from engine.pipeline import Pipeline
+from engine.wallet_copy_store import WalletCopyResearchStore
+from engine.wallet_tracker import WalletTrackerService
+from engine.wallet_labeler import WalletLabelerService
 from engine.multiagent import (
     MultiagentRuntime,
     OrchestratorConfig,
@@ -32,7 +36,7 @@ from engine.multiagent import (
     consult_multiagent_logs,
     dataclass_to_dict,
 )
-from runtime_paths import LOG_DIR, STATE_PATH
+from runtime_paths import DATA_DIR, LOG_DIR, STATE_PATH
 
 # Logging
 stream_handler = logging.StreamHandler()
@@ -52,10 +56,16 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 # Global pipeline instance
 pipeline: Pipeline | None = None
 multiagent_runtime: MultiagentRuntime | None = None
+wallet_copy_store: WalletCopyResearchStore | None = None
+wallet_copy_tracker: WalletTrackerService | None = None
+wallet_copy_labeler: WalletLabelerService | None = None
+wallet_copy_collector = None
 runtime_loop: asyncio.AbstractEventLoop | None = None
 runtime_thread: threading.Thread | None = None
 pipeline_future = None
 multiagent_future = None
+wallet_copy_tracker_future = None
+wallet_copy_labeler_future = None
 OPUS_RUNTIME_ENABLED = os.getenv("OPUS_RUNTIME_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
 
 
@@ -164,10 +174,39 @@ def _log_runtime_future(name: str, future) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start pipeline on startup, stop on shutdown."""
-    global pipeline, multiagent_runtime, runtime_loop, runtime_thread, pipeline_future, multiagent_future
+    global pipeline, multiagent_runtime, wallet_copy_store, wallet_copy_tracker, wallet_copy_labeler, wallet_copy_collector
+    global runtime_loop, runtime_thread, pipeline_future, multiagent_future, wallet_copy_tracker_future, wallet_copy_labeler_future
     config = PipelineConfig()
     pipeline = Pipeline(config)
     multiagent_runtime = MultiagentRuntime(pipeline_config=config) if OPUS_RUNTIME_ENABLED else None
+    wallet_copy_db_path = (
+        Path(config.wallet_copy_research.db_path).expanduser()
+        if config.wallet_copy_research.db_path
+        else (DATA_DIR / config.wallet_copy_research.db_filename)
+    )
+    wallet_copy_store = WalletCopyResearchStore(
+        wallet_copy_db_path,
+        schema_version=config.wallet_copy_research.schema_version,
+        collector_version=config.wallet_copy_research.collector_version,
+        target_labeled_buys=config.wallet_copy_research.target_labeled_buys,
+    )
+    from data.collector import PolymarketCollector
+
+    wallet_copy_collector = PolymarketCollector(
+        config.api.gamma_host,
+        config.api.clob_host,
+        config.api.data_host,
+    )
+    wallet_copy_tracker = WalletTrackerService(
+        pipeline_config=config,
+        collector=wallet_copy_collector,
+        store=wallet_copy_store,
+    )
+    wallet_copy_labeler = WalletLabelerService(
+        pipeline_config=config,
+        collector=wallet_copy_collector,
+        store=wallet_copy_store,
+    )
 
     runtime_loop = asyncio.new_event_loop()
     runtime_thread = threading.Thread(
@@ -188,6 +227,16 @@ async def lifespan(app: FastAPI):
     else:
         multiagent_future = None
         logger.info("Multi-agent runtime disabled by OPUS_RUNTIME_ENABLED=0")
+    if config.wallet_copy_research.enabled:
+        wallet_copy_tracker_future = asyncio.run_coroutine_threadsafe(wallet_copy_tracker.start(), runtime_loop)
+        wallet_copy_tracker_future.add_done_callback(lambda future: _log_runtime_future("Wallet copy tracker", future))
+        wallet_copy_labeler_future = asyncio.run_coroutine_threadsafe(wallet_copy_labeler.start(), runtime_loop)
+        wallet_copy_labeler_future.add_done_callback(lambda future: _log_runtime_future("Wallet copy labeler", future))
+        logger.info("Wallet-copy research tracker + labeler started on dedicated runtime loop")
+    else:
+        wallet_copy_tracker_future = None
+        wallet_copy_labeler_future = None
+        logger.info("Wallet-copy research disabled by WALLET_COPY_RESEARCH_ENABLED=0")
 
     yield
 
@@ -197,6 +246,12 @@ async def lifespan(app: FastAPI):
         stop_futures.append(asyncio.run_coroutine_threadsafe(pipeline.stop(), runtime_loop))
     if multiagent_runtime and runtime_loop:
         stop_futures.append(asyncio.run_coroutine_threadsafe(multiagent_runtime.stop(), runtime_loop))
+    if wallet_copy_tracker and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_tracker.stop(), runtime_loop))
+    if wallet_copy_labeler and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_labeler.stop(), runtime_loop))
+    if wallet_copy_collector and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_collector.close(), runtime_loop))
 
     for future in stop_futures:
         try:
@@ -208,6 +263,10 @@ async def lifespan(app: FastAPI):
         pipeline_future.cancel()
     if multiagent_future:
         multiagent_future.cancel()
+    if wallet_copy_tracker_future:
+        wallet_copy_tracker_future.cancel()
+    if wallet_copy_labeler_future:
+        wallet_copy_labeler_future.cancel()
 
     if runtime_loop:
         runtime_loop.call_soon_threadsafe(runtime_loop.stop)
@@ -218,8 +277,14 @@ async def lifespan(app: FastAPI):
 
     pipeline_future = None
     multiagent_future = None
+    wallet_copy_tracker_future = None
+    wallet_copy_labeler_future = None
     runtime_loop = None
     runtime_thread = None
+    wallet_copy_store = None
+    wallet_copy_tracker = None
+    wallet_copy_labeler = None
+    wallet_copy_collector = None
 
 
 app = FastAPI(
@@ -375,6 +440,45 @@ async def slippage_stats():
 async def health():
     """Health check for Railway."""
     return {"status": "ok", "mode": pipeline.config.mode if pipeline else "unknown"}
+
+
+@app.get("/api/wallet_trades")
+async def wallet_trades(limit: int = 50, wallet_address: str | None = None, market_slug: str | None = None):
+    """Recent wallet-copy research trades from tracked wallets."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(
+        wallet_copy_store.list_wallet_trades(
+            limit=max(1, min(limit, 500)),
+            wallet_address=wallet_address,
+            market_slug=market_slug,
+        )
+    )
+
+
+@app.get("/api/tracked_wallets")
+async def tracked_wallets(limit: int = 100):
+    """Current wallet-copy research watchlist with leaderboard stats."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(wallet_copy_store.list_tracked_wallets(limit=max(1, min(limit, 200))))
+
+
+@app.get("/api/collection_stats")
+async def collection_stats():
+    """Progress, ETA, and health for wallet-copy data collection."""
+    if wallet_copy_store is None or pipeline is None:
+        return JSONResponse({"error": "Wallet-copy collection not initialized"}, status_code=503)
+    cfg = pipeline.config.wallet_copy_research
+    return JSONResponse(
+        wallet_copy_store.collection_stats(
+            now_ts=datetime.now(timezone.utc).timestamp(),
+            tracker_poll_seconds=cfg.wallet_activity_poll_seconds,
+            labeler_poll_seconds=cfg.labeler_poll_seconds,
+            leaderboard_refresh_seconds=cfg.leaderboard_refresh_seconds,
+            positions_refresh_seconds=cfg.positions_refresh_seconds,
+        )
+    )
 
 
 @app.get("/api/multiagent/defaults")
@@ -552,6 +656,7 @@ async def legacy_consult(payload: MultiagentConsultRequest):
 # ---------------------------------------------------------------------------
 
 DASHBOARD_HTML = Path(__file__).parent / "dashboard" / "index.html"
+WALLET_COPY_HTML = Path(__file__).parent / "dashboard" / "wallet_copy.html"
 MULTIAGENT_DIR = Path(__file__).parent / "dashboard" / "multiagent"
 MULTIAGENT_HTML = MULTIAGENT_DIR / "index.html"
 
@@ -572,6 +677,14 @@ async def multiagent_dashboard():
     if MULTIAGENT_HTML.exists():
         return HTMLResponse(MULTIAGENT_HTML.read_text())
     return HTMLResponse("<h1>Oracle Multi-Agent Lab</h1><p>Multi-agent dashboard unavailable.</p>")
+
+
+@app.get("/wallet-copy", response_class=HTMLResponse)
+async def wallet_copy_dashboard():
+    """Serve the separate wallet-copy research collection dashboard."""
+    if WALLET_COPY_HTML.exists():
+        return HTMLResponse(WALLET_COPY_HTML.read_text())
+    return HTMLResponse("<h1>Wallet Copy Research</h1><p>Dashboard unavailable.</p>")
 
 
 # ---------------------------------------------------------------------------

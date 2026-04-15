@@ -115,6 +115,18 @@ class PolymarketCollector:
             logger.error(f"Failed to fetch market {slug}: {e}")
         return None
 
+    async def get_market_by_condition_id(self, condition_id: str) -> Optional[Market]:
+        """Get a specific market by condition id."""
+        try:
+            resp = await self.client.get(f"{self.gamma}/markets", params={"condition_ids": condition_id})
+            resp.raise_for_status()
+            data = resp.json()
+            if data and len(data) > 0:
+                return self._parse_gamma_market(data[0])
+        except Exception as e:
+            logger.error(f"Failed to fetch market for condition %s: %s", condition_id, e)
+        return None
+
     async def get_gamma_market_payload_by_slug(self, slug: str) -> Optional[dict]:
         """Get the raw Gamma payload for a specific market slug."""
         try:
@@ -125,6 +137,18 @@ class PolymarketCollector:
                 return data[0]
         except Exception as e:
             logger.error(f"Failed to fetch raw market payload {slug}: {e}")
+        return None
+
+    async def get_gamma_market_payload_by_condition_id(self, condition_id: str) -> Optional[dict]:
+        """Get the raw Gamma payload for a specific market condition id."""
+        try:
+            resp = await self.client.get(f"{self.gamma}/markets", params={"condition_ids": condition_id})
+            resp.raise_for_status()
+            data = resp.json()
+            if data and len(data) > 0 and isinstance(data[0], dict):
+                return data[0]
+        except Exception as e:
+            logger.error(f"Failed to fetch raw market payload for condition %s: %s", condition_id, e)
         return None
 
     # ------------------------------------------------------------------
@@ -223,13 +247,26 @@ class PolymarketCollector:
             return []
 
     async def get_wallet_activity(
-        self, address: str, limit: int = 50
+        self,
+        address: str,
+        limit: int = 50,
+        *,
+        activity_type: str | None = None,
+        side: str | None = None,
+        condition_id: str | None = None,
     ) -> list[dict]:
         """Get recent activity for a wallet."""
         try:
+            params: dict[str, object] = {"user": address, "limit": limit}
+            if activity_type:
+                params["type"] = activity_type
+            if side:
+                params["side"] = side
+            if condition_id:
+                params["conditionId"] = condition_id
             resp = await self.client.get(
                 f"{self.data}/activity",
-                params={"user": address, "limit": limit}
+                params=params,
             )
             resp.raise_for_status()
             return resp.json()
@@ -237,12 +274,18 @@ class PolymarketCollector:
             logger.error(f"Failed to fetch activity for {address}: {e}")
             return []
 
-    async def get_leaderboard(self, limit: int = 50) -> list[dict]:
+    async def get_leaderboard(
+        self,
+        limit: int = 50,
+        *,
+        period: str = "all",
+        sort_by: str = "profit",
+    ) -> list[dict]:
         """Get top traders from Polymarket leaderboard."""
         try:
             resp = await self.client.get(
-                f"{self.data}/v1/leaderboard",
-                params={"limit": limit, "window": "all"}
+                f"{self.data}/leaderboard",
+                params={"period": period, "limit": limit, "sortBy": sort_by},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -261,9 +304,9 @@ class PolymarketCollector:
     # ------------------------------------------------------------------
 
     async def get_price_history(
-        self, token_id: str, interval: str = "1h", fidelity: int = 60
+        self, token_id: str, interval: str = "1m", fidelity: int = 10
     ) -> list[dict]:
-        """Get historical prices for a token (from CLOB timeseries)."""
+        """Get historical prices for an asset token from CLOB timeseries."""
         try:
             resp = await self.client.get(
                 f"{self.clob}/prices-history",

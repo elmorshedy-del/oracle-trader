@@ -564,6 +564,169 @@ class WalletCopyResearchConfig:
 
 
 @dataclass
+class CopyHeuristicShadowProfileConfig:
+    """Config for one heuristic wallet-copy paper sleeve."""
+
+    strategy_key: str
+    view_key: str
+    label: str
+    source: str
+    session_label: str
+    kind: str
+    budget_usd: float
+    min_trade_usd: float
+    max_trade_usd: float
+    score_threshold: float = 0.30
+    max_open_positions: int = 6
+    scan_trade_limit: int = 300
+    min_wallet_labeled_trades: int = 3
+    min_wallet_win_rate: float = 0.60
+    max_wallet_trade_count_24h: int = 15
+    min_size_vs_avg: float = 1.0
+    max_market_spread: float = 0.10
+    max_detection_delay_seconds: float = 30.0
+    require_first_entry: bool = False
+    min_consensus_wallets: int = 3
+    min_consensus_avg_win_rate: float = 0.58
+    consensus_window_seconds: int = 3600
+    min_hold_hours: float = 24.0
+    min_market_hours_remaining: float = 12.0
+    max_market_age_minutes: float = 30.0
+    min_trade_size_usd: float = 500.0
+    audit_root: str = ""
+    decisions_limit: int = 30
+
+
+COPY_HEURISTIC_SHADOW_DEFAULTS = (
+    {
+        "strategy_key": "wallet_selective_copy_shadow",
+        "view_key": "wallet_selective_copy_shadow",
+        "label": "Selective Copy",
+        "source": "wallet_selective_copy_shadow",
+        "session_label": "wallet_selective_copy_shadow",
+        "kind": "selective_copy",
+        "budget_usd": 700.0,
+        "min_trade_usd": 50.0,
+        "max_trade_usd": 300.0,
+        "score_threshold": 0.30,
+        "max_open_positions": 6,
+        "scan_trade_limit": 300,
+        "min_wallet_labeled_trades": 3,
+        "min_wallet_win_rate": 0.62,
+        "max_wallet_trade_count_24h": 8,
+        "min_size_vs_avg": 1.5,
+        "max_market_spread": 0.05,
+        "max_detection_delay_seconds": 15.0,
+        "require_first_entry": True,
+    },
+    {
+        "strategy_key": "wallet_whale_consensus_shadow",
+        "view_key": "wallet_whale_consensus_shadow",
+        "label": "Whale Consensus",
+        "source": "wallet_whale_consensus_shadow",
+        "session_label": "wallet_whale_consensus_shadow",
+        "kind": "whale_consensus",
+        "budget_usd": 900.0,
+        "min_trade_usd": 50.0,
+        "max_trade_usd": 300.0,
+        "score_threshold": 0.35,
+        "max_open_positions": 4,
+        "scan_trade_limit": 300,
+        "min_wallet_labeled_trades": 3,
+        "min_wallet_win_rate": 0.58,
+        "max_market_spread": 0.08,
+        "min_consensus_wallets": 3,
+        "min_consensus_avg_win_rate": 0.58,
+        "consensus_window_seconds": 3600,
+    },
+    {
+        "strategy_key": "wallet_contrarian_exit_shadow",
+        "view_key": "wallet_contrarian_exit_shadow",
+        "label": "Contrarian Exit",
+        "source": "wallet_contrarian_exit_shadow",
+        "session_label": "wallet_contrarian_exit_shadow",
+        "kind": "contrarian_exit",
+        "budget_usd": 600.0,
+        "min_trade_usd": 50.0,
+        "max_trade_usd": 300.0,
+        "score_threshold": 0.30,
+        "max_open_positions": 5,
+        "scan_trade_limit": 300,
+        "min_wallet_labeled_trades": 3,
+        "min_wallet_win_rate": 0.60,
+        "min_hold_hours": 24.0,
+        "min_market_hours_remaining": 12.0,
+    },
+    {
+        "strategy_key": "wallet_fresh_market_shadow",
+        "view_key": "wallet_fresh_market_shadow",
+        "label": "Fresh Market Sniper",
+        "source": "wallet_fresh_market_shadow",
+        "session_label": "wallet_fresh_market_shadow",
+        "kind": "fresh_market",
+        "budget_usd": 700.0,
+        "min_trade_usd": 50.0,
+        "max_trade_usd": 300.0,
+        "score_threshold": 0.30,
+        "max_open_positions": 5,
+        "scan_trade_limit": 300,
+        "min_wallet_labeled_trades": 3,
+        "min_wallet_win_rate": 0.60,
+        "max_market_spread": 0.10,
+        "max_market_age_minutes": 30.0,
+        "min_trade_size_usd": 500.0,
+    },
+)
+
+
+def build_copy_heuristic_shadow_profiles() -> list[CopyHeuristicShadowProfileConfig]:
+    profiles: list[CopyHeuristicShadowProfileConfig] = []
+    for defaults in COPY_HEURISTIC_SHADOW_DEFAULTS:
+        strategy_key = defaults["strategy_key"]
+        env_prefix = strategy_key.upper()
+        profiles.append(
+            CopyHeuristicShadowProfileConfig(
+                strategy_key=strategy_key,
+                view_key=os.getenv(f"{env_prefix}_VIEW_KEY", defaults["view_key"]),
+                label=os.getenv(f"{env_prefix}_LABEL", defaults["label"]),
+                source=os.getenv(f"{env_prefix}_SOURCE", defaults["source"]),
+                session_label=os.getenv(f"{env_prefix}_SESSION_LABEL", defaults["session_label"]),
+                kind=defaults["kind"],
+                budget_usd=float(os.getenv(f"{env_prefix}_BUDGET_USD", str(defaults["budget_usd"]))),
+                min_trade_usd=float(os.getenv(f"{env_prefix}_MIN_TRADE_USD", str(defaults["min_trade_usd"]))),
+                max_trade_usd=float(os.getenv(f"{env_prefix}_MAX_TRADE_USD", str(defaults["max_trade_usd"]))),
+                score_threshold=float(os.getenv(f"{env_prefix}_SCORE_THRESHOLD", str(defaults["score_threshold"]))),
+                max_open_positions=int(os.getenv(f"{env_prefix}_MAX_OPEN_POSITIONS", str(defaults["max_open_positions"]))),
+                scan_trade_limit=int(os.getenv(f"{env_prefix}_SCAN_TRADE_LIMIT", str(defaults["scan_trade_limit"]))),
+                min_wallet_labeled_trades=int(os.getenv(f"{env_prefix}_MIN_WALLET_LABELED_TRADES", str(defaults.get("min_wallet_labeled_trades", 3)))),
+                min_wallet_win_rate=float(os.getenv(f"{env_prefix}_MIN_WALLET_WIN_RATE", str(defaults.get("min_wallet_win_rate", 0.60)))),
+                max_wallet_trade_count_24h=int(os.getenv(f"{env_prefix}_MAX_WALLET_TRADE_COUNT_24H", str(defaults.get("max_wallet_trade_count_24h", 15)))),
+                min_size_vs_avg=float(os.getenv(f"{env_prefix}_MIN_SIZE_VS_AVG", str(defaults.get("min_size_vs_avg", 1.0)))),
+                max_market_spread=float(os.getenv(f"{env_prefix}_MAX_MARKET_SPREAD", str(defaults.get("max_market_spread", 0.10)))),
+                max_detection_delay_seconds=float(os.getenv(f"{env_prefix}_MAX_DETECTION_DELAY_SECONDS", str(defaults.get("max_detection_delay_seconds", 30.0)))),
+                require_first_entry=os.getenv(f"{env_prefix}_REQUIRE_FIRST_ENTRY", str(defaults.get("require_first_entry", False))).lower() in {"1", "true", "yes", "on"},
+                min_consensus_wallets=int(os.getenv(f"{env_prefix}_MIN_CONSENSUS_WALLETS", str(defaults.get("min_consensus_wallets", 3)))),
+                min_consensus_avg_win_rate=float(os.getenv(f"{env_prefix}_MIN_CONSENSUS_AVG_WIN_RATE", str(defaults.get("min_consensus_avg_win_rate", 0.58)))),
+                consensus_window_seconds=int(os.getenv(f"{env_prefix}_CONSENSUS_WINDOW_SECONDS", str(defaults.get("consensus_window_seconds", 3600)))),
+                min_hold_hours=float(os.getenv(f"{env_prefix}_MIN_HOLD_HOURS", str(defaults.get("min_hold_hours", 24.0)))),
+                min_market_hours_remaining=float(os.getenv(f"{env_prefix}_MIN_MARKET_HOURS_REMAINING", str(defaults.get("min_market_hours_remaining", 12.0)))),
+                max_market_age_minutes=float(os.getenv(f"{env_prefix}_MAX_MARKET_AGE_MINUTES", str(defaults.get("max_market_age_minutes", 30.0)))),
+                min_trade_size_usd=float(os.getenv(f"{env_prefix}_MIN_TRADE_SIZE_USD", str(defaults.get("min_trade_size_usd", 500.0)))),
+                audit_root=os.getenv(f"{env_prefix}_AUDIT_ROOT", ""),
+                decisions_limit=int(os.getenv(f"{env_prefix}_DECISIONS_LIMIT", str(defaults.get("decisions_limit", 30)))),
+            )
+        )
+    return profiles
+
+
+@dataclass
+class CopyHeuristicShadowConfig:
+    """Heuristic wallet-copy paper sleeves driven by the real wallet-copy store."""
+
+    profiles: list[CopyHeuristicShadowProfileConfig] = field(default_factory=build_copy_heuristic_shadow_profiles)
+
+
+@dataclass
 class KalshiBtcArbShadowConfig:
     """Cross-venue BTC hourly overlap arbitrage paper sleeve."""
 
@@ -669,6 +832,7 @@ class PipelineConfig:
     bitcoin_meanrev_shadow: BitcoinMeanRevShadowConfig = field(default_factory=BitcoinMeanRevShadowConfig)
     crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)
     copy_trader_shadow: CopyTraderShadowConfig = field(default_factory=CopyTraderShadowConfig)
+    copy_heuristic_shadow: CopyHeuristicShadowConfig = field(default_factory=CopyHeuristicShadowConfig)
     wallet_copy_research: WalletCopyResearchConfig = field(default_factory=WalletCopyResearchConfig)
     kalshi_btc_arb_shadow: KalshiBtcArbShadowConfig = field(default_factory=KalshiBtcArbShadowConfig)
     bitcoin_latency_shadow: BitcoinLatencyShadowConfig = field(default_factory=BitcoinLatencyShadowConfig)

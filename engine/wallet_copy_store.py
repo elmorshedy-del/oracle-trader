@@ -167,6 +167,40 @@ class WalletCopyResearchStore:
                     schema_version TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS copy_decisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    decision_key TEXT UNIQUE NOT NULL,
+                    strategy_key TEXT NOT NULL,
+                    profile_kind TEXT NOT NULL,
+                    wallet_trade_id INTEGER NOT NULL,
+                    wallet_trade_key TEXT NOT NULL,
+                    tx_hash TEXT NOT NULL,
+                    wallet_address TEXT NOT NULL,
+                    market_condition_id TEXT NOT NULL,
+                    asset_token_id TEXT NOT NULL,
+                    market_slug TEXT,
+                    source_side TEXT,
+                    source_outcome TEXT,
+                    score REAL NOT NULL,
+                    should_copy INTEGER NOT NULL,
+                    suggested_size_usd REAL,
+                    reasons_json TEXT,
+                    context_json TEXT,
+                    paper_executed INTEGER DEFAULT 0,
+                    paper_trade_id TEXT,
+                    paper_side TEXT,
+                    paper_entry_timestamp REAL,
+                    paper_entry_price REAL,
+                    paper_entry_size_usd REAL,
+                    paper_exit_timestamp REAL,
+                    paper_exit_price REAL,
+                    paper_realized_pnl_usd REAL,
+                    paper_close_reason TEXT,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    FOREIGN KEY(wallet_trade_id) REFERENCES wallet_trades(id)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_wallet_trades_wallet_time
                 ON wallet_trades(wallet_address, timestamp);
 
@@ -181,6 +215,12 @@ class WalletCopyResearchStore:
 
                 CREATE INDEX IF NOT EXISTS idx_wallet_position_snapshots_wallet_time
                 ON wallet_position_snapshots(wallet_address, snapshot_at);
+
+                CREATE INDEX IF NOT EXISTS idx_copy_decisions_strategy_created
+                ON copy_decisions(strategy_key, created_at DESC);
+
+                CREATE INDEX IF NOT EXISTS idx_copy_decisions_trade
+                ON copy_decisions(wallet_trade_id, strategy_key);
                 """
             )
             conn.commit()
@@ -680,6 +720,337 @@ class WalletCopyResearchStore:
                 tuple(params),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def list_wallet_trades_after_id(
+        self,
+        *,
+        last_id: int = 0,
+        limit: int = 250,
+        side: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = ["id > ?"]
+        params: list[Any] = [last_id]
+        if side:
+            clauses.append("side = ?")
+            params.append(side.upper())
+        params.append(limit)
+        where = " AND ".join(clauses)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM wallet_trades
+                WHERE {where}
+                ORDER BY id ASC
+                LIMIT ?
+                """,
+                tuple(params),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_wallet_trade(self, *, trade_id: int) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM wallet_trades
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (trade_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def latest_wallet_trade_id(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT MAX(id) AS latest_id FROM wallet_trades"
+            ).fetchone()
+        return int((row["latest_id"] if row else 0) or 0)
+
+    def observed_wallet_performance_before(
+        self,
+        *,
+        wallet_address: str,
+        before_timestamp: float,
+    ) -> dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS labeled_trades,
+                    SUM(
+                        CASE
+                            WHEN COALESCE(is_win_wallet_sell, is_win_resolution) = 1 THEN 1
+                            ELSE 0
+                        END
+                    ) AS wins,
+                    AVG(
+                        CASE
+                            WHEN COALESCE(is_win_wallet_sell, is_win_resolution) IS NOT NULL
+                            THEN COALESCE(is_win_wallet_sell, is_win_resolution)
+                            ELSE NULL
+                        END
+                    ) AS win_rate,
+                    AVG(
+                        CASE
+                            WHEN wallet_sell_timestamp IS NOT NULL THEN (wallet_sell_timestamp - timestamp) / 3600.0
+                            WHEN market_resolved = 1 AND resolution_timestamp IS NOT NULL THEN (resolution_timestamp - timestamp) / 3600.0
+                            ELSE NULL
+                        END
+                    ) AS avg_hold_hours
+                FROM wallet_trades
+                WHERE wallet_address = ?
+                  AND side = 'BUY'
+                  AND timestamp < ?
+                  AND (wallet_sell_timestamp IS NOT NULL OR market_resolved = 1)
+                """,
+                (wallet_address, before_timestamp),
+            ).fetchone()
+        labeled_trades = int((row["labeled_trades"] if row else 0) or 0)
+        wins = int((row["wins"] if row else 0) or 0)
+        win_rate = float(row["win_rate"]) if row and row["win_rate"] is not None else None
+        avg_hold_hours = float(row["avg_hold_hours"]) if row and row["avg_hold_hours"] is not None else None
+        return {
+            "labeled_trades": labeled_trades,
+            "wins": wins,
+            "losses": max(labeled_trades - wins, 0),
+            "win_rate": win_rate,
+            "avg_hold_hours": avg_hold_hours,
+        }
+
+    def recent_same_side_trades(
+        self,
+        *,
+        condition_id: str,
+        asset_token_id: str,
+        outcome: str,
+        since_timestamp: float,
+        exclude_trade_id: int | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        clauses = [
+            "side = 'BUY'",
+            "market_condition_id = ?",
+            "asset_token_id = ?",
+            "outcome = ?",
+            "timestamp >= ?",
+        ]
+        params: list[Any] = [condition_id, asset_token_id, outcome, since_timestamp]
+        if exclude_trade_id is not None:
+            clauses.append("id != ?")
+            params.append(exclude_trade_id)
+        params.append(limit)
+        where = " AND ".join(clauses)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM wallet_trades
+                WHERE {where}
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                tuple(params),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def market_first_seen_timestamp(self, *, condition_id: str) -> float | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT MIN(timestamp) AS first_seen
+                FROM wallet_trades
+                WHERE market_condition_id = ?
+                """,
+                (condition_id,),
+            ).fetchone()
+        if row is None or row["first_seen"] is None:
+            return None
+        return float(row["first_seen"])
+
+    def find_prior_buy(
+        self,
+        *,
+        wallet_address: str,
+        condition_id: str,
+        asset_token_id: str,
+        before_timestamp: float,
+    ) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM wallet_trades
+                WHERE wallet_address = ?
+                  AND market_condition_id = ?
+                  AND asset_token_id = ?
+                  AND side = 'BUY'
+                  AND timestamp < ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                (wallet_address, condition_id, asset_token_id, before_timestamp),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def insert_copy_decision(self, row: dict[str, Any]) -> int:
+        columns = [
+            "decision_key",
+            "strategy_key",
+            "profile_kind",
+            "wallet_trade_id",
+            "wallet_trade_key",
+            "tx_hash",
+            "wallet_address",
+            "market_condition_id",
+            "asset_token_id",
+            "market_slug",
+            "source_side",
+            "source_outcome",
+            "score",
+            "should_copy",
+            "suggested_size_usd",
+            "reasons_json",
+            "context_json",
+            "paper_executed",
+            "paper_trade_id",
+            "paper_side",
+            "paper_entry_timestamp",
+            "paper_entry_price",
+            "paper_entry_size_usd",
+            "paper_exit_timestamp",
+            "paper_exit_price",
+            "paper_realized_pnl_usd",
+            "paper_close_reason",
+            "created_at",
+            "updated_at",
+        ]
+        payload = dict(row)
+        if not isinstance(payload.get("reasons_json"), str):
+            payload["reasons_json"] = self._json_value(payload.get("reasons_json") or [])
+        if not isinstance(payload.get("context_json"), str):
+            payload["context_json"] = self._json_value(payload.get("context_json") or {})
+        placeholders = ", ".join("?" for _ in columns)
+        values = [payload.get(column) for column in columns]
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                f"""
+                INSERT OR IGNORE INTO copy_decisions (
+                    {", ".join(columns)}
+                ) VALUES ({placeholders})
+                """,
+                values,
+            )
+            row_id = conn.execute(
+                "SELECT id FROM copy_decisions WHERE decision_key = ? LIMIT 1",
+                (payload["decision_key"],),
+            ).fetchone()
+            conn.commit()
+        return int(row_id["id"])
+
+    def mark_copy_decision_executed(
+        self,
+        *,
+        decision_id: int,
+        paper_trade_id: str,
+        paper_side: str,
+        entry_timestamp: float,
+        entry_price: float,
+        entry_size_usd: float,
+    ) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE copy_decisions
+                SET paper_executed = 1,
+                    paper_trade_id = ?,
+                    paper_side = ?,
+                    paper_entry_timestamp = ?,
+                    paper_entry_price = ?,
+                    paper_entry_size_usd = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    paper_trade_id,
+                    paper_side,
+                    entry_timestamp,
+                    entry_price,
+                    entry_size_usd,
+                    entry_timestamp,
+                    decision_id,
+                ),
+            )
+            conn.commit()
+
+    def close_copy_decision(
+        self,
+        *,
+        decision_id: int,
+        exit_timestamp: float,
+        exit_price: float,
+        realized_pnl_usd: float,
+        close_reason: str,
+    ) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE copy_decisions
+                SET paper_exit_timestamp = ?,
+                    paper_exit_price = ?,
+                    paper_realized_pnl_usd = ?,
+                    paper_close_reason = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    exit_timestamp,
+                    exit_price,
+                    realized_pnl_usd,
+                    close_reason,
+                    exit_timestamp,
+                    decision_id,
+                ),
+            )
+            conn.commit()
+
+    def list_copy_decisions(
+        self,
+        *,
+        limit: int = 100,
+        strategy_key: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if strategy_key:
+            clauses.append("strategy_key = ?")
+            params.append(strategy_key)
+        params.append(limit)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM copy_decisions
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                tuple(params),
+            ).fetchall()
+        decisions: list[dict[str, Any]] = []
+        for row in rows:
+            payload = dict(row)
+            for key in ("reasons_json", "context_json"):
+                try:
+                    payload[key[:-5]] = json.loads(payload[key] or "[]")
+                except json.JSONDecodeError:
+                    payload[key[:-5]] = [] if key == "reasons_json" else {}
+            payload["should_copy"] = bool(payload.get("should_copy"))
+            payload["paper_executed"] = bool(payload.get("paper_executed"))
+            decisions.append(payload)
+        return decisions
 
     def list_tracked_wallets(self, *, limit: int = 100) -> list[dict[str, Any]]:
         with self._connect() as conn:

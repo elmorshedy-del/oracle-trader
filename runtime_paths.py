@@ -34,6 +34,19 @@ def _resolve_state_path(preferred: Path, fallback: Path) -> Path:
     return fallback
 
 
+def resolve_runtime_file(preferred: Path, fallback: Path) -> Path:
+    for candidate in (preferred, fallback):
+        try:
+            candidate.parent.mkdir(parents=True, exist_ok=True)
+            probe = candidate.parent / ".codex-write-test"
+            probe.write_text("ok")
+            probe.unlink(missing_ok=True)
+            return candidate
+        except OSError:
+            continue
+    return fallback
+
+
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 LOG_DIR = _resolve_dir(Path(os.getenv("LOG_DIR", str(DATA_DIR / "logs"))), Path("logs"))
 STATE_PATH = _resolve_state_path(

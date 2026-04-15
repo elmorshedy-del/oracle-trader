@@ -10,6 +10,7 @@ import asyncio
 import time as _time
 import logging
 import re
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from config import PipelineConfig
 from data.collector import PolymarketCollector
@@ -24,6 +25,7 @@ from strategies.crypto_pairs_shadow import CryptoPairsShadowStrategy
 from strategies.bitcoin_model import BitcoinModelStrategy
 from strategies.bitcoin_latency_shadow import BitcoinLatencyShadowStrategy
 from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
+from strategies.copy_heuristic_shadow import CopyHeuristicShadowStrategy
 from strategies.copy_trader_shadow import CopyTraderShadowStrategy
 from strategies.kalshi_btc_arb_shadow import KalshiBtcArbShadowStrategy
 from strategies.sports_model import SportsModelStrategy
@@ -36,7 +38,8 @@ from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester
 from engine.health_monitor import HealthMonitor
-from runtime_paths import LOG_DIR, STATE_PATH
+from engine.wallet_copy_store import WalletCopyResearchStore
+from runtime_paths import DATA_DIR, LOG_DIR, STATE_PATH, resolve_runtime_file
 
 logger = logging.getLogger(__name__)
 BITCOIN_SIGNAL_PATTERN = re.compile(r"\b(?:btc|bitcoin)\b", re.IGNORECASE)
@@ -197,15 +200,11 @@ CRYPTO_PAIRS_SHADOW_VIEW_KEYS = (
     "crypto_pairs_comp_link",
     "crypto_pairs_bonk_grt",
 )
-SELF_MANAGED_LANE_VIEW_KEYS = (
+BASE_SELF_MANAGED_LANE_VIEW_KEYS = (
     "weather_edge_live",
     "copy_trader_shadow",
     "kalshi_btc_arb_shadow",
     "bitcoin_meanrev_shadow",
-)
-SELF_MANAGED_COMPARISON_VIEW_KEYS = (
-    *SELF_MANAGED_LANE_VIEW_KEYS,
-    *CRYPTO_PAIRS_SHADOW_VIEW_KEYS,
 )
 
 
@@ -224,6 +223,43 @@ class Pipeline:
             clob_host=self.config.api.clob_host,
             data_host=self.config.api.data_host,
         )
+        wallet_copy_db_path = (
+            Path(self.config.wallet_copy_research.db_path).expanduser()
+            if self.config.wallet_copy_research.db_path
+            else resolve_runtime_file(
+                DATA_DIR / self.config.wallet_copy_research.db_filename,
+                Path(self.config.wallet_copy_research.db_filename),
+            )
+        )
+        self.wallet_copy_store = WalletCopyResearchStore(
+            wallet_copy_db_path,
+            schema_version=self.config.wallet_copy_research.schema_version,
+            collector_version=self.config.wallet_copy_research.collector_version,
+            target_labeled_buys=self.config.wallet_copy_research.target_labeled_buys,
+        )
+        self.copy_heuristic_profiles = tuple(self.config.copy_heuristic_shadow.profiles)
+        self.copy_heuristic_strategy_keys = tuple(
+            profile.strategy_key for profile in self.copy_heuristic_profiles
+        )
+        self.copy_heuristic_view_keys = tuple(
+            profile.view_key for profile in self.copy_heuristic_profiles
+        )
+        self.self_managed_lane_view_keys = (
+            *BASE_SELF_MANAGED_LANE_VIEW_KEYS,
+            *self.copy_heuristic_view_keys,
+        )
+        self.self_managed_comparison_view_keys = (
+            *self.self_managed_lane_view_keys,
+            *CRYPTO_PAIRS_SHADOW_VIEW_KEYS,
+        )
+        for profile in self.copy_heuristic_profiles:
+            COMPARISON_VIEW_CONFIG[profile.view_key] = {
+                "label": profile.label,
+                "strategy": profile.strategy_key,
+                "source": profile.source,
+                "signal_sources": (),
+                "self_managed": True,
+            }
 
         # Strategies
         self.strategies = {
@@ -269,6 +305,13 @@ class Pipeline:
             "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
         }
+        for profile in self.copy_heuristic_profiles:
+            self.comparison_only_strategies[profile.strategy_key] = CopyHeuristicShadowStrategy(
+                self.config,
+                collector=self.collector,
+                store=self.wallet_copy_store,
+                profile=profile,
+            )
         self.crypto_pairs_shadow_profiles = tuple(self.config.crypto_pairs_shadow.profiles)
         self.crypto_pairs_shadow_strategy_keys = tuple(
             profile.strategy_key for profile in self.crypto_pairs_shadow_profiles
@@ -562,6 +605,24 @@ class Pipeline:
                 strategy_signals["copy_trader_shadow"] = []
                 self.health.record_strategy_error("copy_trader_shadow", str(e))
 
+            for strategy_key in self.copy_heuristic_strategy_keys:
+                heuristic_shadow: CopyHeuristicShadowStrategy = self.comparison_only_strategies[strategy_key]
+                try:
+                    _heuristic_shadow_start = _time.time()
+                    heuristic_shadow_signals = await heuristic_shadow.scan(self._markets, self._events)
+                    _heuristic_shadow_dur = (_time.time() - _heuristic_shadow_start) * 1000
+                    strategy_signals[strategy_key] = heuristic_shadow_signals
+                    self.health.record_strategy_run(
+                        strategy_key,
+                        len(heuristic_shadow_signals),
+                        _heuristic_shadow_dur,
+                    )
+                except Exception as e:
+                    logger.error(f"Strategy {strategy_key} error: {e}")
+                    heuristic_shadow._stats["errors"] += 1
+                    strategy_signals[strategy_key] = []
+                    self.health.record_strategy_error(strategy_key, str(e))
+
             kalshi_btc_arb_shadow: KalshiBtcArbShadowStrategy = self.comparison_only_strategies["kalshi_btc_arb_shadow"]
             try:
                 _kalshi_btc_arb_shadow_start = _time.time()
@@ -666,7 +727,7 @@ class Pipeline:
                     self._latest_comparison_signals[view_key] = all_signals[:30]
                     continue
 
-                if view_key in SELF_MANAGED_COMPARISON_VIEW_KEYS:
+                if view_key in self.self_managed_comparison_view_keys:
                     self._latest_comparison_signals[view_key] = []
                     continue
 
@@ -1063,7 +1124,7 @@ class Pipeline:
         for view_key, meta in COMPARISON_VIEW_CONFIG.items():
             if view_key == "all":
                 continue
-            if view_key in SELF_MANAGED_COMPARISON_VIEW_KEYS:
+            if view_key in self.self_managed_comparison_view_keys:
                 strategy = self.comparison_only_strategies.get(meta["strategy"])
                 if strategy is None:
                     continue
@@ -1099,6 +1160,9 @@ class Pipeline:
                 "kalshi_btc_arb_shadow": self.comparison_only_strategies["kalshi_btc_arb_shadow"].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
+            } | {
+                strategy_key: self.comparison_only_strategies[strategy_key].stats
+                for strategy_key in self.copy_heuristic_strategy_keys
             } | {
                 strategy_key: self.comparison_only_strategies[strategy_key].stats
                 for strategy_key in self.crypto_pairs_shadow_strategy_keys
@@ -1231,6 +1295,10 @@ class Pipeline:
                 "kalshi_btc_arb_shadow_budget": self.config.kalshi_btc_arb_shadow.budget_usd,
                 "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
                 "crypto_pairs_shadow_budget": self.config.crypto_pairs_shadow.budget_usd,
+                "copy_heuristic_shadow_budgets": {
+                    profile.view_key: profile.budget_usd
+                    for profile in self.copy_heuristic_profiles
+                },
             },
             "diagnostics_log_path": str(LEGACY_DIAGNOSTICS_LOG_PATH),
             "app_log_path": str(LEGACY_APP_LOG_PATH),

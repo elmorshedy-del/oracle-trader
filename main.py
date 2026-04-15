@@ -36,7 +36,7 @@ from engine.multiagent import (
     consult_multiagent_logs,
     dataclass_to_dict,
 )
-from runtime_paths import DATA_DIR, LOG_DIR, STATE_PATH
+from runtime_paths import DATA_DIR, LOG_DIR, STATE_PATH, resolve_runtime_file
 
 # Logging
 stream_handler = logging.StreamHandler()
@@ -182,7 +182,10 @@ async def lifespan(app: FastAPI):
     wallet_copy_db_path = (
         Path(config.wallet_copy_research.db_path).expanduser()
         if config.wallet_copy_research.db_path
-        else (DATA_DIR / config.wallet_copy_research.db_filename)
+        else resolve_runtime_file(
+            DATA_DIR / config.wallet_copy_research.db_filename,
+            Path(config.wallet_copy_research.db_filename),
+        )
     )
     wallet_copy_store = WalletCopyResearchStore(
         wallet_copy_db_path,
@@ -477,6 +480,19 @@ async def collection_stats():
             labeler_poll_seconds=cfg.labeler_poll_seconds,
             leaderboard_refresh_seconds=cfg.leaderboard_refresh_seconds,
             positions_refresh_seconds=cfg.positions_refresh_seconds,
+        )
+    )
+
+
+@app.get("/api/copy_signal")
+async def copy_signal(limit: int = 50, strategy_key: str | None = None):
+    """Recent heuristic copy decisions scored from the real wallet-copy trade tape."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(
+        wallet_copy_store.list_copy_decisions(
+            limit=max(1, min(limit, 500)),
+            strategy_key=strategy_key,
         )
     )
 

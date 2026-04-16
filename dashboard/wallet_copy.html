@@ -136,11 +136,48 @@
     .health {
       grid-column: span 4;
     }
+    .quality {
+      grid-column: span 12;
+    }
     .wallets {
       grid-column: span 4;
     }
     .trades {
       grid-column: span 8;
+    }
+    .quality-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .quality-metrics {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .mix-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .mix-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 70px;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .mini-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .mini-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
     }
     .health-list, .checkpoint-list {
       display: grid;
@@ -207,11 +244,11 @@
     }
     @media (max-width: 1000px) {
       .health, .wallets, .trades { grid-column: span 12; }
-      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats, .quality-metrics, .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 640px) {
       .topbar { flex-direction: column; }
-      .stats { grid-template-columns: 1fr; }
+      .stats, .quality-metrics, .quality-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -262,6 +299,48 @@
           <div class="stat">
             <div class="label">Latest Trade</div>
             <div class="value" id="latestTrade">-</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card quality">
+        <div class="label">ML Diversity & Thresholds</div>
+        <div class="value" id="readinessScore">0.00%</div>
+        <div class="sub" id="readinessSummary">Waiting for diversity stats.</div>
+        <div class="stats quality-metrics">
+          <div class="stat">
+            <div class="label">Categories at Floor</div>
+            <div class="value" id="categoriesAtFloor">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Category</div>
+            <div class="value" id="topCategoryShare">0%</div>
+          </div>
+          <div class="stat">
+            <div class="label">Wallets at Floor</div>
+            <div class="value" id="walletsAtFloor">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Wallet</div>
+            <div class="value" id="topWalletShare">0%</div>
+          </div>
+          <div class="stat">
+            <div class="label">Labeled Markets</div>
+            <div class="value" id="uniqueLabeledMarkets">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Market</div>
+            <div class="value" id="topMarketShare">0%</div>
+          </div>
+        </div>
+        <div class="quality-grid">
+          <div>
+            <div class="label">Category Mix</div>
+            <div class="mix-list" id="categoryMix"></div>
+          </div>
+          <div>
+            <div class="label">Readiness Checks</div>
+            <div class="checkpoint-list" id="readinessChecks"></div>
           </div>
         </div>
       </section>
@@ -324,6 +403,7 @@
       if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
       return `${Number(value).toFixed(digits)}%`;
     };
+    const fmtShare = (value, digits = 1) => fmtPct(Number(value || 0) * 100, digits);
     const fmtAgo = (timestamp) => {
       if (!timestamp) return '-';
       const diff = Math.max(0, (Date.now() / 1000) - Number(timestamp));
@@ -333,6 +413,13 @@
       return `${Math.round(diff / 86400)}d ago`;
     };
     const shorten = (value) => value ? `${String(value).slice(0, 6)}...${String(value).slice(-4)}` : '-';
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
 
     function healthBadge(isHealthy) {
       return isHealthy
@@ -379,6 +466,7 @@
       document.getElementById('marketCount').textContent = fmtNumber(counts.unique_markets || 0);
       document.getElementById('labelRate').textContent = timing.labels_per_day ? fmtNumber(timing.labels_per_day, 1) : '0';
       document.getElementById('latestTrade').textContent = fmtAgo(timing.latest_trade_detected_at);
+      renderDiversity(stats);
 
       document.getElementById('watchlistCount').textContent = fmtNumber(counts.tracked_wallets || 0);
       document.getElementById('schemaVersion').textContent = stats.schema_version || '-';
@@ -405,6 +493,63 @@
           ${healthBadge(Boolean(ok))}
         </div>
       `).join('');
+    }
+
+    function renderDiversity(stats) {
+      const diversity = stats.diversity || {};
+      const readiness = stats.ml_readiness || {};
+      const thresholds = readiness.thresholds || {};
+      const wallets = diversity.wallets || {};
+      const markets = diversity.markets || {};
+      const labelMix = diversity.label_mix || {};
+      const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+      const categoryMix = Array.isArray(diversity.category_mix) ? diversity.category_mix : [];
+
+      document.getElementById('readinessScore').textContent = fmtPct(readiness.score || 0, 2);
+      document.getElementById('readinessSummary').textContent =
+        `Core copy/hold model: ${readiness.core_ready ? 'ready' : 'collecting'} · wallet-exit model: ${readiness.wallet_exit_ready ? 'ready' : 'needs sell labels'} · resolution labels: ${fmtNumber(labelMix.resolution_labeled_buys || 0)} · wallet-sell labels: ${fmtNumber(labelMix.wallet_sell_labeled_buys || 0)}`;
+      document.getElementById('categoriesAtFloor').textContent =
+        `${fmtNumber(diversity.categories_at_floor || 0)}/${fmtNumber(thresholds.min_categories_at_floor || 0)}`;
+      document.getElementById('topCategoryShare').textContent = fmtShare(diversity.top_category_share || 0);
+      document.getElementById('walletsAtFloor').textContent =
+        `${fmtNumber(wallets.wallets_at_floor || 0)}/${fmtNumber(thresholds.min_wallets_at_floor || 0)}`;
+      document.getElementById('topWalletShare').textContent = fmtShare(wallets.top_wallet_share || 0);
+      document.getElementById('uniqueLabeledMarkets').textContent =
+        `${fmtNumber(markets.unique_labeled_markets || 0)}/${fmtNumber(thresholds.min_unique_labeled_markets || 0)}`;
+      document.getElementById('topMarketShare').textContent = fmtShare(markets.top_market_share || 0);
+
+      const categoryContainer = document.getElementById('categoryMix');
+      categoryContainer.innerHTML = categoryMix.length
+        ? categoryMix.slice(0, 8).map((row) => {
+            const share = Number(row.share || 0);
+            return `
+              <div class="mix-row">
+                <div>${escapeHtml(row.category || 'unknown')}</div>
+                <div class="mini-bar"><div class="mini-fill" style="width: ${Math.max(0, Math.min(100, share * 100))}%"></div></div>
+                <div>${fmtShare(share, 1)}</div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">No category labels yet.</div>';
+
+      const checksContainer = document.getElementById('readinessChecks');
+      checksContainer.innerHTML = checks.length
+        ? checks.map((check) => {
+            const unit = check.unit || '';
+            const value = unit === '%' ? `${fmtNumber(check.value || 0, 2)}%` : fmtNumber(check.value || 0);
+            const target = unit === '%' ? `${fmtNumber(check.target || 0, 2)}%` : fmtNumber(check.target || 0);
+            const direction = check.direction === 'max' ? '≤' : '≥';
+            return `
+              <div class="health-item">
+                <div>
+                  <div>${escapeHtml(check.label || check.key)}</div>
+                  <div class="muted">${value} / ${direction} ${target}</div>
+                </div>
+                ${healthBadge(Boolean(check.ok))}
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">No readiness checks yet.</div>';
     }
 
     function renderWallets(wallets) {

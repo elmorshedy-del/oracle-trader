@@ -249,6 +249,31 @@ class WalletCopyResearchStore:
             f" OR ({prefix}market_seconds_to_expiry IS NOT NULL AND {prefix}market_seconds_to_expiry <= 0))"
         )
 
+    @staticmethod
+    def _share(part: int | float, total: int | float) -> float:
+        return round((float(part) / float(total)), 4) if total else 0.0
+
+    @staticmethod
+    def _check(
+        *,
+        key: str,
+        label: str,
+        value: int | float,
+        target: int | float,
+        ok: bool,
+        unit: str = "",
+        direction: str = "min",
+    ) -> dict[str, Any]:
+        return {
+            "key": key,
+            "label": label,
+            "value": value,
+            "target": target,
+            "unit": unit,
+            "direction": direction,
+            "ok": bool(ok),
+        }
+
     def set_meta(self, key: str, value: Any, *, updated_at: float | None = None) -> None:
         updated_at = float(updated_at if updated_at is not None else __import__("time").time())
         with self._lock, self._connect() as conn:
@@ -1106,8 +1131,19 @@ class WalletCopyResearchStore:
         labeler_poll_seconds: int,
         leaderboard_refresh_seconds: int,
         positions_refresh_seconds: int,
+        ml_min_category_labeled_buys: int,
+        ml_min_categories_at_floor: int,
+        ml_max_top_category_share: float,
+        ml_min_wallet_labeled_buys: int,
+        ml_min_wallets_at_floor: int,
+        ml_max_top_wallet_share: float,
+        ml_min_unique_labeled_markets: int,
+        ml_max_top_market_share: float,
+        ml_min_resolution_labeled_buys: int,
+        ml_min_wallet_sell_labeled_buys: int,
     ) -> dict[str, Any]:
         ml_ready_buy = self._ml_ready_buy_predicate()
+        ml_ready_labeled_buy = f"({ml_ready_buy}) AND (wallet_sell_timestamp IS NOT NULL OR market_resolved = 1)"
         stale_buy = self._stale_buy_predicate()
         with self._connect() as conn:
             counts = conn.execute(
@@ -1132,6 +1168,72 @@ class WalletCopyResearchStore:
                 FROM wallet_trades
                 """
             ).fetchone()
+            category_rows = conn.execute(
+                f"""
+                SELECT
+                    COALESCE(NULLIF(market_category, ''), 'unknown') AS category,
+                    COUNT(*) AS labeled_buys,
+                    COUNT(DISTINCT wallet_address) AS unique_wallets,
+                    COUNT(DISTINCT market_condition_id) AS unique_markets
+                FROM wallet_trades
+                WHERE {ml_ready_labeled_buy}
+                GROUP BY COALESCE(NULLIF(market_category, ''), 'unknown')
+                ORDER BY labeled_buys DESC
+                """
+            ).fetchall()
+            wallet_rows = conn.execute(
+                f"""
+                SELECT
+                    wallet_address,
+                    COUNT(*) AS labeled_buys,
+                    COUNT(DISTINCT market_condition_id) AS unique_markets
+                FROM wallet_trades
+                WHERE {ml_ready_labeled_buy}
+                GROUP BY wallet_address
+                ORDER BY labeled_buys DESC
+                LIMIT 10
+                """
+            ).fetchall()
+            wallet_coverage = conn.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS unique_labeled_wallets,
+                    SUM(CASE WHEN labeled_buys >= ? THEN 1 ELSE 0 END) AS wallets_at_floor
+                FROM (
+                    SELECT wallet_address, COUNT(*) AS labeled_buys
+                    FROM wallet_trades
+                    WHERE {ml_ready_labeled_buy}
+                    GROUP BY wallet_address
+                )
+                """,
+                (ml_min_wallet_labeled_buys,),
+            ).fetchone()
+            market_rows = conn.execute(
+                f"""
+                SELECT
+                    market_condition_id,
+                    market_slug,
+                    COALESCE(NULLIF(market_category, ''), 'unknown') AS category,
+                    COUNT(*) AS labeled_buys,
+                    COUNT(DISTINCT wallet_address) AS unique_wallets
+                FROM wallet_trades
+                WHERE {ml_ready_labeled_buy}
+                GROUP BY market_condition_id, market_slug, COALESCE(NULLIF(market_category, ''), 'unknown')
+                ORDER BY labeled_buys DESC
+                LIMIT 10
+                """
+            ).fetchall()
+            market_coverage = conn.execute(
+                f"""
+                SELECT COUNT(*) AS unique_labeled_markets
+                FROM (
+                    SELECT market_condition_id
+                    FROM wallet_trades
+                    WHERE {ml_ready_labeled_buy}
+                    GROUP BY market_condition_id
+                )
+                """
+            ).fetchone()
             tracked_wallet_count_row = conn.execute(
                 "SELECT COUNT(*) AS tracked_wallet_count FROM tracked_wallets"
             ).fetchone()
@@ -1150,6 +1252,142 @@ class WalletCopyResearchStore:
                 labels_per_day = ml_ready_labeled_buys / elapsed_days
                 remaining = max(self.target_labeled_buys - ml_ready_labeled_buys, 0)
                 eta_days = (remaining / labels_per_day) if labels_per_day > 0 and remaining > 0 else 0.0
+
+        category_mix = []
+        categories_at_floor = 0
+        for row in category_rows:
+            labeled = int(row["labeled_buys"] or 0)
+            if labeled >= ml_min_category_labeled_buys:
+                categories_at_floor += 1
+            category_mix.append(
+                {
+                    "category": row["category"],
+                    "ml_ready_labeled_buys": labeled,
+                    "share": self._share(labeled, ml_ready_labeled_buys),
+                    "unique_wallets": int(row["unique_wallets"] or 0),
+                    "unique_markets": int(row["unique_markets"] or 0),
+                }
+            )
+        top_category_share = category_mix[0]["share"] if category_mix else 0.0
+
+        top_wallets = []
+        for row in wallet_rows:
+            labeled = int(row["labeled_buys"] or 0)
+            top_wallets.append(
+                {
+                    "wallet_address": row["wallet_address"],
+                    "ml_ready_labeled_buys": labeled,
+                    "share": self._share(labeled, ml_ready_labeled_buys),
+                    "unique_markets": int(row["unique_markets"] or 0),
+                }
+            )
+        unique_labeled_wallets = int((wallet_coverage["unique_labeled_wallets"] if wallet_coverage else 0) or 0)
+        wallets_at_floor = int((wallet_coverage["wallets_at_floor"] if wallet_coverage else 0) or 0)
+        top_wallet_share = top_wallets[0]["share"] if top_wallets else 0.0
+
+        top_markets = []
+        for row in market_rows:
+            labeled = int(row["labeled_buys"] or 0)
+            top_markets.append(
+                {
+                    "market_condition_id": row["market_condition_id"],
+                    "market_slug": row["market_slug"],
+                    "category": row["category"],
+                    "ml_ready_labeled_buys": labeled,
+                    "share": self._share(labeled, ml_ready_labeled_buys),
+                    "unique_wallets": int(row["unique_wallets"] or 0),
+                }
+            )
+        unique_labeled_markets = int((market_coverage["unique_labeled_markets"] if market_coverage else 0) or 0)
+        top_market_share = top_markets[0]["share"] if top_markets else 0.0
+
+        ml_ready_resolution_labeled_buys = int(counts["ml_ready_resolution_labeled_buys"] or 0)
+        ml_ready_wallet_sell_labeled_buys = int(counts["ml_ready_wallet_sell_labeled_buys"] or 0)
+        checks = [
+            self._check(
+                key="total_ml_ready_labels",
+                label="ML-ready labeled buys",
+                value=ml_ready_labeled_buys,
+                target=self.target_labeled_buys,
+                ok=ml_ready_labeled_buys >= self.target_labeled_buys,
+            ),
+            self._check(
+                key="resolution_labels",
+                label="Resolution labels for copy/hold model",
+                value=ml_ready_resolution_labeled_buys,
+                target=ml_min_resolution_labeled_buys,
+                ok=ml_ready_resolution_labeled_buys >= ml_min_resolution_labeled_buys,
+            ),
+            self._check(
+                key="categories_at_floor",
+                label=f"Categories with {ml_min_category_labeled_buys}+ labels",
+                value=categories_at_floor,
+                target=ml_min_categories_at_floor,
+                ok=categories_at_floor >= ml_min_categories_at_floor,
+            ),
+            self._check(
+                key="top_category_share",
+                label="Largest category share",
+                value=round(top_category_share * 100.0, 2),
+                target=round(ml_max_top_category_share * 100.0, 2),
+                ok=ml_ready_labeled_buys > 0 and top_category_share <= ml_max_top_category_share,
+                unit="%",
+                direction="max",
+            ),
+            self._check(
+                key="wallets_at_floor",
+                label=f"Wallets with {ml_min_wallet_labeled_buys}+ labels",
+                value=wallets_at_floor,
+                target=ml_min_wallets_at_floor,
+                ok=wallets_at_floor >= ml_min_wallets_at_floor,
+            ),
+            self._check(
+                key="top_wallet_share",
+                label="Largest wallet share",
+                value=round(top_wallet_share * 100.0, 2),
+                target=round(ml_max_top_wallet_share * 100.0, 2),
+                ok=ml_ready_labeled_buys > 0 and top_wallet_share <= ml_max_top_wallet_share,
+                unit="%",
+                direction="max",
+            ),
+            self._check(
+                key="unique_labeled_markets",
+                label="Unique labeled markets",
+                value=unique_labeled_markets,
+                target=ml_min_unique_labeled_markets,
+                ok=unique_labeled_markets >= ml_min_unique_labeled_markets,
+            ),
+            self._check(
+                key="top_market_share",
+                label="Largest market share",
+                value=round(top_market_share * 100.0, 2),
+                target=round(ml_max_top_market_share * 100.0, 2),
+                ok=ml_ready_labeled_buys > 0 and top_market_share <= ml_max_top_market_share,
+                unit="%",
+                direction="max",
+            ),
+            self._check(
+                key="wallet_exit_labels",
+                label="Wallet-sell labels for copy/exit model",
+                value=ml_ready_wallet_sell_labeled_buys,
+                target=ml_min_wallet_sell_labeled_buys,
+                ok=ml_ready_wallet_sell_labeled_buys >= ml_min_wallet_sell_labeled_buys,
+            ),
+        ]
+        core_check_keys = {
+            "total_ml_ready_labels",
+            "resolution_labels",
+            "categories_at_floor",
+            "top_category_share",
+            "wallets_at_floor",
+            "top_wallet_share",
+            "unique_labeled_markets",
+            "top_market_share",
+        }
+        core_checks = [check for check in checks if check["key"] in core_check_keys]
+        core_ready = all(check["ok"] for check in core_checks)
+        exit_ready = next((check["ok"] for check in checks if check["key"] == "wallet_exit_labels"), False)
+        readiness_score = round((sum(1 for check in core_checks if check["ok"]) / len(core_checks)) * 100.0, 2) if core_checks else 0.0
 
         tracker_heartbeat = self.get_meta("tracker_last_heartbeat")
         labeler_heartbeat = self.get_meta("labeler_last_heartbeat")
@@ -1194,6 +1432,45 @@ class WalletCopyResearchStore:
                 "unique_wallets": int(counts["unique_wallets"] or 0),
                 "unique_markets": int(counts["unique_markets"] or 0),
                 "tracked_wallets": tracked_wallet_count,
+            },
+            "diversity": {
+                "category_mix": category_mix,
+                "categories_at_floor": categories_at_floor,
+                "top_category_share": top_category_share,
+                "wallets": {
+                    "unique_labeled_wallets": unique_labeled_wallets,
+                    "wallets_at_floor": wallets_at_floor,
+                    "top_wallet_share": top_wallet_share,
+                    "top_wallets": top_wallets,
+                },
+                "markets": {
+                    "unique_labeled_markets": unique_labeled_markets,
+                    "top_market_share": top_market_share,
+                    "top_markets": top_markets,
+                },
+                "label_mix": {
+                    "resolution_labeled_buys": ml_ready_resolution_labeled_buys,
+                    "wallet_sell_labeled_buys": ml_ready_wallet_sell_labeled_buys,
+                },
+            },
+            "ml_readiness": {
+                "score": readiness_score,
+                "core_ready": core_ready,
+                "wallet_exit_ready": exit_ready,
+                "checks": checks,
+                "thresholds": {
+                    "target_labeled_buys": self.target_labeled_buys,
+                    "min_resolution_labeled_buys": ml_min_resolution_labeled_buys,
+                    "min_category_labeled_buys": ml_min_category_labeled_buys,
+                    "min_categories_at_floor": ml_min_categories_at_floor,
+                    "max_top_category_share": ml_max_top_category_share,
+                    "min_wallet_labeled_buys": ml_min_wallet_labeled_buys,
+                    "min_wallets_at_floor": ml_min_wallets_at_floor,
+                    "max_top_wallet_share": ml_max_top_wallet_share,
+                    "min_unique_labeled_markets": ml_min_unique_labeled_markets,
+                    "max_top_market_share": ml_max_top_market_share,
+                    "min_wallet_sell_labeled_buys": ml_min_wallet_sell_labeled_buys,
+                },
             },
             "timing": {
                 "collection_started_at": collection_started_at,

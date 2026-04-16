@@ -480,6 +480,16 @@ async def collection_stats():
             labeler_poll_seconds=cfg.labeler_poll_seconds,
             leaderboard_refresh_seconds=cfg.leaderboard_refresh_seconds,
             positions_refresh_seconds=cfg.positions_refresh_seconds,
+            ml_min_category_labeled_buys=cfg.ml_min_category_labeled_buys,
+            ml_min_categories_at_floor=cfg.ml_min_categories_at_floor,
+            ml_max_top_category_share=cfg.ml_max_top_category_share,
+            ml_min_wallet_labeled_buys=cfg.ml_min_wallet_labeled_buys,
+            ml_min_wallets_at_floor=cfg.ml_min_wallets_at_floor,
+            ml_max_top_wallet_share=cfg.ml_max_top_wallet_share,
+            ml_min_unique_labeled_markets=cfg.ml_min_unique_labeled_markets,
+            ml_max_top_market_share=cfg.ml_max_top_market_share,
+            ml_min_resolution_labeled_buys=cfg.ml_min_resolution_labeled_buys,
+            ml_min_wallet_sell_labeled_buys=cfg.ml_min_wallet_sell_labeled_buys,
         )
     )
 

@@ -614,6 +614,21 @@ class WalletCopyResearchStore:
             ).fetchone()
         return dict(row) if row is not None else None
 
+    def list_wallet_market_sells(self, *, wallet_address: str, condition_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM wallet_trades
+                WHERE side = 'SELL'
+                  AND wallet_address = ?
+                  AND market_condition_id = ?
+                ORDER BY timestamp ASC
+                """,
+                (wallet_address, condition_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def apply_wallet_sell_label(self, *, buy_trade_id: int, sell_row: dict[str, Any], match_quality: str) -> None:
         with self._lock, self._connect() as conn:
             buy_row = conn.execute(

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from bisect import bisect_left
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from config import PipelineConfig, WalletCopyResearchConfig
@@ -57,18 +58,54 @@ class WalletLabelerService:
 
     async def _apply_wallet_sell_labels(self, now_ts: float) -> None:
         labeled = 0
-        for index, buy_row in enumerate(self.store.get_unlabeled_buy_trades(limit=250), start=1):
-            sell_row = self.store.find_first_later_sell(buy_row)
-            if sell_row is None:
-                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
-                    self.store.mark_heartbeat("labeler", time.time())
-                continue
-            self.store.apply_wallet_sell_label(
-                buy_trade_id=int(buy_row["id"]),
-                sell_row=sell_row,
-                match_quality="first_later_sell",
+        buy_rows = self.store.get_unlabeled_buy_trades(limit=250)
+        grouped_buys: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
+        for buy_row in buy_rows:
+            grouped_buys[(str(buy_row["wallet_address"]), str(buy_row["market_condition_id"]))].append(buy_row)
+
+        semaphore = asyncio.Semaphore(self.cfg.wallet_sell_backfill_concurrency)
+
+        async def fetch_sell_candidates(
+            wallet_address: str,
+            condition_id: str,
+        ) -> tuple[tuple[str, str], list[dict[str, object]]]:
+            async with semaphore:
+                local_rows = self.store.list_wallet_market_sells(
+                    wallet_address=wallet_address,
+                    condition_id=condition_id,
+                )
+                remote_rows = await self.collector.get_wallet_activity(
+                    wallet_address,
+                    limit=self.cfg.wallet_sell_backfill_limit,
+                    activity_type="TRADE",
+                    side="SELL",
+                    condition_id=condition_id,
+                )
+            candidates = self._merge_sell_candidates(
+                wallet_address=wallet_address,
+                local_rows=local_rows,
+                remote_rows=remote_rows,
             )
-            labeled += 1
+            return (wallet_address, condition_id), candidates
+
+        sell_candidates_by_group = dict(
+            await asyncio.gather(
+                *(fetch_sell_candidates(wallet_address, condition_id) for wallet_address, condition_id in grouped_buys),
+                return_exceptions=False,
+            )
+        )
+
+        for index, buy_row in enumerate(buy_rows, start=1):
+            group_key = (str(buy_row["wallet_address"]), str(buy_row["market_condition_id"]))
+            candidates = sell_candidates_by_group.get(group_key, [])
+            sell_row = self._match_first_later_sell(buy_row, candidates)
+            if sell_row is not None:
+                self.store.apply_wallet_sell_label(
+                    buy_trade_id=int(buy_row["id"]),
+                    sell_row=sell_row,
+                    match_quality=str(sell_row.get("match_quality") or "grouped_first_later_sell"),
+                )
+                labeled += 1
             if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
                 self.store.mark_heartbeat("labeler", time.time())
         if labeled:
@@ -157,6 +194,94 @@ class WalletLabelerService:
         if best_distance > 900:
             return None
         return best_price
+
+    def _merge_sell_candidates(
+        self,
+        *,
+        wallet_address: str,
+        local_rows: list[dict[str, object]],
+        remote_rows: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        merged: dict[tuple[str, str, str, float], dict[str, object]] = {}
+        for row in local_rows:
+            normalized = self._normalize_local_sell_row(row)
+            if normalized is None:
+                continue
+            merged[self._sell_candidate_key(normalized)] = normalized
+        for row in remote_rows:
+            normalized = self._normalize_remote_sell_row(wallet_address=wallet_address, row=row)
+            if normalized is None:
+                continue
+            merged.setdefault(self._sell_candidate_key(normalized), normalized)
+        return sorted(merged.values(), key=lambda row: float(row.get("timestamp") or 0.0))
+
+    @staticmethod
+    def _normalize_local_sell_row(row: dict[str, object]) -> dict[str, object] | None:
+        asset_token_id = str(row.get("asset_token_id") or "")
+        timestamp = float(row.get("timestamp") or 0.0)
+        if not asset_token_id or timestamp <= 0:
+            return None
+        return {
+            "trade_key": row.get("trade_key"),
+            "tx_hash": row.get("tx_hash"),
+            "timestamp": timestamp,
+            "asset_token_id": asset_token_id,
+            "price": row.get("price"),
+            "size_shares": row.get("size_shares"),
+            "match_quality": "local_first_later_sell",
+        }
+
+    @staticmethod
+    def _normalize_remote_sell_row(wallet_address: str, row: dict[str, object]) -> dict[str, object] | None:
+        if str(row.get("side") or "").upper() != "SELL":
+            return None
+        asset_token_id = str(row.get("asset") or "")
+        timestamp = float(row.get("timestamp") or 0.0)
+        if not asset_token_id or timestamp <= 0:
+            return None
+        return {
+            "trade_key": "|".join(
+                [
+                    wallet_address,
+                    str(row.get("transactionHash") or ""),
+                    str(row.get("conditionId") or ""),
+                    asset_token_id,
+                    "SELL",
+                    str(row.get("timestamp") or ""),
+                    str(row.get("type") or "TRADE"),
+                ]
+            ),
+            "tx_hash": row.get("transactionHash"),
+            "timestamp": timestamp,
+            "asset_token_id": asset_token_id,
+            "price": row.get("price"),
+            "size_shares": row.get("size"),
+            "match_quality": "api_first_later_sell",
+        }
+
+    @staticmethod
+    def _sell_candidate_key(row: dict[str, object]) -> tuple[str, str, str, float]:
+        return (
+            str(row.get("tx_hash") or ""),
+            str(row.get("trade_key") or ""),
+            str(row.get("asset_token_id") or ""),
+            float(row.get("timestamp") or 0.0),
+        )
+
+    @staticmethod
+    def _match_first_later_sell(
+        buy_row: dict[str, object],
+        candidates: list[dict[str, object]],
+    ) -> dict[str, object] | None:
+        asset_token_id = str(buy_row.get("asset_token_id") or "")
+        buy_timestamp = float(buy_row.get("timestamp") or 0.0)
+        for candidate in candidates:
+            if str(candidate.get("asset_token_id") or "") != asset_token_id:
+                continue
+            if float(candidate.get("timestamp") or 0.0) <= buy_timestamp:
+                continue
+            return candidate
+        return None
 
     @staticmethod
     def _resolution_timestamp(market) -> float:

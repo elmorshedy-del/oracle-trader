@@ -559,6 +559,10 @@ class WalletCopyResearchConfig:
     wallet_activity_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_WALLET_ACTIVITY_LIMIT", "20"))
     positions_refresh_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_POSITIONS_REFRESH_SECONDS", "300"))
     labeler_poll_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_LABELER_POLL_SECONDS", "60"))
+    wallet_sell_backfill_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_WALLET_SELL_BACKFILL_LIMIT", "200"))
+    wallet_sell_backfill_concurrency: int = int(
+        os.getenv("WALLET_COPY_RESEARCH_WALLET_SELL_BACKFILL_CONCURRENCY", "8")
+    )
 
     market_cache_ttl_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_MARKET_CACHE_TTL_SECONDS", "30"))
     orderbook_cache_ttl_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_ORDERBOOK_CACHE_TTL_SECONDS", "10"))

@@ -842,6 +842,74 @@ class WalletCopyResearchStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_resolution_training_rows_after_id(
+        self,
+        *,
+        last_id: int = 0,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT
+                    id,
+                    trade_key,
+                    timestamp,
+                    detected_at,
+                    wallet_address,
+                    market_condition_id,
+                    asset_token_id,
+                    market_title,
+                    market_slug,
+                    outcome,
+                    price,
+                    size_shares,
+                    size_usd,
+                    token_best_bid,
+                    token_best_ask,
+                    token_best_bid_size,
+                    token_best_ask_size,
+                    token_depth_within_2pct,
+                    market_yes_bid,
+                    market_yes_ask,
+                    market_no_bid,
+                    market_no_ask,
+                    market_spread,
+                    market_volume_24h,
+                    market_volume_total,
+                    market_liquidity,
+                    market_midpoint,
+                    market_reward_pool,
+                    market_primary_tag,
+                    market_seconds_to_expiry,
+                    market_category,
+                    wallet_leaderboard_rank,
+                    wallet_leaderboard_profit,
+                    wallet_leaderboard_win_rate,
+                    wallet_open_positions,
+                    wallet_trade_count_24h,
+                    is_adding_to_position,
+                    size_vs_wallet_avg,
+                    detection_delay_seconds,
+                    hour_of_day,
+                    day_of_week,
+                    btc_price,
+                    btc_momentum_60s,
+                    resolution_timestamp,
+                    resolution_return,
+                    is_win_resolution,
+                    winning_outcome
+                FROM wallet_trades
+                WHERE id > ?
+                  AND {self._ml_ready_buy_predicate()}
+                  AND market_resolved = 1
+                ORDER BY id ASC
+                LIMIT ?
+                """,
+                (last_id, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_wallet_trade(self, *, trade_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(

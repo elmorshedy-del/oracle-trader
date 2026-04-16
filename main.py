@@ -494,6 +494,25 @@ async def collection_stats():
     )
 
 
+@app.get("/api/wallet_resolution_rows")
+async def wallet_resolution_rows(after_id: int = 0, limit: int = 500):
+    """Paginated resolved BUY rows for offline wallet-copy ML research."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    rows = wallet_copy_store.list_resolution_training_rows_after_id(
+        last_id=max(0, after_id),
+        limit=max(1, min(limit, 500)),
+    )
+    next_after_id = int(rows[-1]["id"]) if rows else max(0, after_id)
+    return JSONResponse(
+        {
+            "rows": rows,
+            "next_after_id": next_after_id,
+            "has_more": len(rows) >= max(1, min(limit, 500)),
+        }
+    )
+
+
 @app.get("/api/copy_signal")
 async def copy_signal(limit: int = 50, strategy_key: str | None = None):
     """Recent heuristic copy decisions scored from the real wallet-copy trade tape."""

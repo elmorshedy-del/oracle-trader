@@ -383,11 +383,15 @@
       document.getElementById('watchlistCount').textContent = fmtNumber(counts.tracked_wallets || 0);
       document.getElementById('schemaVersion').textContent = stats.schema_version || '-';
 
+      const positionsDetail = [
+        `complete ${fmtAgo(health.last_positions_completed_at || health.last_positions_refresh_at)}`,
+        `progress ${fmtAgo(health.last_positions_progress_at || health.last_positions_refresh_at)}`,
+      ].join(' · ');
       const checkpoints = [
         ['Tracker heartbeat', health.tracker_alive, fmtAgo(health.last_tracker_heartbeat)],
         ['Labeler heartbeat', health.labeler_alive, fmtAgo(health.last_labeler_heartbeat)],
         ['Leaderboard freshness', health.leaderboard_fresh, fmtAgo(health.last_leaderboard_refresh_at)],
-        ['Positions freshness', health.positions_fresh, fmtAgo(health.last_positions_refresh_at)],
+        ['Positions refresh', health.positions_ok ?? health.positions_fresh, positionsDetail],
         ['DB writable', health.db_writable, health.db_writable ? 'ok' : 'check'],
       ];
 

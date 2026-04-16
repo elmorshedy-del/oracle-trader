@@ -106,10 +106,10 @@ class WalletLabelerService:
         updated = 0
         cache: dict[str, list[dict[str, float]]] = {}
         for index, trade_row in enumerate(self.store.trades_missing_price_checkpoints(limit=250), start=1):
+            if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                self.store.mark_heartbeat("labeler", time.time())
             trade_ts = float(trade_row["timestamp"] or 0.0)
             if now_ts - trade_ts < 1800:
-                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
-                    self.store.mark_heartbeat("labeler", time.time())
                 continue
             asset_token_id = str(trade_row["asset_token_id"])
             history = cache.get(asset_token_id)
@@ -121,6 +121,8 @@ class WalletLabelerService:
                 )
                 cache[asset_token_id] = history
             if not history:
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("labeler", time.time())
                 continue
             p1 = self._history_price_at(history, trade_ts + 60.0)
             p5 = self._history_price_at(history, trade_ts + 300.0)

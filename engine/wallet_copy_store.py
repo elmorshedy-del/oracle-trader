@@ -1154,7 +1154,11 @@ class WalletCopyResearchStore:
         tracker_heartbeat = self.get_meta("tracker_last_heartbeat")
         labeler_heartbeat = self.get_meta("labeler_last_heartbeat")
         leaderboard_heartbeat = self.get_meta("leaderboard_last_refreshed_at")
-        positions_heartbeat = self.get_meta("positions_last_refreshed_at")
+        positions_refreshed_at = self.get_meta("positions_last_refreshed_at")
+        positions_started_at = self.get_meta("positions_last_started_at")
+        positions_progress_at = self.get_meta("positions_last_progress_at")
+        positions_completed_at = self.get_meta("positions_last_completed_at")
+        positions_heartbeat = positions_completed_at if isinstance(positions_completed_at, (int, float)) else positions_refreshed_at
         tracked_wallet_count = int(
             (tracked_wallet_count_row["tracked_wallet_count"] if tracked_wallet_count_row else 0) or 0
         )
@@ -1168,6 +1172,9 @@ class WalletCopyResearchStore:
         tracker_threshold = max(float(tracker_poll_seconds * 3), 180.0)
         labeler_threshold = max(float(labeler_poll_seconds * 3), 180.0)
         positions_threshold = max(float(positions_refresh_seconds * 3), 900.0)
+        positions_active_threshold = max(float(tracker_poll_seconds * 6), 300.0)
+        positions_fresh = alive(positions_heartbeat, positions_threshold)
+        positions_refresh_active = alive(positions_progress_at, positions_active_threshold)
         return {
             "target_labeled_buys": self.target_labeled_buys,
             "progress_basis": "ml_ready_labeled_buys",
@@ -1199,12 +1206,17 @@ class WalletCopyResearchStore:
                 "tracker_alive": alive(tracker_heartbeat, tracker_threshold),
                 "labeler_alive": alive(labeler_heartbeat, labeler_threshold),
                 "leaderboard_fresh": alive(leaderboard_heartbeat, leaderboard_refresh_seconds * 1.5),
-                "positions_fresh": alive(positions_heartbeat, positions_threshold),
+                "positions_fresh": positions_fresh,
+                "positions_refresh_active": positions_refresh_active,
+                "positions_ok": positions_fresh or positions_refresh_active,
                 "db_writable": db_writable,
                 "last_tracker_heartbeat": tracker_heartbeat,
                 "last_labeler_heartbeat": labeler_heartbeat,
                 "last_leaderboard_refresh_at": leaderboard_heartbeat,
                 "last_positions_refresh_at": positions_heartbeat,
+                "last_positions_started_at": positions_started_at,
+                "last_positions_progress_at": positions_progress_at,
+                "last_positions_completed_at": positions_completed_at,
             },
             "schema_version": self.schema_version,
             "collector_version": self.collector_version,

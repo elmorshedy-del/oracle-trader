@@ -176,6 +176,8 @@ class WalletTrackerService:
             return
         if self._last_positions_refresh_at and now_ts - self._last_positions_refresh_at < self.cfg.positions_refresh_seconds:
             return
+        self.store.set_meta("positions_last_started_at", now_ts, updated_at=now_ts)
+        self.store.set_meta("positions_last_progress_at", now_ts, updated_at=now_ts)
         semaphore = asyncio.Semaphore(self.cfg.positions_concurrency)
 
         async def fetch(wallet: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
@@ -183,10 +185,15 @@ class WalletTrackerService:
                 rows = await self.collector.get_wallet_positions(wallet["address"])
                 return wallet["address"], rows
 
-        for index, (address, rows) in enumerate(
-            await asyncio.gather(*(fetch(wallet) for wallet in self._tracked_wallets)),
-            start=1,
-        ):
+        results = await asyncio.gather(*(fetch(wallet) for wallet in self._tracked_wallets), return_exceptions=True)
+        for index, result in enumerate(results, start=1):
+            if isinstance(result, Exception):
+                logger.warning("[WALLET_COPY] positions fetch error: %s", result)
+                self.store.set_meta("positions_last_progress_at", time.time(), updated_at=time.time())
+                if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
+                    self.store.mark_heartbeat("tracker", time.time())
+                continue
+            address, rows = result
             held_condition_ids = sorted({str(row.get("conditionId") or "") for row in rows if row.get("conditionId")})
             held_asset_ids = sorted({str(row.get("asset") or "") for row in rows if row.get("asset")})
             snapshot = {
@@ -207,9 +214,13 @@ class WalletTrackerService:
                 raw_positions=rows,
             )
             if index == 1 or index % HEARTBEAT_PROGRESS_INTERVAL == 0:
-                self.store.mark_heartbeat("tracker", time.time())
-        self._last_positions_refresh_at = now_ts
-        self.store.set_meta("positions_last_refreshed_at", now_ts, updated_at=now_ts)
+                progress_at = time.time()
+                self.store.set_meta("positions_last_progress_at", progress_at, updated_at=progress_at)
+                self.store.mark_heartbeat("tracker", progress_at)
+        completed_at = time.time()
+        self._last_positions_refresh_at = completed_at
+        self.store.set_meta("positions_last_refreshed_at", completed_at, updated_at=completed_at)
+        self.store.set_meta("positions_last_completed_at", completed_at, updated_at=completed_at)
 
     async def _poll_wallet_activity(self, now_ts: float) -> None:
         if not self._tracked_wallets:

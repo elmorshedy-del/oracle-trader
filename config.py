@@ -537,7 +537,7 @@ class WalletCopyResearchConfig:
     db_filename: str = os.getenv("WALLET_COPY_RESEARCH_DB_FILENAME", "wallet_copy_research.sqlite")
     schema_version: str = os.getenv("WALLET_COPY_RESEARCH_SCHEMA_VERSION", "v1")
     collector_version: str = os.getenv("WALLET_COPY_RESEARCH_COLLECTOR_VERSION", "wallet-copy-v1")
-    target_labeled_buys: int = int(os.getenv("WALLET_COPY_RESEARCH_TARGET_LABELED_BUYS", "2000"))
+    target_labeled_buys: int = int(os.getenv("WALLET_COPY_RESEARCH_TARGET_LABELED_BUYS", "10000"))
 
     leaderboard_refresh_seconds: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_REFRESH_SECONDS", "86400"))
     leaderboard_all_limit: int = int(os.getenv("WALLET_COPY_RESEARCH_LEADERBOARD_ALL_LIMIT", "50"))

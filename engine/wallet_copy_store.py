@@ -26,8 +26,8 @@ class WalletCopyResearchStore:
         self._init_db()
         self.set_meta("schema_version", schema_version)
         self.set_meta("collector_version", collector_version)
-        if self.get_meta("collection_started_at") is None:
-            self.set_meta("collection_started_at", self._json_value(None))
+        if self.get_meta("collection_started_at") in {None, "null"}:
+            self.set_meta("collection_started_at", None)
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30.0)
@@ -228,6 +228,26 @@ class WalletCopyResearchStore:
     @staticmethod
     def _json_value(value: Any) -> str:
         return json.dumps(value, sort_keys=True, default=str)
+
+    @staticmethod
+    def _ml_ready_buy_predicate(alias: str = "") -> str:
+        prefix = f"{alias}." if alias else ""
+        return (
+            f"{prefix}side = 'BUY'"
+            f" AND COALESCE({prefix}price, 0) > 0"
+            f" AND COALESCE({prefix}size_usd, 0) > 0"
+            f" AND COALESCE({prefix}market_closed, 0) = 0"
+            f" AND ({prefix}market_seconds_to_expiry IS NULL OR {prefix}market_seconds_to_expiry > 0)"
+        )
+
+    @staticmethod
+    def _stale_buy_predicate(alias: str = "") -> str:
+        prefix = f"{alias}." if alias else ""
+        return (
+            f"{prefix}side = 'BUY'"
+            f" AND (COALESCE({prefix}market_closed, 0) = 1"
+            f" OR ({prefix}market_seconds_to_expiry IS NOT NULL AND {prefix}market_seconds_to_expiry <= 0))"
+        )
 
     def set_meta(self, key: str, value: Any, *, updated_at: float | None = None) -> None:
         updated_at = float(updated_at if updated_at is not None else __import__("time").time())
@@ -494,7 +514,7 @@ class WalletCopyResearchStore:
             conn.commit()
             inserted = cursor.rowcount > 0
         if inserted:
-            if self.get_meta("collection_started_at") is None:
+            if self.get_meta("collection_started_at") in {None, "null"}:
                 self.set_meta("collection_started_at", row["detected_at"], updated_at=row["detected_at"])
             self.set_meta("tracker_last_trade_detected_at", row["detected_at"], updated_at=row["detected_at"])
         return inserted
@@ -711,6 +731,8 @@ class WalletCopyResearchStore:
                     wallet_leaderboard_rank, wallet_trade_count_24h, is_adding_to_position, size_vs_wallet_avg,
                     btc_price, btc_momentum_60s, wallet_sell_timestamp, wallet_sell_price, wallet_sell_return,
                     market_resolved, resolution_timestamp, winning_outcome, resolution_return,
+                    CASE WHEN {self._ml_ready_buy_predicate()} THEN 1 ELSE 0 END AS ml_ready_candidate,
+                    CASE WHEN {self._stale_buy_predicate()} THEN 1 ELSE 0 END AS stale_candidate,
                     price_1min_after, price_5min_after, price_30min_after
                 FROM wallet_trades
                 {where}
@@ -1085,9 +1107,11 @@ class WalletCopyResearchStore:
         leaderboard_refresh_seconds: int,
         positions_refresh_seconds: int,
     ) -> dict[str, Any]:
+        ml_ready_buy = self._ml_ready_buy_predicate()
+        stale_buy = self._stale_buy_predicate()
         with self._connect() as conn:
             counts = conn.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS total_trades,
                     SUM(CASE WHEN side = 'BUY' THEN 1 ELSE 0 END) AS total_buys,
@@ -1095,9 +1119,15 @@ class WalletCopyResearchStore:
                     SUM(CASE WHEN side = 'BUY' AND wallet_sell_timestamp IS NOT NULL THEN 1 ELSE 0 END) AS wallet_sell_labeled_buys,
                     SUM(CASE WHEN side = 'BUY' AND market_resolved = 1 THEN 1 ELSE 0 END) AS resolution_labeled_buys,
                     SUM(CASE WHEN side = 'BUY' AND (wallet_sell_timestamp IS NOT NULL OR market_resolved = 1) THEN 1 ELSE 0 END) AS labeled_buys,
+                    SUM(CASE WHEN {ml_ready_buy} THEN 1 ELSE 0 END) AS ml_ready_buys,
+                    SUM(CASE WHEN {ml_ready_buy} AND wallet_sell_timestamp IS NOT NULL THEN 1 ELSE 0 END) AS ml_ready_wallet_sell_labeled_buys,
+                    SUM(CASE WHEN {ml_ready_buy} AND market_resolved = 1 THEN 1 ELSE 0 END) AS ml_ready_resolution_labeled_buys,
+                    SUM(CASE WHEN {ml_ready_buy} AND (wallet_sell_timestamp IS NOT NULL OR market_resolved = 1) THEN 1 ELSE 0 END) AS ml_ready_labeled_buys,
+                    SUM(CASE WHEN {stale_buy} THEN 1 ELSE 0 END) AS stale_buy_candidates,
                     COUNT(DISTINCT wallet_address) AS unique_wallets,
                     COUNT(DISTINCT market_condition_id) AS unique_markets,
                     MIN(timestamp) AS first_trade_timestamp,
+                    MIN(detected_at) AS first_trade_detected_at,
                     MAX(detected_at) AS latest_trade_detected_at
                 FROM wallet_trades
                 """
@@ -1107,17 +1137,18 @@ class WalletCopyResearchStore:
             ).fetchone()
         collection_started_at = self.get_meta("collection_started_at")
         if not isinstance(collection_started_at, (int, float)) or collection_started_at <= 0:
-            first_trade_timestamp = float(counts["first_trade_timestamp"] or 0.0)
-            collection_started_at = first_trade_timestamp if first_trade_timestamp > 0 else None
+            first_trade_detected_at = float(counts["first_trade_detected_at"] or 0.0)
+            collection_started_at = first_trade_detected_at if first_trade_detected_at > 0 else None
         labeled_buys = int(counts["labeled_buys"] or 0)
+        ml_ready_labeled_buys = int(counts["ml_ready_labeled_buys"] or 0)
         elapsed_days = None
         labels_per_day = None
         eta_days = None
         if isinstance(collection_started_at, (int, float)) and collection_started_at > 0 and now_ts > collection_started_at:
             elapsed_days = (now_ts - collection_started_at) / 86400.0
             if elapsed_days > 0:
-                labels_per_day = labeled_buys / elapsed_days
-                remaining = max(self.target_labeled_buys - labeled_buys, 0)
+                labels_per_day = ml_ready_labeled_buys / elapsed_days
+                remaining = max(self.target_labeled_buys - ml_ready_labeled_buys, 0)
                 eta_days = (remaining / labels_per_day) if labels_per_day > 0 and remaining > 0 else 0.0
 
         tracker_heartbeat = self.get_meta("tracker_last_heartbeat")
@@ -1133,12 +1164,13 @@ class WalletCopyResearchStore:
         def alive(last_seen: Any, threshold: float) -> bool:
             return isinstance(last_seen, (int, float)) and (now_ts - float(last_seen)) <= threshold
 
-        progress_pct = min(100.0, (labeled_buys / self.target_labeled_buys) * 100.0) if self.target_labeled_buys > 0 else 0.0
+        progress_pct = min(100.0, (ml_ready_labeled_buys / self.target_labeled_buys) * 100.0) if self.target_labeled_buys > 0 else 0.0
         tracker_threshold = max(float(tracker_poll_seconds * 3), 180.0)
         labeler_threshold = max(float(labeler_poll_seconds * 3), 180.0)
         positions_threshold = max(float(positions_refresh_seconds * 3), 900.0)
         return {
             "target_labeled_buys": self.target_labeled_buys,
+            "progress_basis": "ml_ready_labeled_buys",
             "progress_pct": round(progress_pct, 2),
             "counts": {
                 "total_trades": int(counts["total_trades"] or 0),
@@ -1147,6 +1179,11 @@ class WalletCopyResearchStore:
                 "wallet_sell_labeled_buys": int(counts["wallet_sell_labeled_buys"] or 0),
                 "resolution_labeled_buys": int(counts["resolution_labeled_buys"] or 0),
                 "labeled_buys": labeled_buys,
+                "ml_ready_buys": int(counts["ml_ready_buys"] or 0),
+                "ml_ready_wallet_sell_labeled_buys": int(counts["ml_ready_wallet_sell_labeled_buys"] or 0),
+                "ml_ready_resolution_labeled_buys": int(counts["ml_ready_resolution_labeled_buys"] or 0),
+                "ml_ready_labeled_buys": ml_ready_labeled_buys,
+                "stale_buy_candidates": int(counts["stale_buy_candidates"] or 0),
                 "unique_wallets": int(counts["unique_wallets"] or 0),
                 "unique_markets": int(counts["unique_markets"] or 0),
                 "tracked_wallets": tracked_wallet_count,

@@ -238,12 +238,13 @@
         <div class="value" id="progressHeadline">0.00%</div>
         <div class="progress-wrap">
           <div class="progress-meta">
-            <span id="progressCopy">0 of 0 labeled buys</span>
+            <span id="progressCopy">0 of 0 ML-ready labeled buys</span>
             <span id="progressEta">Estimating...</span>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
           </div>
+          <div class="sub muted" id="progressQuality">Raw labels and excluded stale buys will appear here.</div>
         </div>
         <div class="stats">
           <div class="stat">
@@ -255,7 +256,7 @@
             <div class="value" id="marketCount">0</div>
           </div>
           <div class="stat">
-            <div class="label">Labels Per Day</div>
+            <div class="label">ML-Ready Labels / Day</div>
             <div class="value" id="labelRate">0</div>
           </div>
           <div class="stat">
@@ -359,10 +360,15 @@
       const counts = stats.counts || {};
       const timing = stats.timing || {};
       const health = stats.health || {};
+      const progressCount = counts.ml_ready_labeled_buys ?? counts.labeled_buys ?? 0;
+      const staleBuys = counts.stale_buy_candidates ?? 0;
+      const rawLabeled = counts.labeled_buys ?? 0;
 
       document.getElementById('progressHeadline').textContent = fmtPct(stats.progress_pct || 0, 2);
       document.getElementById('progressCopy').textContent =
-        `${fmtNumber(counts.labeled_buys || 0)} of ${fmtNumber(stats.target_labeled_buys || 0)} labeled buys`;
+        `${fmtNumber(progressCount || 0)} of ${fmtNumber(stats.target_labeled_buys || 0)} ML-ready labeled buys`;
+      document.getElementById('progressQuality').textContent =
+        `Raw labeled buys: ${fmtNumber(rawLabeled || 0)} · stale/expired buy candidates excluded from target: ${fmtNumber(staleBuys || 0)}`;
       document.getElementById('progressEta').textContent =
         timing.eta_days_to_target === null || timing.eta_days_to_target === undefined
           ? 'ETA: estimating...'

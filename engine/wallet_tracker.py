@@ -565,7 +565,39 @@ class WalletTrackerService:
     @staticmethod
     def _categorize_market(*, slug: str, title: str, tags: list[str]) -> str:
         haystack = " ".join([slug.lower(), title.lower(), " ".join(tag.lower() for tag in tags)])
-        if any(keyword in haystack for keyword in ("nhl", "nba", "nfl", "mlb", "soccer", "football", "tennis", "ufc", "fifa", "golf")):
+        if any(
+            keyword in haystack
+            for keyword in (
+                "cs2",
+                "counter-strike",
+                "valorant",
+                "val-",
+                "league of legends",
+                "lol-",
+                "dota",
+                "esports",
+                "e-sports",
+            )
+        ):
+            return "esports"
+        if any(
+            keyword in haystack
+            for keyword in (
+                "nhl",
+                "nba",
+                "nfl",
+                "mlb",
+                "mlb-",
+                "soccer",
+                "football",
+                "tennis",
+                "atp-",
+                "wta-",
+                "ufc",
+                "fifa",
+                "golf",
+            )
+        ):
             return "sports"
         if any(keyword in haystack for keyword in ("bitcoin", "btc", "ethereum", "eth", "sol", "crypto")):
             if any(keyword in haystack for keyword in ("5m", "5 min", "15m", "15 min", "30m", "30 min")):

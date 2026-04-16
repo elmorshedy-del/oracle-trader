@@ -250,6 +250,38 @@ class WalletCopyResearchStore:
         )
 
     @staticmethod
+    def _ml_category_expr(alias: str = "") -> str:
+        prefix = f"{alias}." if alias else ""
+        haystack = (
+            f"LOWER(COALESCE({prefix}market_slug, '') || ' ' || "
+            f"COALESCE({prefix}market_title, '') || ' ' || "
+            f"COALESCE({prefix}market_primary_tag, ''))"
+        )
+        return (
+            "CASE "
+            f"WHEN {haystack} LIKE '%cs2%' OR {haystack} LIKE '%valorant%' OR {haystack} LIKE '%val-%' "
+            f"OR {haystack} LIKE '%league of legends%' OR {haystack} LIKE '%lol-%' OR {haystack} LIKE '%dota%' "
+            f"THEN 'esports' "
+            f"WHEN {haystack} LIKE '%mlb%' OR {haystack} LIKE '%nba%' OR {haystack} LIKE '%nfl%' "
+            f"OR {haystack} LIKE '%nhl%' OR {haystack} LIKE '%soccer%' OR {haystack} LIKE '%football%' "
+            f"OR {haystack} LIKE '%tennis%' OR {haystack} LIKE '%atp-%' OR {haystack} LIKE '%wta-%' "
+            f"OR {haystack} LIKE '%ufc%' OR {haystack} LIKE '%fifa%' OR {haystack} LIKE '%golf%' "
+            f"THEN 'sports' "
+            f"WHEN {haystack} LIKE '%bitcoin%' OR {haystack} LIKE '%btc%' OR {haystack} LIKE '%ethereum%' "
+            f"OR {haystack} LIKE '%eth%' OR {haystack} LIKE '%solana%' OR {haystack} LIKE '% sol %' "
+            f"OR {haystack} LIKE '%crypto%' THEN 'crypto' "
+            f"WHEN {haystack} LIKE '%election%' OR {haystack} LIKE '%president%' OR {haystack} LIKE '%senate%' "
+            f"OR {haystack} LIKE '%house%' OR {haystack} LIKE '%governor%' OR {haystack} LIKE '%mayor%' "
+            f"OR {haystack} LIKE '%parliament%' THEN 'politics' "
+            f"WHEN {haystack} LIKE '%fed%' OR {haystack} LIKE '%rates%' OR {haystack} LIKE '%cpi%' "
+            f"OR {haystack} LIKE '%inflation%' OR {haystack} LIKE '%recession%' OR {haystack} LIKE '%gdp%' "
+            f"OR {haystack} LIKE '%tariff%' OR {haystack} LIKE '%economy%' THEN 'macro' "
+            f"WHEN {haystack} LIKE '%policy%' OR {haystack} LIKE '%law%' OR {haystack} LIKE '%court%' "
+            f"OR {haystack} LIKE '%supreme court%' OR {haystack} LIKE '%executive order%' THEN 'policy' "
+            f"ELSE COALESCE(NULLIF({prefix}market_category, ''), 'unknown') END"
+        )
+
+    @staticmethod
     def _share(part: int | float, total: int | float) -> float:
         return round((float(part) / float(total)), 4) if total else 0.0
 
@@ -1144,6 +1176,7 @@ class WalletCopyResearchStore:
     ) -> dict[str, Any]:
         ml_ready_buy = self._ml_ready_buy_predicate()
         ml_ready_labeled_buy = f"({ml_ready_buy}) AND (wallet_sell_timestamp IS NOT NULL OR market_resolved = 1)"
+        ml_category = self._ml_category_expr()
         stale_buy = self._stale_buy_predicate()
         with self._connect() as conn:
             counts = conn.execute(
@@ -1171,13 +1204,13 @@ class WalletCopyResearchStore:
             category_rows = conn.execute(
                 f"""
                 SELECT
-                    COALESCE(NULLIF(market_category, ''), 'unknown') AS category,
+                    {ml_category} AS category,
                     COUNT(*) AS labeled_buys,
                     COUNT(DISTINCT wallet_address) AS unique_wallets,
                     COUNT(DISTINCT market_condition_id) AS unique_markets
                 FROM wallet_trades
                 WHERE {ml_ready_labeled_buy}
-                GROUP BY COALESCE(NULLIF(market_category, ''), 'unknown')
+                GROUP BY {ml_category}
                 ORDER BY labeled_buys DESC
                 """
             ).fetchall()
@@ -1213,12 +1246,12 @@ class WalletCopyResearchStore:
                 SELECT
                     market_condition_id,
                     market_slug,
-                    COALESCE(NULLIF(market_category, ''), 'unknown') AS category,
+                    {ml_category} AS category,
                     COUNT(*) AS labeled_buys,
                     COUNT(DISTINCT wallet_address) AS unique_wallets
                 FROM wallet_trades
                 WHERE {ml_ready_labeled_buy}
-                GROUP BY market_condition_id, market_slug, COALESCE(NULLIF(market_category, ''), 'unknown')
+                GROUP BY market_condition_id, market_slug, {ml_category}
                 ORDER BY labeled_buys DESC
                 LIMIT 10
                 """

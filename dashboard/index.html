@@ -666,7 +666,7 @@ let stateFetchInFlight = false;
 let statePollTimer = null;
 const CRYPTO_PAIRS_VIEW_KEYS = ['crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt'];
 const COPY_HEURISTIC_VIEW_KEYS = ['wallet_selective_copy_shadow', 'wallet_whale_consensus_shadow', 'wallet_contrarian_exit_shadow', 'wallet_fresh_market_shadow'];
-const SELF_MANAGED_SHADOW_VIEW_KEYS = ['weather_edge_live', 'copy_trader_shadow', ...COPY_HEURISTIC_VIEW_KEYS, 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', ...CRYPTO_PAIRS_VIEW_KEYS];
+const SELF_MANAGED_SHADOW_VIEW_KEYS = ['weather_edge_live', 'copy_trader_shadow', ...COPY_HEURISTIC_VIEW_KEYS, 'wallet_ml_30m_drift_shadow', 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', ...CRYPTO_PAIRS_VIEW_KEYS];
 
 function isCryptoPairsShadowView(viewKey) {
   return CRYPTO_PAIRS_VIEW_KEYS.includes(viewKey);
@@ -694,6 +694,7 @@ function stratBadge(source) {
     'wallet_whale_consensus_shadow': ['CONS', 'strat-whale'],
     'wallet_contrarian_exit_shadow': ['XREV', 'strat-whale'],
     'wallet_fresh_market_shadow': ['FRESH', 'strat-whale'],
+    'wallet_ml_30m_drift_shadow': ['ML DFT', 'strat-whale'],
     'kalshi_btc_arb_shadow': ['PK ARB', 'strat-arbitrage'],
     'crypto_pairs_aave_doge_shadow': ['PAIRS', 'strat-crypto'],
     'crypto_pairs_comp_floki_shadow': ['PAIRS', 'strat-crypto'],
@@ -733,6 +734,7 @@ function normalizeStrategyKey(key) {
     wallet_whale_consensus_shadow: 'wallet_whale_consensus_shadow',
     wallet_contrarian_exit_shadow: 'wallet_contrarian_exit_shadow',
     wallet_fresh_market_shadow: 'wallet_fresh_market_shadow',
+    wallet_ml_30m_drift_shadow: 'wallet_ml_30m_drift_shadow',
     kalshi_btc_arb_shadow: 'kalshi_btc_arb_shadow',
     crypto_pairs_shadow: 'crypto_pairs_aave_doge_shadow',
     crypto_pairs_shadow_comp_floki: 'crypto_pairs_comp_floki_shadow',
@@ -839,6 +841,7 @@ function renderViewTabs(d) {
     'wallet_whale_consensus_shadow',
     'wallet_contrarian_exit_shadow',
     'wallet_fresh_market_shadow',
+    'wallet_ml_30m_drift_shadow',
     'kalshi_btc_arb_shadow',
     'bitcoin_meanrev_shadow',
     'crypto_pairs_aave_doge',
@@ -984,7 +987,7 @@ function render(d) {
   // Strategy Performance
   const perfEl = document.getElementById('strategy-perf');
   const comparisonViews = d.comparison_views || {};
-  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'weather_edge_live', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_latency_shadow', 'copy_trader_shadow', 'wallet_selective_copy_shadow', 'wallet_whale_consensus_shadow', 'wallet_contrarian_exit_shadow', 'wallet_fresh_market_shadow', 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'weather_edge_live', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_latency_shadow', 'copy_trader_shadow', 'wallet_selective_copy_shadow', 'wallet_whale_consensus_shadow', 'wallet_contrarian_exit_shadow', 'wallet_fresh_market_shadow', 'wallet_ml_30m_drift_shadow', 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
   const sportsIndex = order.indexOf('bitcoin_whale');
   order.splice(sportsIndex, 0, 'sports');
   const rows = order.filter(key => comparisonViews[key]).map(key => {
@@ -1229,6 +1232,7 @@ function renderSanity(d) {
       wallet_whale_consensus_shadow: 'wallet_whale_consensus_shadow',
       wallet_contrarian_exit_shadow: 'wallet_contrarian_exit_shadow',
       wallet_fresh_market_shadow: 'wallet_fresh_market_shadow',
+      wallet_ml_30m_drift_shadow: 'wallet_ml_30m_drift_shadow',
       kalshi_btc_arb_shadow: 'kalshi_btc_arb_shadow',
       bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
       crypto_pairs_aave_doge: 'crypto_pairs_shadow',
@@ -1275,7 +1279,7 @@ function renderSanity(d) {
       ? 30
       : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
         ? 12
-        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_latency_shadow' ? 8 : ((activeView.key === 'copy_trader_shadow') ? 10 : ((COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) ? (runtime.max_open_positions || 6) : ((activeView.key === 'kalshi_btc_arb_shadow' || activeView.key === 'bitcoin_meanrev_shadow' || isCryptoPairsShadowView(activeView.key)) ? 1 : 10))))))));
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_latency_shadow' ? 8 : ((activeView.key === 'copy_trader_shadow') ? 10 : (activeView.key === 'wallet_ml_30m_drift_shadow' ? (runtime.max_open_positions || 20) : ((COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) ? (runtime.max_open_positions || 6) : ((activeView.key === 'kalshi_btc_arb_shadow' || activeView.key === 'bitcoin_meanrev_shadow' || isCryptoPairsShadowView(activeView.key)) ? 1 : 10)))))))));
     const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
     const copyTraderMinTrade = Number(runtime.min_trade_usd || 10);
     const checks = [
@@ -1299,12 +1303,15 @@ function renderSanity(d) {
           || (runtime.signals_generated || 0) > 0
           || (activeView.key === 'copy_trader_shadow' && (((runtime.entries || 0) > 0) || ((runtime.target_wallets || 0) > 0)))
           || (COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key) && (((runtime.copied_trades || 0) > 0) || ((runtime.decisions_logged || 0) > 0)))
+          || (activeView.key === 'wallet_ml_30m_drift_shadow' && (((runtime.paper_trades || 0) > 0) || ((runtime.decisions_logged || 0) > 0)))
           || (activeView.key === 'kalshi_btc_arb_shadow' && (((runtime.entries || 0) > 0) || ((runtime.candidate_opportunities || 0) > 0)))
           || (activeView.key === 'bitcoin_meanrev_shadow' && ((runtime.evaluated_buckets || 0) > 0 || (runtime.candidate_events || 0) > 0)),
         note: activeView.key === 'bitcoin_meanrev_shadow'
           ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.candidate_events || 0} shock / ${runtime.evaluated_buckets || 0} eval`
           : activeView.key === 'copy_trader_shadow'
             ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.target_wallets || 0} wallets / ${runtime.entries || 0} entries`
+            : activeView.key === 'wallet_ml_30m_drift_shadow'
+              ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.decisions_logged || 0} decisions / ${runtime.paper_trades || 0} paper`
             : COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)
               ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.decisions_logged || 0} decisions / ${runtime.copied_trades || 0} copied`
             : activeView.key === 'kalshi_btc_arb_shadow'
@@ -1312,11 +1319,11 @@ function renderSanity(d) {
           : `${signals.length} live / ${p.total_trades || 0} trades`,
       },
       {
-        label: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow') ? 'Deployable cash' : 'Capacity headroom',
-        ok: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow')
+        label: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow') ? 'Deployable cash' : 'Capacity headroom',
+        ok: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow')
           ? true
           : ((p.cash || 0) > 25 || positions.length < resolvedOpenCap),
-        note: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow')
+        note: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow')
           ? `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (no cash gate)`
           : `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
       },
@@ -1380,6 +1387,19 @@ function renderSanity(d) {
         label: 'Heuristic scorer active',
         ok: (runtime.decisions_logged || 0) > 0 || (runtime.scans_completed || 0) > 0,
         note: `${runtime.decisions_logged || 0} decisions / ${runtime.copied_trades || 0} copied`,
+      });
+    }
+
+    if (activeView.key === 'wallet_ml_30m_drift_shadow') {
+      checks.splice(2, 0, {
+        label: 'ML model loaded',
+        ok: !!runtime.model_loaded,
+        note: runtime.model_error ? `Error: ${runtime.model_error}` : `${runtime.score_threshold != null ? 'threshold ' + Number(runtime.score_threshold).toFixed(3) : 'ready'} / ${runtime.horizon_seconds || 0}s horizon`,
+      });
+      checks.splice(3, 0, {
+        label: 'Drift scorer active',
+        ok: (runtime.decisions_logged || 0) > 0 || (runtime.scans_completed || 0) > 0,
+        note: `${runtime.decisions_logged || 0} decisions / ${runtime.paper_trades || 0} paper / ${runtime.closed_trades || 0} closed / ${runtime.wins || 0}W-${runtime.losses || 0}L`,
       });
     }
 

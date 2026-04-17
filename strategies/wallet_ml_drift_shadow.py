@@ -197,6 +197,9 @@ class WalletMLDriftShadowStrategy(BaseStrategy):
         self._load_runtime_state()
         if self.last_processed_trade_id <= 0:
             self.last_processed_trade_id = self.store.latest_wallet_trade_id()
+        self._stats["last_processed_trade_id"] = self.last_processed_trade_id
+        self._stats["cash_balance_usd"] = round(self.cash_balance, 4)
+        self._stats["portfolio_value_usd"] = round(self._current_equity(), 4)
         self._write_runtime_state()
 
     async def scan(self, markets: list[Market], events: list[Event]) -> list:

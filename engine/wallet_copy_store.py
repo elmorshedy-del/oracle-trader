@@ -960,7 +960,14 @@ class WalletCopyResearchStore:
                             WHEN market_resolved = 1 AND resolution_timestamp IS NOT NULL THEN (resolution_timestamp - timestamp) / 3600.0
                             ELSE NULL
                         END
-                    ) AS avg_hold_hours
+                    ) AS avg_hold_hours,
+                    AVG(
+                        CASE
+                            WHEN COALESCE(wallet_sell_return, resolution_return) IS NOT NULL
+                            THEN COALESCE(wallet_sell_return, resolution_return)
+                            ELSE NULL
+                        END
+                    ) AS avg_return
                 FROM wallet_trades
                 WHERE wallet_address = ?
                   AND side = 'BUY'
@@ -973,12 +980,14 @@ class WalletCopyResearchStore:
         wins = int((row["wins"] if row else 0) or 0)
         win_rate = float(row["win_rate"]) if row and row["win_rate"] is not None else None
         avg_hold_hours = float(row["avg_hold_hours"]) if row and row["avg_hold_hours"] is not None else None
+        avg_return = float(row["avg_return"]) if row and row["avg_return"] is not None else None
         return {
             "labeled_trades": labeled_trades,
             "wins": wins,
             "losses": max(labeled_trades - wins, 0),
             "win_rate": win_rate,
             "avg_hold_hours": avg_hold_hours,
+            "avg_return": avg_return,
         }
 
     def recent_same_side_trades(

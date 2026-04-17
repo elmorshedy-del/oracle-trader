@@ -202,7 +202,7 @@ LIMIT ?
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train a v0 resolution-only wallet-copy ML probe.")
+    parser = argparse.ArgumentParser(description="Train a v0 wallet-copy ML probe.")
     parser.add_argument("--db-path", default="wallet_copy_research.sqlite", help="Optional local wallet-copy SQLite path")
     parser.add_argument("--rows-json", default="", help="Optional pre-exported JSON file with resolved training rows")
     parser.add_argument("--api-base-url", default=DEFAULT_API_BASE_URL, help="Base URL for paginated wallet-copy export")
@@ -212,7 +212,37 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--random-seed", type=int, default=DEFAULT_RANDOM_SEED, help="Random seed")
     parser.add_argument("--catboost-iterations", type=int, default=500, help="CatBoost training iterations")
     parser.add_argument("--lightgbm-estimators", type=int, default=500, help="LightGBM estimator count")
+    parser.add_argument(
+        "--target-mode",
+        choices=("resolution_win", "forward_abs_move"),
+        default="resolution_win",
+        help="Prediction target to train against",
+    )
+    parser.add_argument(
+        "--forward-column",
+        default="price_5min_after",
+        help="Forward checkpoint column for forward_abs_move mode",
+    )
+    parser.add_argument(
+        "--forward-threshold",
+        type=float,
+        default=0.01,
+        help="Minimum absolute price improvement required in forward_abs_move mode",
+    )
+    parser.add_argument(
+        "--model-output-dir",
+        default="",
+        help="Optional directory to write the fitted CatBoost model and deployment metadata",
+    )
     return parser.parse_args()
+
+
+def target_slug(args: argparse.Namespace) -> str:
+    if args.target_mode == "resolution_win":
+        return "resolution_win"
+    column = str(args.forward_column).replace("_after", "").replace("price_", "")
+    threshold_bps = int(round(float(args.forward_threshold) * 10000))
+    return f"{column}_plus_{threshold_bps}bps"
 
 
 def normalize_rate(value: Any) -> float | None:
@@ -316,6 +346,9 @@ def prepare_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
         "resolution_timestamp",
         "resolution_return",
         "is_win_resolution",
+        "price_1min_after",
+        "price_5min_after",
+        "price_30min_after",
     ]
     for column in numeric_columns:
         if column in df.columns:
@@ -388,6 +421,25 @@ def prepare_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
     return df
 
 
+def apply_target(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
+    target_label = "target"
+    frame = df.copy()
+    if args.target_mode == "resolution_win":
+        frame = frame.dropna(subset=["is_win_resolution"]).copy()
+        frame[target_label] = frame["is_win_resolution"].astype(int)
+        return frame
+    if args.target_mode == "forward_abs_move":
+        forward_column = args.forward_column
+        if forward_column not in frame.columns:
+            raise ValueError(f"missing forward column: {forward_column}")
+        frame = frame.dropna(subset=[forward_column, "price"]).copy()
+        frame["forward_abs_move"] = pd.to_numeric(frame[forward_column], errors="coerce") - pd.to_numeric(frame["price"], errors="coerce")
+        frame = frame.dropna(subset=["forward_abs_move"]).copy()
+        frame[target_label] = (frame["forward_abs_move"] >= float(args.forward_threshold)).astype(int)
+        return frame
+    raise ValueError(f"unsupported target mode: {args.target_mode}")
+
+
 def ensure_class_diversity(name: str, y: pd.Series) -> None:
     if y.nunique(dropna=True) < 2:
         raise ValueError(f"{name} split lost class diversity")
@@ -410,9 +462,9 @@ def build_splits(df: pd.DataFrame, *, gap_seconds: float = 60.0) -> dict[str, pd
         valid = df.iloc[valid_boundary:test_boundary].copy()
         test = df.iloc[test_boundary:].copy()
 
-    ensure_class_diversity("train", train["is_win_resolution"])
-    ensure_class_diversity("valid", valid["is_win_resolution"])
-    ensure_class_diversity("test", test["is_win_resolution"])
+    ensure_class_diversity("train", train["target"])
+    ensure_class_diversity("valid", valid["target"])
+    ensure_class_diversity("test", test["target"])
     return {"train": train, "valid": valid, "test": test}
 
 
@@ -487,6 +539,15 @@ def precision_at_top_decile(y_true: pd.Series, y_score: np.ndarray) -> float | N
     return float(np.asarray(y_true)[order].mean())
 
 
+def score_cutoff_at_top_fraction(y_score: np.ndarray, fraction: float) -> float | None:
+    score = np.asarray(y_score, dtype=float)
+    if len(score) < 10:
+        return None
+    cutoff = max(int(np.ceil(len(score) * fraction)), 1)
+    order = np.argsort(score)[::-1][:cutoff]
+    return float(score[order[-1]])
+
+
 def evaluate_predictions(y_true: pd.Series, y_score: np.ndarray) -> dict[str, Any]:
     labels = y_true.to_numpy(dtype=int)
     score = np.asarray(y_score, dtype=float)
@@ -504,6 +565,8 @@ def evaluate_predictions(y_true: pd.Series, y_score: np.ndarray) -> dict[str, An
         "recall": float(recall_score(labels, pred, zero_division=0)),
         "f1": float(f1_score(labels, pred, zero_division=0)),
         "precision_top_decile": precision_at_top_decile(y_true, score),
+        "score_top_decile_cutoff": score_cutoff_at_top_fraction(score, 0.10),
+        "score_top_5pct_cutoff": score_cutoff_at_top_fraction(score, 0.05),
     }
     if len(np.unique(labels)) >= 2:
         metrics["auc"] = float(roc_auc_score(labels, score))
@@ -518,10 +581,11 @@ def evaluate_slice_set(
     name: str,
     frame: pd.DataFrame,
     y_score: np.ndarray,
+    target_col: str = "is_win_resolution",
 ) -> dict[str, Any]:
     if frame.empty:
         return {"name": name, "rows": 0}
-    metrics = evaluate_predictions(frame["is_win_resolution"], y_score)
+    metrics = evaluate_predictions(frame[target_col], y_score)
     return {"name": name, **metrics}
 
 
@@ -531,7 +595,7 @@ def build_slice_reports(
     test: pd.DataFrame,
     test_scores: np.ndarray,
 ) -> list[dict[str, Any]]:
-    reports = [evaluate_slice_set(name="overall_test", frame=test, y_score=test_scores)]
+    reports = [evaluate_slice_set(name="overall_test", frame=test, y_score=test_scores, target_col="target")]
     seen_markets = set(train["market_condition_id"].astype(str))
     seen_wallets = set(train["wallet_address"].astype(str))
     unseen_markets = test.loc[~test["market_condition_id"].astype(str).isin(seen_markets)]
@@ -542,6 +606,7 @@ def build_slice_reports(
                 name="unseen_markets",
                 frame=unseen_markets,
                 y_score=test_scores[unseen_markets.index.to_numpy()],
+                target_col="target",
             )
         )
     if not unseen_wallets.empty:
@@ -550,6 +615,7 @@ def build_slice_reports(
                 name="unseen_wallets",
                 frame=unseen_wallets,
                 y_score=test_scores[unseen_wallets.index.to_numpy()],
+                target_col="target",
             )
         )
     for category, category_frame in test.groupby("market_category"):
@@ -560,6 +626,7 @@ def build_slice_reports(
                 name=f"category:{category}",
                 frame=category_frame,
                 y_score=test_scores[category_frame.index.to_numpy()],
+                target_col="target",
             )
         )
     return reports
@@ -583,15 +650,16 @@ def train_probe(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"Need at least {args.min_rows} resolved rows, got {len(rows)}")
 
     df = prepare_frame(rows)
+    df = apply_target(df, args)
     splits = build_splits(df)
     train = splits["train"].reset_index(drop=True)
     valid = splits["valid"].reset_index(drop=True)
     test = splits["test"].reset_index(drop=True)
     splits = {"train": train, "valid": valid, "test": test}
 
-    y_train = train["is_win_resolution"].astype(int)
-    y_valid = valid["is_win_resolution"].astype(int)
-    y_test = test["is_win_resolution"].astype(int)
+    y_train = train["target"].astype(int)
+    y_valid = valid["target"].astype(int)
+    y_test = test["target"].astype(int)
 
     tabular = build_tabular_matrices(splits)
     X_train_tab = tabular["train"]
@@ -757,8 +825,11 @@ def train_probe(args: argparse.Namespace) -> dict[str, Any]:
 
     slice_reports = build_slice_reports(train=train, test=test, test_scores=ensemble_test_score)
 
-    return {
+    report = {
         "source": source,
+        "target_mode": args.target_mode,
+        "forward_column": args.forward_column if args.target_mode == "forward_abs_move" else None,
+        "forward_threshold": args.forward_threshold if args.target_mode == "forward_abs_move" else None,
         "row_count": int(len(df)),
         "train_rows": int(len(train)),
         "valid_rows": int(len(valid)),
@@ -813,15 +884,50 @@ def train_probe(args: argparse.Namespace) -> dict[str, Any]:
             ),
         },
     }
+    if args.model_output_dir:
+        model_output_dir = Path(args.model_output_dir).expanduser().resolve()
+        model_output_dir.mkdir(parents=True, exist_ok=True)
+        model_path = model_output_dir / "catboost.cbm"
+        metadata_path = model_output_dir / "metadata.json"
+        cat_model.save_model(str(model_path))
+        deployment_metadata = sanitize_json(
+            {
+                "model_type": "catboost",
+                "model_path": str(model_path),
+                "target_slug": target_slug(args),
+                "target_mode": report["target_mode"],
+                "forward_column": report["forward_column"],
+                "forward_threshold": report["forward_threshold"],
+                "feature_columns": report["feature_columns"],
+                "categorical_features": CATEGORICAL_FEATURES,
+                "numeric_features": NUMERIC_FEATURES,
+                "recommended_score_threshold": report["models"]["catboost"]["valid"].get("score_top_decile_cutoff"),
+                "valid_metrics": report["models"]["catboost"]["valid"],
+                "test_metrics": report["models"]["catboost"]["test"],
+                "top_catboost_features": report["top_catboost_features"],
+                "trained_at": datetime.now(UTC).isoformat(),
+                "source": report["source"],
+                "row_count": report["row_count"],
+            }
+        )
+        metadata_path.write_text(json.dumps(deployment_metadata, indent=2), encoding="utf-8")
+        report["model_artifacts"] = {
+            "catboost_model_path": str(model_path),
+            "metadata_path": str(metadata_path),
+        }
+    return report
 
 
 def render_report(report: dict[str, Any]) -> str:
     ensemble_test = report["models"]["ensemble_mean"]["test"]
     cat_test = report["models"]["catboost"]["test"]
     lines = [
-        "# Wallet Copy Resolution Probe",
+        "# Wallet Copy ML Probe",
         "",
         f"- Source: `{report['source']}`",
+        f"- Target mode: `{report.get('target_mode')}`",
+        f"- Forward column: `{report.get('forward_column')}`",
+        f"- Forward threshold: `{report.get('forward_threshold')}`",
         f"- Rows: `{report['row_count']}`",
         f"- Split: train `{report['train_rows']}`, valid `{report['valid_rows']}`, test `{report['test_rows']}`",
         f"- Test positive rate: `{report['test_positive_rate']:.4f}`",
@@ -867,7 +973,7 @@ def main() -> None:
     args = parse_args()
     started_at = datetime.now(UTC)
     report = train_probe(args)
-    run_name = f"wallet_copy_resolution_probe_{started_at.strftime('%Y%m%dT%H%M%S')}_v1"
+    run_name = f"wallet_copy_probe_{target_slug(args)}_{started_at.strftime('%Y%m%dT%H%M%S%f')}_v1"
     run_root = Path(args.output_root).resolve() / run_name
     report_root = run_root / "reports"
     report_root.mkdir(parents=True, exist_ok=True)

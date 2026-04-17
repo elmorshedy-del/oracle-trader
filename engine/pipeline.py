@@ -28,6 +28,7 @@ from strategies.bitcoin_meanrev_shadow import BitcoinMeanRevShadowStrategy
 from strategies.copy_heuristic_shadow import CopyHeuristicShadowStrategy
 from strategies.copy_trader_shadow import CopyTraderShadowStrategy
 from strategies.kalshi_btc_arb_shadow import KalshiBtcArbShadowStrategy
+from strategies.wallet_ml_drift_shadow import WalletMLDriftShadowStrategy
 from strategies.sports_model import SportsModelStrategy
 from strategies.weather import WeatherForecastStrategy
 from strategies.weather_edge_live import WeatherEdgeLiveStrategy
@@ -244,8 +245,11 @@ class Pipeline:
         self.copy_heuristic_view_keys = tuple(
             profile.view_key for profile in self.copy_heuristic_profiles
         )
+        self.wallet_ml_drift_strategy_key = self.config.wallet_ml_drift_shadow.strategy_key
+        self.wallet_ml_drift_view_key = self.config.wallet_ml_drift_shadow.view_key
         self.self_managed_lane_view_keys = (
             *BASE_SELF_MANAGED_LANE_VIEW_KEYS,
+            self.wallet_ml_drift_view_key,
             *self.copy_heuristic_view_keys,
         )
         self.self_managed_comparison_view_keys = (
@@ -260,6 +264,13 @@ class Pipeline:
                 "signal_sources": (),
                 "self_managed": True,
             }
+        COMPARISON_VIEW_CONFIG[self.wallet_ml_drift_view_key] = {
+            "label": self.config.wallet_ml_drift_shadow.label,
+            "strategy": self.wallet_ml_drift_strategy_key,
+            "source": self.config.wallet_ml_drift_shadow.source,
+            "signal_sources": (),
+            "self_managed": True,
+        }
 
         # Strategies
         self.strategies = {
@@ -301,6 +312,12 @@ class Pipeline:
             "kalshi_btc_arb_shadow": KalshiBtcArbShadowStrategy(
                 self.config,
                 collector=self.collector,
+            ),
+            self.wallet_ml_drift_strategy_key: WalletMLDriftShadowStrategy(
+                self.config,
+                collector=self.collector,
+                store=self.wallet_copy_store,
+                profile=self.config.wallet_ml_drift_shadow,
             ),
             "bitcoin_meanrev_shadow": BitcoinMeanRevShadowStrategy(self.config),
             "sports_model": SportsModelStrategy(self.config),
@@ -622,6 +639,25 @@ class Pipeline:
                     heuristic_shadow._stats["errors"] += 1
                     strategy_signals[strategy_key] = []
                     self.health.record_strategy_error(strategy_key, str(e))
+
+            wallet_ml_drift_shadow: WalletMLDriftShadowStrategy = self.comparison_only_strategies[
+                self.wallet_ml_drift_strategy_key
+            ]
+            try:
+                _wallet_ml_drift_start = _time.time()
+                wallet_ml_drift_signals = await wallet_ml_drift_shadow.scan(self._markets, self._events)
+                _wallet_ml_drift_dur = (_time.time() - _wallet_ml_drift_start) * 1000
+                strategy_signals[self.wallet_ml_drift_strategy_key] = wallet_ml_drift_signals
+                self.health.record_strategy_run(
+                    self.wallet_ml_drift_strategy_key,
+                    len(wallet_ml_drift_signals),
+                    _wallet_ml_drift_dur,
+                )
+            except Exception as e:
+                logger.error(f"Strategy {self.wallet_ml_drift_strategy_key} error: {e}")
+                wallet_ml_drift_shadow._stats["errors"] += 1
+                strategy_signals[self.wallet_ml_drift_strategy_key] = []
+                self.health.record_strategy_error(self.wallet_ml_drift_strategy_key, str(e))
 
             kalshi_btc_arb_shadow: KalshiBtcArbShadowStrategy = self.comparison_only_strategies["kalshi_btc_arb_shadow"]
             try:
@@ -1158,6 +1194,9 @@ class Pipeline:
                 "bitcoin_latency_shadow": self.comparison_only_strategies["bitcoin_latency_shadow"].stats,
                 "copy_trader_shadow": self.comparison_only_strategies["copy_trader_shadow"].stats,
                 "kalshi_btc_arb_shadow": self.comparison_only_strategies["kalshi_btc_arb_shadow"].stats,
+                self.wallet_ml_drift_strategy_key: self.comparison_only_strategies[
+                    self.wallet_ml_drift_strategy_key
+                ].stats,
                 "bitcoin_meanrev_shadow": self.comparison_only_strategies["bitcoin_meanrev_shadow"].stats,
                 "sports_model": self.comparison_only_strategies["sports_model"].stats,
             } | {
@@ -1292,6 +1331,7 @@ class Pipeline:
                 "bitcoin_model_budget": self.config.bitcoin_model.budget_usd,
                 "bitcoin_latency_shadow_budget": self.config.bitcoin_latency_shadow.budget_usd,
                 "copy_trader_shadow_budget": self.config.copy_trader_shadow.budget_usd,
+                "wallet_ml_drift_shadow_budget": self.config.wallet_ml_drift_shadow.budget_usd,
                 "kalshi_btc_arb_shadow_budget": self.config.kalshi_btc_arb_shadow.budget_usd,
                 "bitcoin_meanrev_shadow_budget": self.config.bitcoin_meanrev_shadow.budget_usd,
                 "crypto_pairs_shadow_budget": self.config.crypto_pairs_shadow.budget_usd,

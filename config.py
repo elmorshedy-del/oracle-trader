@@ -741,6 +741,37 @@ class CopyHeuristicShadowConfig:
 
 
 @dataclass
+class WalletMLDriftShadowConfig:
+    """ML-filtered wallet-copy paper sleeve for short-horizon drift."""
+
+    enabled: bool = os.getenv("WALLET_ML_DRIFT_SHADOW_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+    strategy_key: str = os.getenv("WALLET_ML_DRIFT_SHADOW_STRATEGY_KEY", "wallet_ml_30m_drift_shadow")
+    view_key: str = os.getenv("WALLET_ML_DRIFT_SHADOW_VIEW_KEY", "wallet_ml_30m_drift_shadow")
+    label: str = os.getenv("WALLET_ML_DRIFT_SHADOW_LABEL", "Wallet ML 30m Drift")
+    source: str = os.getenv("WALLET_ML_DRIFT_SHADOW_SOURCE", "wallet_ml_30m_drift_shadow")
+    session_label: str = os.getenv("WALLET_ML_DRIFT_SHADOW_SESSION_LABEL", "wallet_ml_30m_drift_shadow")
+    model_path: str = os.getenv("WALLET_ML_DRIFT_SHADOW_MODEL_PATH", "models/wallet_copy_ml/30m_plus_2c_v1/catboost.cbm")
+    metadata_path: str = os.getenv("WALLET_ML_DRIFT_SHADOW_METADATA_PATH", "models/wallet_copy_ml/30m_plus_2c_v1/metadata.json")
+    budget_usd: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_BUDGET_USD", "1000"))
+    min_trade_usd: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_MIN_TRADE_USD", "10"))
+    max_trade_usd: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_MAX_TRADE_USD", "50"))
+    max_open_positions: int = int(os.getenv("WALLET_ML_DRIFT_SHADOW_MAX_OPEN_POSITIONS", "20"))
+    scan_trade_limit: int = int(os.getenv("WALLET_ML_DRIFT_SHADOW_SCAN_TRADE_LIMIT", "300"))
+    score_threshold: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_SCORE_THRESHOLD", "0"))
+    horizon_seconds: int = int(os.getenv("WALLET_ML_DRIFT_SHADOW_HORIZON_SECONDS", "1800"))
+    target_move_dollars: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_TARGET_MOVE_DOLLARS", "0.02"))
+    allowed_categories: tuple[str, ...] = tuple(
+        category.strip().lower()
+        for category in os.getenv("WALLET_ML_DRIFT_SHADOW_ALLOWED_CATEGORIES", "sports,esports").split(",")
+        if category.strip()
+    )
+    min_depth_to_size_multiple: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_MIN_DEPTH_TO_SIZE_MULTIPLE", "2.0"))
+    max_market_spread: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_MAX_MARKET_SPREAD", "0.10"))
+    max_detection_delay_seconds: float = float(os.getenv("WALLET_ML_DRIFT_SHADOW_MAX_DETECTION_DELAY_SECONDS", "60"))
+    audit_root: str = os.getenv("WALLET_ML_DRIFT_SHADOW_AUDIT_ROOT", "")
+
+
+@dataclass
 class KalshiBtcArbShadowConfig:
     """Cross-venue BTC hourly overlap arbitrage paper sleeve."""
 
@@ -847,6 +878,7 @@ class PipelineConfig:
     crypto_pairs_shadow: CryptoPairsShadowConfig = field(default_factory=CryptoPairsShadowConfig)
     copy_trader_shadow: CopyTraderShadowConfig = field(default_factory=CopyTraderShadowConfig)
     copy_heuristic_shadow: CopyHeuristicShadowConfig = field(default_factory=CopyHeuristicShadowConfig)
+    wallet_ml_drift_shadow: WalletMLDriftShadowConfig = field(default_factory=WalletMLDriftShadowConfig)
     wallet_copy_research: WalletCopyResearchConfig = field(default_factory=WalletCopyResearchConfig)
     kalshi_btc_arb_shadow: KalshiBtcArbShadowConfig = field(default_factory=KalshiBtcArbShadowConfig)
     bitcoin_latency_shadow: BitcoinLatencyShadowConfig = field(default_factory=BitcoinLatencyShadowConfig)

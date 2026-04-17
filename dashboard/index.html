@@ -1312,11 +1312,11 @@ function renderSanity(d) {
           : `${signals.length} live / ${p.total_trades || 0} trades`,
       },
       {
-        label: activeView.key === 'copy_trader_shadow' ? 'Deployable cash' : 'Capacity headroom',
-        ok: activeView.key === 'copy_trader_shadow'
+        label: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow') ? 'Deployable cash' : 'Capacity headroom',
+        ok: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow')
           ? true
           : ((p.cash || 0) > 25 || positions.length < resolvedOpenCap),
-        note: activeView.key === 'copy_trader_shadow'
+        note: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_drift_shadow')
           ? `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (no cash gate)`
           : `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
       },

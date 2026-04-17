@@ -372,8 +372,9 @@ class WalletMLDriftShadowStrategy(BaseStrategy):
             blockers.append("missing_entry_price")
         if len(self.open_positions) >= self.profile.max_open_positions:
             blockers.append("max_open_positions_reached")
-        if suggested_size_usd > self.cash_balance:
-            blockers.append("insufficient_cash")
+        # Shadow/paper trader — no cash gate (same rationale as copy_trader_shadow)
+        # if suggested_size_usd > self.cash_balance:
+        #     blockers.append("insufficient_cash")
         position_key = self._position_key(
             condition_id=str(row.get("market_condition_id") or ""),
             token_id=str(row.get("asset_token_id") or ""),
@@ -627,7 +628,7 @@ class WalletMLDriftShadowStrategy(BaseStrategy):
         margin = max(score - self.score_threshold, 0.0)
         scale = min(margin / 0.25, 1.0)
         size = self.profile.min_trade_usd + (self.profile.max_trade_usd - self.profile.min_trade_usd) * scale
-        return round(min(size, self.profile.max_trade_usd, self.cash_balance), 4)
+        return round(min(size, self.profile.max_trade_usd), 4)
 
     async def _mark_price(self, *, position: MLDriftPosition, market_map: dict[str, Market]) -> float | None:
         market = market_map.get(position.condition_id)

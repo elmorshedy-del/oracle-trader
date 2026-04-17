@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wallet Copy Research</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b12;
+      --panel: rgba(18, 23, 35, 0.94);
+      --panel-border: rgba(120, 145, 190, 0.18);
+      --text: #edf2ff;
+      --muted: #9fb0d0;
+      --good: #39d98a;
+      --warn: #ffb84d;
+      --bad: #ff6b6b;
+      --accent: #64a8ff;
+      --accent-2: #8f7dff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(100, 168, 255, 0.16), transparent 26%),
+        radial-gradient(circle at top right, rgba(143, 125, 255, 0.14), transparent 24%),
+        linear-gradient(180deg, #0b0e16 0%, #090b12 100%);
+    }
+    .shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 34px;
+      line-height: 1.05;
+    }
+    .sub {
+      color: var(--muted);
+      max-width: 820px;
+      line-height: 1.45;
+    }
+    .nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+    .card {
+      grid-column: span 12;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 22px;
+      padding: 20px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.22);
+    }
+    .hero {
+      grid-column: span 12;
+      padding: 24px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .stat {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .progress-wrap {
+      margin-top: 20px;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: inherit;
+      transition: width 0.35s ease;
+    }
+    .health {
+      grid-column: span 4;
+    }
+    .quality {
+      grid-column: span 12;
+    }
+    .wallets {
+      grid-column: span 4;
+    }
+    .trades {
+      grid-column: span 8;
+    }
+    .quality-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .quality-metrics {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .mix-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .mix-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 70px;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .mini-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .mini-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+    .health-list, .checkpoint-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .health-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .status {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .status.good { background: rgba(57,217,138,0.14); color: var(--good); }
+    .status.warn { background: rgba(255,184,77,0.16); color: var(--warn); }
+    .status.bad { background: rgba(255,107,107,0.14); color: var(--bad); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+    }
+    th {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      font-size: 12px;
+      margin-right: 10px;
+    }
+    .muted { color: var(--muted); }
+    .good { color: var(--good); }
+    .warn-text { color: var(--warn); }
+    .bad-text { color: var(--bad); }
+    .empty {
+      color: var(--muted);
+      padding: 18px 0 4px;
+    }
+    @media (max-width: 1000px) {
+      .health, .wallets, .trades { grid-column: span 12; }
+      .stats, .quality-metrics, .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; }
+      .stats, .quality-metrics, .quality-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div>
+        <h1>Wallet Copy Research</h1>
+        <div class="sub">
+          Separate collection lane for tracked-wallet trades, outcome labels, and future ML training readiness.
+          This page tracks collection progress, ETA, and system health without touching the live trading views.
+        </div>
+      </div>
+      <div class="nav">
+        <a href="/">Main Dashboard</a>
+        <a href="/api/collection_stats" target="_blank" rel="noreferrer">Stats JSON</a>
+        <a href="/api/wallet_trades?limit=50" target="_blank" rel="noreferrer">Trades JSON</a>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card hero">
+        <div class="label">Collection Progress</div>
+        <div class="value" id="progressHeadline">0.00%</div>
+        <div class="progress-wrap">
+          <div class="progress-meta">
+            <span id="progressCopy">0 of 0 ML-ready labeled buys</span>
+            <span id="progressEta">Estimating...</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="sub muted" id="progressQuality">Raw labels and excluded stale buys will appear here.</div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Tracked Wallets</div>
+            <div class="value" id="walletCount">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Unique Markets</div>
+            <div class="value" id="marketCount">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">ML-Ready Labels / Day</div>
+            <div class="value" id="labelRate">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Latest Trade</div>
+            <div class="value" id="latestTrade">-</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card quality">
+        <div class="label">ML Diversity & Thresholds</div>
+        <div class="value" id="readinessScore">0.00%</div>
+        <div class="sub" id="readinessSummary">Waiting for diversity stats.</div>
+        <div class="stats quality-metrics">
+          <div class="stat">
+            <div class="label">Categories at Floor</div>
+            <div class="value" id="categoriesAtFloor">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Category</div>
+            <div class="value" id="topCategoryShare">0%</div>
+          </div>
+          <div class="stat">
+            <div class="label">Wallets at Floor</div>
+            <div class="value" id="walletsAtFloor">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Wallet</div>
+            <div class="value" id="topWalletShare">0%</div>
+          </div>
+          <div class="stat">
+            <div class="label">Labeled Markets</div>
+            <div class="value" id="uniqueLabeledMarkets">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Top Market</div>
+            <div class="value" id="topMarketShare">0%</div>
+          </div>
+        </div>
+        <div class="quality-grid">
+          <div>
+            <div class="label">Category Mix</div>
+            <div class="mix-list" id="categoryMix"></div>
+          </div>
+          <div>
+            <div class="label">Readiness Checks</div>
+            <div class="checkpoint-list" id="readinessChecks"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card health">
+        <div class="label">Health Checkpoints</div>
+        <div class="health-list" id="healthList"></div>
+      </section>
+
+      <section class="card wallets">
+        <div class="label">Current Watchlist</div>
+        <div class="pill"><span id="watchlistCount">0</span> wallets</div>
+        <div class="pill"><span id="schemaVersion">-</span> schema</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Rank</th>
+              <th>PnL</th>
+              <th>Win Rate</th>
+            </tr>
+          </thead>
+          <tbody id="walletRows"></tbody>
+        </table>
+        <div class="empty" id="walletEmpty" hidden>No tracked wallets yet.</div>
+      </section>
+
+      <section class="card trades">
+        <div class="label">Recent Trades</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Wallet</th>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Outcome</th>
+              <th>Price</th>
+              <th>USD</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="tradeRows"></tbody>
+        </table>
+        <div class="empty" id="tradeEmpty" hidden>No wallet trades collected yet.</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const fmtNumber = (value, digits = 0) => {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+      return Number(value).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+    };
+    const fmtUsd = (value) => {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(Number(value));
+    };
+    const fmtPct = (value, digits = 2) => {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+      return `${Number(value).toFixed(digits)}%`;
+    };
+    const fmtShare = (value, digits = 1) => fmtPct(Number(value || 0) * 100, digits);
+    const fmtAgo = (timestamp) => {
+      if (!timestamp) return '-';
+      const diff = Math.max(0, (Date.now() / 1000) - Number(timestamp));
+      if (diff < 60) return `${Math.round(diff)}s ago`;
+      if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
+      if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+      return `${Math.round(diff / 86400)}d ago`;
+    };
+    const shorten = (value) => value ? `${String(value).slice(0, 6)}...${String(value).slice(-4)}` : '-';
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
+
+    function healthBadge(isHealthy) {
+      return isHealthy
+        ? '<span class="status good">Healthy</span>'
+        : '<span class="status bad">Needs attention</span>';
+    }
+
+    async function loadStats() {
+      const [statsRes, walletsRes, tradesRes] = await Promise.all([
+        fetch('/api/collection_stats', { cache: 'no-store' }),
+        fetch('/api/tracked_wallets?limit=12', { cache: 'no-store' }),
+        fetch('/api/wallet_trades?limit=18', { cache: 'no-store' }),
+      ]);
+
+      const stats = await statsRes.json();
+      const wallets = await walletsRes.json();
+      const trades = await tradesRes.json();
+
+      renderStats(stats);
+      renderWallets(Array.isArray(wallets) ? wallets : []);
+      renderTrades(Array.isArray(trades) ? trades : []);
+    }
+
+    function renderStats(stats) {
+      const counts = stats.counts || {};
+      const timing = stats.timing || {};
+      const health = stats.health || {};
+      const progressCount = counts.ml_ready_labeled_buys ?? counts.labeled_buys ?? 0;
+      const staleBuys = counts.stale_buy_candidates ?? 0;
+      const rawLabeled = counts.labeled_buys ?? 0;
+
+      document.getElementById('progressHeadline').textContent = fmtPct(stats.progress_pct || 0, 2);
+      document.getElementById('progressCopy').textContent =
+        `${fmtNumber(progressCount || 0)} of ${fmtNumber(stats.target_labeled_buys || 0)} ML-ready labeled buys`;
+      document.getElementById('progressQuality').textContent =
+        `Raw labeled buys: ${fmtNumber(rawLabeled || 0)} · stale/expired buy candidates excluded from target: ${fmtNumber(staleBuys || 0)}`;
+      document.getElementById('progressEta').textContent =
+        timing.eta_days_to_target === null || timing.eta_days_to_target === undefined
+          ? 'ETA: estimating...'
+          : `ETA: ${fmtNumber(timing.eta_days_to_target, 1)} days`;
+      document.getElementById('progressFill').style.width = `${Math.max(0, Math.min(100, Number(stats.progress_pct || 0)))}%`;
+
+      document.getElementById('walletCount').textContent = fmtNumber(counts.tracked_wallets || 0);
+      document.getElementById('marketCount').textContent = fmtNumber(counts.unique_markets || 0);
+      document.getElementById('labelRate').textContent = timing.labels_per_day ? fmtNumber(timing.labels_per_day, 1) : '0';
+      document.getElementById('latestTrade').textContent = fmtAgo(timing.latest_trade_detected_at);
+      renderDiversity(stats);
+
+      document.getElementById('watchlistCount').textContent = fmtNumber(counts.tracked_wallets || 0);
+      document.getElementById('schemaVersion').textContent = stats.schema_version || '-';
+
+      const positionsDetail = [
+        `complete ${fmtAgo(health.last_positions_completed_at || health.last_positions_refresh_at)}`,
+        `progress ${fmtAgo(health.last_positions_progress_at || health.last_positions_refresh_at)}`,
+      ].join(' · ');
+      const checkpoints = [
+        ['Tracker heartbeat', health.tracker_alive, fmtAgo(health.last_tracker_heartbeat)],
+        ['Labeler heartbeat', health.labeler_alive, fmtAgo(health.last_labeler_heartbeat)],
+        ['Leaderboard freshness', health.leaderboard_fresh, fmtAgo(health.last_leaderboard_refresh_at)],
+        ['Positions refresh', health.positions_ok ?? health.positions_fresh, positionsDetail],
+        ['DB writable', health.db_writable, health.db_writable ? 'ok' : 'check'],
+      ];
+
+      const container = document.getElementById('healthList');
+      container.innerHTML = checkpoints.map(([label, ok, detail]) => `
+        <div class="health-item">
+          <div>
+            <div>${label}</div>
+            <div class="muted">${detail || '-'}</div>
+          </div>
+          ${healthBadge(Boolean(ok))}
+        </div>
+      `).join('');
+    }
+
+    function renderDiversity(stats) {
+      const diversity = stats.diversity || {};
+      const readiness = stats.ml_readiness || {};
+      const thresholds = readiness.thresholds || {};
+      const wallets = diversity.wallets || {};
+      const markets = diversity.markets || {};
+      const labelMix = diversity.label_mix || {};
+      const checks = Array.isArray(readiness.checks) ? readiness.checks : [];
+      const categoryMix = Array.isArray(diversity.category_mix) ? diversity.category_mix : [];
+
+      document.getElementById('readinessScore').textContent = fmtPct(readiness.score || 0, 2);
+      document.getElementById('readinessSummary').textContent =
+        `Core copy/hold model: ${readiness.core_ready ? 'ready' : 'collecting'} · wallet-exit model: ${readiness.wallet_exit_ready ? 'ready' : 'needs sell labels'} · resolution labels: ${fmtNumber(labelMix.resolution_labeled_buys || 0)} · wallet-sell labels: ${fmtNumber(labelMix.wallet_sell_labeled_buys || 0)}`;
+      document.getElementById('categoriesAtFloor').textContent =
+        `${fmtNumber(diversity.categories_at_floor || 0)}/${fmtNumber(thresholds.min_categories_at_floor || 0)}`;
+      document.getElementById('topCategoryShare').textContent = fmtShare(diversity.top_category_share || 0);
+      document.getElementById('walletsAtFloor').textContent =
+        `${fmtNumber(wallets.wallets_at_floor || 0)}/${fmtNumber(thresholds.min_wallets_at_floor || 0)}`;
+      document.getElementById('topWalletShare').textContent = fmtShare(wallets.top_wallet_share || 0);
+      document.getElementById('uniqueLabeledMarkets').textContent =
+        `${fmtNumber(markets.unique_labeled_markets || 0)}/${fmtNumber(thresholds.min_unique_labeled_markets || 0)}`;
+      document.getElementById('topMarketShare').textContent = fmtShare(markets.top_market_share || 0);
+
+      const categoryContainer = document.getElementById('categoryMix');
+      categoryContainer.innerHTML = categoryMix.length
+        ? categoryMix.slice(0, 8).map((row) => {
+            const share = Number(row.share || 0);
+            return `
+              <div class="mix-row">
+                <div>${escapeHtml(row.category || 'unknown')}</div>
+                <div class="mini-bar"><div class="mini-fill" style="width: ${Math.max(0, Math.min(100, share * 100))}%"></div></div>
+                <div>${fmtShare(share, 1)}</div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">No category labels yet.</div>';
+
+      const checksContainer = document.getElementById('readinessChecks');
+      checksContainer.innerHTML = checks.length
+        ? checks.map((check) => {
+            const unit = check.unit || '';
+            const value = unit === '%' ? `${fmtNumber(check.value || 0, 2)}%` : fmtNumber(check.value || 0);
+            const target = unit === '%' ? `${fmtNumber(check.target || 0, 2)}%` : fmtNumber(check.target || 0);
+            const direction = check.direction === 'max' ? '≤' : '≥';
+            return `
+              <div class="health-item">
+                <div>
+                  <div>${escapeHtml(check.label || check.key)}</div>
+                  <div class="muted">${value} / ${direction} ${target}</div>
+                </div>
+                ${healthBadge(Boolean(check.ok))}
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">No readiness checks yet.</div>';
+    }
+
+    function renderWallets(wallets) {
+      const body = document.getElementById('walletRows');
+      const empty = document.getElementById('walletEmpty');
+      if (!wallets.length) {
+        body.innerHTML = '';
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      body.innerHTML = wallets.map((wallet) => `
+        <tr>
+          <td>${shorten(wallet.address)}</td>
+          <td>${fmtNumber(wallet.leaderboard_rank_30d || wallet.leaderboard_rank_all || wallet.leaderboard_rank_30d_volume || 0)}</td>
+          <td>${fmtUsd(wallet.leaderboard_profit)}</td>
+          <td>${wallet.leaderboard_win_rate !== null && wallet.leaderboard_win_rate !== undefined ? fmtPct(Number(wallet.leaderboard_win_rate) * 100, 1) : '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderTrades(trades) {
+      const body = document.getElementById('tradeRows');
+      const empty = document.getElementById('tradeEmpty');
+      if (!trades.length) {
+        body.innerHTML = '';
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      body.innerHTML = trades.map((trade) => `
+        <tr>
+          <td>${fmtAgo(trade.detected_at || trade.timestamp)}</td>
+          <td>${shorten(trade.wallet_address)}</td>
+          <td title="${trade.market_title || ''}">${trade.market_slug || '-'}</td>
+          <td>${trade.side || '-'}</td>
+          <td>${trade.outcome || '-'}</td>
+          <td>${fmtNumber(trade.price, 3)}</td>
+          <td>${fmtUsd(trade.size_usd)}</td>
+          <td>${trade.market_category || '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function refresh() {
+      try {
+        await loadStats();
+      } catch (error) {
+        console.error('wallet-copy dashboard refresh failed', error);
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>

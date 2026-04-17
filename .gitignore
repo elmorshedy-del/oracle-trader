@@ -1,6 +1,2 @@
 __pycache__/
-*.pyc
-*.pyo
-.env
-logs/
-/data/state.json
+*.py[cod]

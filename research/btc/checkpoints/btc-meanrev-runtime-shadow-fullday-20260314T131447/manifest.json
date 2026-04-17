@@ -1,0 +1,19 @@
+{
+  "checkpoint_id": "btc-meanrev-runtime-shadow-fullday-20260314T131447",
+  "created_at": "2026-03-14T13:15:38.350258+00:00",
+  "status": "runtime_shadow_same_day_negative",
+  "category": "mean_reversion_validation_runtime",
+  "summary": "Frozen BTC 30s downshock mean-reversion validation on the full March 14 runtime shadow multivenue day.",
+  "artifacts": {
+    "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset_runtime_shadow_all_v1/btc_multivenue_1s_20260314T052318_20260314T121119_7sessions_v1/dataset/features.csv.gz",
+    "validation_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_meanrev_validation_runtime_shadow_all_v1/btc_meanrev_validation_20260314T131447_v1/reports/metadata.json",
+    "spec_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-meanrev-downshock30-v1/validation_spec.json"
+  },
+  "metrics": {
+    "row_count": 10655,
+    "candidate_events": 4,
+    "trades": 2,
+    "total_net_bps": -3.165994668308688,
+    "win_rate": 0.0
+  }
+}

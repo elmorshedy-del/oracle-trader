@@ -1,0 +1,229 @@
+# Crypto Pairs v1
+
+Follow the architecture document in order and freeze each phase before moving on.
+
+## Phase 1: Pair Discovery
+
+- Status: `frozen`
+- Date range: `2026-02-12` to `2026-03-13`
+- Symbols: `ETHUSDT, BTCUSDT, SOLUSDT, AVAXUSDT, NEARUSDT, DOTUSDT, ATOMUSDT, ADAUSDT, MATICUSDT, SUIUSDT, UNIUSDT, AAVEUSDT, LINKUSDT, MKRUSDT, ARBUSDT, OPUSDT, DOGEUSDT, SHIBUSDT`
+- Report: `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json`
+- Checkpoint: `crypto-pairs-discovery-20260314T222257`
+
+Top tradeable pairs:
+- `LINK/SOL` score `4.0985` halflife `13.95h`
+- `AVAX/ETH` score `6.2311` halflife `20.15h`
+- `AAVE/DOGE` score `7.5988` halflife `27.97h`
+
+## Phase 2-7: Runtime Scaffold
+
+- Status: `implemented and frozen`
+- Modules:
+  - `engine/crypto_pairs/price_streamer.py`
+  - `engine/crypto_pairs/ratio_engine.py`
+  - `engine/crypto_pairs/signal_engine_v1.py`
+  - `engine/crypto_pairs/execution_engine.py`
+  - `engine/crypto_pairs/position_manager.py`
+  - `engine/crypto_pairs/logger.py`
+  - `tools/run_crypto_pairs_shadow.py`
+- Live streamer note:
+  - primary Binance spot websocket returned `HTTP 451` in this environment
+  - runtime now falls back to `wss://data-stream.binance.vision/stream`
+- Live smoke session:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260314T231223_v1/summary.json`
+  - `17` websocket messages, `6` emitted bars, `3` active pairs
+
+## Phase 8: Backtester
+
+- Status: `implemented`
+- Historical loader fix:
+  - Binance spot archive timestamps were in microseconds, not milliseconds
+  - corrected in `engine/crypto_pairs/historical.py`
+  - earlier coarse single-pair backtest numbers are superseded
+- Corrected single-pair backtests:
+  - `LINK/SOL`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358537377_v1/report.json`
+    - `22` trades
+    - `77.27%` win rate
+    - `+624.5312 bps`
+  - `AVAX/ETH`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json`
+    - `21` trades
+    - `42.86%` win rate
+    - `-166.8219 bps`
+  - `AAVE/DOGE`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json`
+    - `18` trades
+    - `50.00%` win rate
+    - `+475.8089 bps`
+- Corrected 3-pair basket:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json`
+  - `69` trades
+  - `57.97%` win rate
+  - `+687.4537 bps`
+- Extended 60-day backtests:
+  - `LINK/SOL`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038366_v1/report.json`
+    - `50` trades
+    - `62.00%` win rate
+    - `+439.3625 bps`
+  - `AVAX/ETH`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json`
+    - `49` trades
+    - `46.94%` win rate
+    - `-263.6010 bps`
+  - `AAVE/DOGE`: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json`
+    - `43` trades
+    - `58.14%` win rate
+    - `+634.6798 bps`
+  - basket: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json`
+    - `156` trades
+    - `53.21%` win rate
+    - `+595.2121 bps`
+- Read:
+  - `LINK/SOL` and `AAVE/DOGE` remain positive on 60 days
+  - `AVAX/ETH` remains the weak leg and is a natural drop candidate
+- Split-half robustness check:
+  - first half `2026-01-13` to `2026-02-11`
+  - second half `2026-02-12` to `2026-03-13`
+  - `LINK/SOL`
+    - first half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957851054_v1/report.json`
+      - `26` trades
+      - `50.00%` win rate
+      - `-153.1950 bps`
+    - second half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957850673_v1/report.json`
+      - `22` trades
+      - `77.27%` win rate
+      - `+624.5312 bps`
+  - `AAVE/DOGE`
+    - first half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957849753_v1/report.json`
+      - `18` trades
+      - `77.78%` win rate
+      - `+296.1293 bps`
+    - second half: `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957853835_v1/report.json`
+      - `18` trades
+      - `50.00%` win rate
+      - `+475.8089 bps`
+  - 15-day cuts:
+    - `LINK/SOL`: `+81.9375`, `-211.2614`, `+278.7251`, `+237.9989 bps`
+    - `AAVE/DOGE`: `+51.2314`, `+285.4920`, `-47.6122`, `+423.1097 bps`
+  - Read:
+    - `AAVE/DOGE` is the stronger live-first candidate
+    - `LINK/SOL` remains usable as a secondary candidate, but not as the primary overfitting-safe pair
+
+## Next
+
+- Freeze this scaffold as the baseline runtime checkpoint.
+- Expand backtests from the top pair to the full active-pair basket using the same rule set.
+- Only after the rule-based lane is characterized, consider the CatBoost upgrade from the architecture.
+
+## External Supervision
+
+- Status: `implemented`
+- Tool:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/supervise_crypto_pairs_shadow.py`
+- Verified lifecycle:
+  - detached `start`
+  - independent `status`
+  - controlled `stop`
+- Active live supervisor:
+  - id `crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - root `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_live_20260315T0031_v1`
+  - worker runtime `3900s`
+  - status file shows supervisor and child both alive
+
+## Live Pipeline Fix
+
+- Status: `implemented and verified`
+- Change set:
+  - widened `max_leg_lag_ms` from `1500` to `10000`
+  - ratio now updates on every fresh bar using the last known opposite leg price
+  - added reject counters: `no_price_reject`, `lag_reject`, `warmup_reject`
+  - shadow runner now logs ratio updates even before warmup completes, with `ready` in the payload
+- Verified short live session:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T033639_v1/summary.json`
+  - `5` ratio ticks
+  - reject counters:
+    - `no_price_reject: 27`
+    - `lag_reject: 0`
+    - `warmup_reject: 5`
+- Read:
+  - the live pipeline is no longer dead
+  - the next live blocker is warmup depth, not pair synchronization
+
+## Focused Live Follow-Up
+
+- Status: `implemented and running`
+- Runtime selection upgrade:
+  - explicit `--pair-key` support added to the discovery/runtime path
+  - live shadow and external supervisor can now run a specific pair instead of only `top N`
+- Why:
+  - the split-half robustness check showed `AAVE/DOGE` is the stronger live-first candidate
+- Smoke verification:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T035315_v1/summary.json`
+  - active pairs:
+    - `AAVE/DOGE`
+  - `1` ratio tick in a short validation run
+- Active focused supervisor:
+  - id `crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1`
+  - state `/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json`
+
+## Candidate Sweep Follow-Up
+
+- Status: `screened`
+- New requested pairs checked on the frozen 60-day discovery window:
+  - `DOGE/SHIB`
+  - `ARB/OP`
+  - `AAVE/UNI`
+  - `FET/RENDER`
+  - `SEI/SUI`
+- Report:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json`
+- Read:
+  - none passed the same discovery gate used for the original basket
+  - all five failed at the cointegration screen, so none advanced to the rule-based backtest stage
+
+## Oracle AAVE/DOGE Shadow
+
+- Status: `live in Oracle`
+- Deployment:
+  - Railway `1136d74d-9d32-4e45-a194-1cf6a7db553d`
+  - commit `bd4e893`
+- Runtime files written on Railway:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/ratio_ticks.csv`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/trade_ledger.csv`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/daily_summary.jsonl`
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow/hourly_checks.jsonl`
+- Live verification snapshot:
+  - `507` streamer messages
+  - `48` emitted bars
+  - `26` ratio updates
+  - `0` entry signals
+  - `0` closed trades
+- Monitor script:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/check_crypto_pairs_shadow_health.py`
+
+## Oracle Triple Crypto-Pairs Shadow
+
+- Status: `live in Oracle`
+- Deployment:
+  - Railway `aa6f2fcb-9cc2-46c2-ad5f-23de2165f6e7`
+  - startup fix after failed attempt `bc87003d-b822-4a71-8dc1-5b94425062b2`
+- Live pairs:
+  - `AAVE/DOGE`
+  - `COMP/FLOKI`
+  - `COMP/LINK`
+- Runtime source of truth:
+  - brute-force discovery lane
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json`
+- Live verification after warmup:
+  - `AAVE/DOGE`: `43` ratio updates
+  - `COMP/FLOKI`: `66` ratio updates
+  - `COMP/LINK`: `59` ratio updates
+  - all three currently `0` signals / `0` entries / `0` closed trades
+- Audit roots on Railway:
+  - `/data/logs/comparison/crypto_pairs_aave_doge_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_floki_shadow`
+  - `/data/logs/comparison/crypto_pairs_comp_link_shadow`
+- Combined monitor root:
+  - `/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_shadow_monitor`
+- 5-day comparison basis:
+  - per-pair `trade_ledger.csv`
+  - per-pair `daily_summary.jsonl`
+  - per-pair `hourly_checks.jsonl`
+  - combined hourly monitor snapshots in `crypto_pairs_shadow_monitor`

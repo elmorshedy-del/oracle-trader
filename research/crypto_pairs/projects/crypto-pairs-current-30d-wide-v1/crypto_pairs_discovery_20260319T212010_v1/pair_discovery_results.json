@@ -1,0 +1,6034 @@
+{
+  "run_name": "crypto_pairs_discovery_20260319T212010_v1",
+  "started_at": "2026-03-19T21:20:10.704275+00:00",
+  "start_date": "2026-02-17",
+  "end_date": "2026-03-18",
+  "interval": "1h",
+  "symbols_requested": [
+    "AAVEUSDT",
+    "UNIUSDT",
+    "LINKUSDT",
+    "DOGEUSDT",
+    "SHIBUSDT",
+    "SOLUSDT",
+    "ETHUSDT",
+    "BTCUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "DOTUSDT",
+    "ATOMUSDT",
+    "ADAUSDT",
+    "MATICUSDT",
+    "ARBUSDT",
+    "OPUSDT",
+    "FETUSDT",
+    "RENDERUSDT",
+    "SUIUSDT",
+    "SEIUSDT",
+    "INJUSDT",
+    "TIAUSDT",
+    "MKRUSDT",
+    "SNXUSDT",
+    "CRVUSDT",
+    "COMPUSDT",
+    "PEPEUSDT",
+    "FLOKIUSDT",
+    "WIFUSDT",
+    "BONKUSDT",
+    "FTMUSDT",
+    "ALGOUSDT",
+    "XLMUSDT",
+    "HBARUSDT",
+    "VETUSDT",
+    "TAOUSDT",
+    "RUNEUSDT",
+    "GRTUSDT",
+    "STXUSDT",
+    "IMXUSDT"
+  ],
+  "symbols_loaded": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "ALGOUSDT",
+    "ARBUSDT",
+    "ATOMUSDT",
+    "AVAXUSDT",
+    "BONKUSDT",
+    "BTCUSDT",
+    "COMPUSDT",
+    "CRVUSDT",
+    "DOGEUSDT",
+    "DOTUSDT",
+    "ETHUSDT",
+    "FETUSDT",
+    "FLOKIUSDT",
+    "GRTUSDT",
+    "HBARUSDT",
+    "IMXUSDT",
+    "INJUSDT",
+    "LINKUSDT",
+    "NEARUSDT",
+    "OPUSDT",
+    "PEPEUSDT",
+    "RENDERUSDT",
+    "RUNEUSDT",
+    "SEIUSDT",
+    "SHIBUSDT",
+    "SNXUSDT",
+    "SOLUSDT",
+    "STXUSDT",
+    "SUIUSDT",
+    "TAOUSDT",
+    "TIAUSDT",
+    "UNIUSDT",
+    "VETUSDT",
+    "WIFUSDT",
+    "XLMUSDT"
+  ],
+  "download_report": {
+    "start_date": "2026-02-17",
+    "end_date": "2026-03-18",
+    "interval": "1h",
+    "symbols": [
+      "AAVEUSDT",
+      "UNIUSDT",
+      "LINKUSDT",
+      "DOGEUSDT",
+      "SHIBUSDT",
+      "SOLUSDT",
+      "ETHUSDT",
+      "BTCUSDT",
+      "AVAXUSDT",
+      "NEARUSDT",
+      "DOTUSDT",
+      "ATOMUSDT",
+      "ADAUSDT",
+      "MATICUSDT",
+      "ARBUSDT",
+      "OPUSDT",
+      "FETUSDT",
+      "RENDERUSDT",
+      "SUIUSDT",
+      "SEIUSDT",
+      "INJUSDT",
+      "TIAUSDT",
+      "MKRUSDT",
+      "SNXUSDT",
+      "CRVUSDT",
+      "COMPUSDT",
+      "PEPEUSDT",
+      "FLOKIUSDT",
+      "WIFUSDT",
+      "BONKUSDT",
+      "FTMUSDT",
+      "ALGOUSDT",
+      "XLMUSDT",
+      "HBARUSDT",
+      "VETUSDT",
+      "TAOUSDT",
+      "RUNEUSDT",
+      "GRTUSDT",
+      "STXUSDT",
+      "IMXUSDT"
+    ],
+    "download_count": 1110,
+    "output_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h",
+    "downloads_preview": [
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-17",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-17.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-17.zip",
+        "bytes": 1325,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-18",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-18.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-18.zip",
+        "bytes": 1334,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-19",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-19.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-19.zip",
+        "bytes": 1309,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-20",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-20.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-20.zip",
+        "bytes": 1345,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-21",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-21.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-21.zip",
+        "bytes": 1331,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-22",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-22.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-22.zip",
+        "bytes": 1303,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-23",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-23.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-23.zip",
+        "bytes": 1358,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-24",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-24.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-24.zip",
+        "bytes": 1331,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-25",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-25.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-25.zip",
+        "bytes": 1359,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-26",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-26.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-26.zip",
+        "bytes": 1361,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-27",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-27.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-27.zip",
+        "bytes": 1351,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-28",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-28.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-28.zip",
+        "bytes": 1344,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-01",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-01.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-01.zip",
+        "bytes": 1349,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-02",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-02.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-02.zip",
+        "bytes": 1355,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-03",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-03.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-03.zip",
+        "bytes": 1361,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-04",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-04.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-04.zip",
+        "bytes": 1368,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-05",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-05.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-05.zip",
+        "bytes": 1341,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-06",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-06.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-06.zip",
+        "bytes": 1334,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-07",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-07.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-07.zip",
+        "bytes": 1267,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-03-08",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-08.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-03-08.zip",
+        "bytes": 1303,
+        "status": "cached"
+      }
+    ]
+  },
+  "tradeable_pairs": [
+    {
+      "pair": "LINK/SOL",
+      "token_a": "LINK",
+      "token_b": "SOL",
+      "tradeable": true,
+      "correlation": 0.9783,
+      "coint_score": -4.707298,
+      "coint_pvalue": 0.000548,
+      "halflife_hours": 11.75,
+      "hurst": 0.2646,
+      "adf_stat": -3.99221,
+      "adf_pvalue": 0.001452,
+      "spread_mean": -2.260902,
+      "spread_std": 0.010394,
+      "spread_z_range": 6.32,
+      "score": 3.4075
+    },
+    {
+      "pair": "BONK/DOGE",
+      "token_a": "BONK",
+      "token_b": "DOGE",
+      "tradeable": true,
+      "correlation": 0.9258,
+      "coint_score": -4.421509,
+      "coint_pvalue": 0.001643,
+      "halflife_hours": 13.59,
+      "hurst": 0.2975,
+      "adf_stat": -4.348759,
+      "adf_pvalue": 0.000365,
+      "spread_mean": -9.65844,
+      "spread_std": 0.016642,
+      "spread_z_range": 6.39,
+      "score": 4.4479
+    },
+    {
+      "pair": "BONK/GRT",
+      "token_a": "BONK",
+      "token_b": "GRT",
+      "tradeable": true,
+      "correlation": 0.9049,
+      "coint_score": -5.073621,
+      "coint_pvalue": 0.00012,
+      "halflife_hours": 12.94,
+      "hurst": 0.3127,
+      "adf_stat": -4.758055,
+      "adf_pvalue": 6.5e-05,
+      "spread_mean": -8.377564,
+      "spread_std": 0.018948,
+      "spread_z_range": 8.19,
+      "score": 4.6293
+    },
+    {
+      "pair": "DOGE/GRT",
+      "token_a": "DOGE",
+      "token_b": "GRT",
+      "tradeable": true,
+      "correlation": 0.8781,
+      "coint_score": -5.829549,
+      "coint_pvalue": 4e-06,
+      "halflife_hours": 14.42,
+      "hurst": 0.332,
+      "adf_stat": -5.803836,
+      "adf_pvalue": 0.0,
+      "spread_mean": 1.280877,
+      "spread_std": 0.018972,
+      "spread_z_range": 8.17,
+      "score": 5.1393
+    },
+    {
+      "pair": "LINK/TIA",
+      "token_a": "LINK",
+      "token_b": "TIA",
+      "tradeable": true,
+      "correlation": 0.9364,
+      "coint_score": -4.213855,
+      "coint_pvalue": 0.003475,
+      "halflife_hours": 20.59,
+      "hurst": 0.3422,
+      "adf_stat": -3.583363,
+      "adf_pvalue": 0.006087,
+      "spread_mean": 3.290713,
+      "spread_std": 0.021231,
+      "spread_z_range": 4.53,
+      "score": 5.2637
+    },
+    {
+      "pair": "SOL/TIA",
+      "token_a": "SOL",
+      "token_b": "TIA",
+      "tradeable": true,
+      "correlation": 0.9149,
+      "coint_score": -3.923292,
+      "coint_pvalue": 0.009209,
+      "halflife_hours": 16.68,
+      "hurst": 0.292,
+      "adf_stat": -4.173104,
+      "adf_pvalue": 0.000731,
+      "spread_mean": 5.551615,
+      "spread_std": 0.022231,
+      "spread_z_range": 6.38,
+      "score": 5.387
+    },
+    {
+      "pair": "COMP/IMX",
+      "token_a": "COMP",
+      "token_b": "IMX",
+      "tradeable": true,
+      "correlation": 0.8422,
+      "coint_score": -4.565892,
+      "coint_pvalue": 0.000952,
+      "halflife_hours": 12.48,
+      "hurst": 0.3466,
+      "adf_stat": -4.234546,
+      "adf_pvalue": 0.000576,
+      "spread_mean": 4.705584,
+      "spread_std": 0.024744,
+      "spread_z_range": 5.08,
+      "score": 5.6599
+    },
+    {
+      "pair": "DOGE/VET",
+      "token_a": "DOGE",
+      "token_b": "VET",
+      "tradeable": true,
+      "correlation": 0.8816,
+      "coint_score": -3.807421,
+      "coint_pvalue": 0.01325,
+      "halflife_hours": 22.21,
+      "hurst": 0.2634,
+      "adf_stat": -3.792826,
+      "adf_pvalue": 0.002982,
+      "spread_mean": 2.559508,
+      "spread_std": 0.020654,
+      "spread_z_range": 6.21,
+      "score": 6.068
+    },
+    {
+      "pair": "AAVE/VET",
+      "token_a": "AAVE",
+      "token_b": "VET",
+      "tradeable": true,
+      "correlation": 0.8977,
+      "coint_score": -4.043741,
+      "coint_pvalue": 0.006214,
+      "halflife_hours": 15.88,
+      "hurst": 0.3918,
+      "adf_stat": -4.034238,
+      "adf_pvalue": 0.001241,
+      "spread_mean": 9.658984,
+      "spread_std": 0.020724,
+      "spread_z_range": 6.9,
+      "score": 6.2241
+    },
+    {
+      "pair": "ALGO/COMP",
+      "token_a": "ALGO",
+      "token_b": "COMP",
+      "tradeable": true,
+      "correlation": 0.8565,
+      "coint_score": -3.899117,
+      "coint_pvalue": 0.009947,
+      "halflife_hours": 16.29,
+      "hurst": 0.3944,
+      "adf_stat": -3.949073,
+      "adf_pvalue": 0.001702,
+      "spread_mean": -5.3194,
+      "spread_std": 0.02299,
+      "spread_z_range": 6.41,
+      "score": 7.0521
+    },
+    {
+      "pair": "BONK/IMX",
+      "token_a": "BONK",
+      "token_b": "IMX",
+      "tradeable": true,
+      "correlation": 0.8045,
+      "coint_score": -3.842926,
+      "coint_pvalue": 0.011871,
+      "halflife_hours": 22.34,
+      "hurst": 0.3265,
+      "adf_stat": -3.666338,
+      "adf_pvalue": 0.004612,
+      "spread_mean": -10.196209,
+      "spread_std": 0.027749,
+      "spread_z_range": 5.28,
+      "score": 7.3373
+    },
+    {
+      "pair": "AAVE/SEI",
+      "token_a": "AAVE",
+      "token_b": "SEI",
+      "tradeable": true,
+      "correlation": 0.8642,
+      "coint_score": -3.706126,
+      "coint_pvalue": 0.017996,
+      "halflife_hours": 18.26,
+      "hurst": 0.3639,
+      "adf_stat": -3.635507,
+      "adf_pvalue": 0.005117,
+      "spread_mean": 7.438988,
+      "spread_std": 0.024148,
+      "spread_z_range": 4.53,
+      "score": 7.557
+    },
+    {
+      "pair": "COMP/XLM",
+      "token_a": "COMP",
+      "token_b": "XLM",
+      "tradeable": true,
+      "correlation": 0.8571,
+      "coint_score": -3.685542,
+      "coint_pvalue": 0.019124,
+      "halflife_hours": 17.01,
+      "hurst": 0.3568,
+      "adf_stat": -3.526394,
+      "adf_pvalue": 0.007335,
+      "spread_mean": 4.729112,
+      "spread_std": 0.02355,
+      "spread_z_range": 7.03,
+      "score": 7.6184
+    },
+    {
+      "pair": "IMX/XLM",
+      "token_a": "IMX",
+      "token_b": "XLM",
+      "tradeable": true,
+      "correlation": 0.8573,
+      "coint_score": -3.778162,
+      "coint_pvalue": 0.014492,
+      "halflife_hours": 18.89,
+      "hurst": 0.4017,
+      "adf_stat": -3.621555,
+      "adf_pvalue": 0.005362,
+      "spread_mean": 0.023528,
+      "spread_std": 0.023762,
+      "spread_z_range": 5.41,
+      "score": 7.6809
+    },
+    {
+      "pair": "SUI/TIA",
+      "token_a": "SUI",
+      "token_b": "TIA",
+      "tradeable": true,
+      "correlation": 0.9187,
+      "coint_score": -3.604907,
+      "coint_pvalue": 0.024161,
+      "halflife_hours": 20.83,
+      "hurst": 0.3601,
+      "adf_stat": -3.504018,
+      "adf_pvalue": 0.007884,
+      "spread_mean": 1.043298,
+      "spread_std": 0.02186,
+      "spread_z_range": 6.65,
+      "score": 7.6975
+    },
+    {
+      "pair": "AVAX/SOL",
+      "token_a": "AVAX",
+      "token_b": "SOL",
+      "tradeable": true,
+      "correlation": 0.9387,
+      "coint_score": -3.409124,
+      "coint_pvalue": 0.041347,
+      "halflife_hours": 20.77,
+      "hurst": 0.2422,
+      "adf_stat": -3.422482,
+      "adf_pvalue": 0.010216,
+      "spread_mean": -2.224886,
+      "spread_std": 0.017349,
+      "spread_z_range": 5.36,
+      "score": 8.0353
+    },
+    {
+      "pair": "CRV/STX",
+      "token_a": "CRV",
+      "token_b": "STX",
+      "tradeable": true,
+      "correlation": 0.8732,
+      "coint_score": -3.533233,
+      "coint_pvalue": 0.029561,
+      "halflife_hours": 18.15,
+      "hurst": 0.3915,
+      "adf_stat": -3.370558,
+      "adf_pvalue": 0.012004,
+      "spread_mean": -0.053635,
+      "spread_std": 0.019693,
+      "spread_z_range": 5.61,
+      "score": 8.8953
+    },
+    {
+      "pair": "DOGE/FLOKI",
+      "token_a": "DOGE",
+      "token_b": "FLOKI",
+      "tradeable": true,
+      "correlation": 0.9093,
+      "coint_score": -3.472038,
+      "coint_pvalue": 0.034956,
+      "halflife_hours": 24.29,
+      "hurst": 0.3524,
+      "adf_stat": -3.320162,
+      "adf_pvalue": 0.014001,
+      "spread_mean": 8.086274,
+      "spread_std": 0.019547,
+      "spread_z_range": 5.03,
+      "score": 8.9383
+    },
+    {
+      "pair": "BONK/XLM",
+      "token_a": "BONK",
+      "token_b": "XLM",
+      "tradeable": true,
+      "correlation": 0.8438,
+      "coint_score": -3.556847,
+      "coint_pvalue": 0.027678,
+      "halflife_hours": 30.46,
+      "hurst": 0.3717,
+      "adf_stat": -2.947719,
+      "adf_pvalue": 0.040074,
+      "spread_mean": -10.172681,
+      "spread_std": 0.024409,
+      "spread_z_range": 5.06,
+      "score": 9.3159
+    },
+    {
+      "pair": "BONK/FLOKI",
+      "token_a": "BONK",
+      "token_b": "FLOKI",
+      "tradeable": true,
+      "correlation": 0.9222,
+      "coint_score": -3.374018,
+      "coint_pvalue": 0.045319,
+      "halflife_hours": 27.44,
+      "hurst": 0.3454,
+      "adf_stat": -3.029908,
+      "adf_pvalue": 0.032194,
+      "spread_mean": -1.572166,
+      "spread_std": 0.018134,
+      "spread_z_range": 5.2,
+      "score": 9.9076
+    },
+    {
+      "pair": "ETH/TIA",
+      "token_a": "ETH",
+      "token_b": "TIA",
+      "tradeable": true,
+      "correlation": 0.9092,
+      "coint_score": -3.37438,
+      "coint_pvalue": 0.045277,
+      "halflife_hours": 19.69,
+      "hurst": 0.381,
+      "adf_stat": -3.647431,
+      "adf_pvalue": 0.004916,
+      "spread_mean": 8.71373,
+      "spread_std": 0.023257,
+      "spread_z_range": 6.03,
+      "score": 10.066
+    },
+    {
+      "pair": "AVAX/BTC",
+      "token_a": "AVAX",
+      "token_b": "BTC",
+      "tradeable": true,
+      "correlation": 0.9331,
+      "coint_score": -3.387662,
+      "coint_pvalue": 0.043739,
+      "halflife_hours": 32.49,
+      "hurst": 0.4124,
+      "adf_stat": -3.06525,
+      "adf_pvalue": 0.029234,
+      "spread_mean": -8.911701,
+      "spread_std": 0.020234,
+      "spread_z_range": 5.26,
+      "score": 10.52
+    }
+  ],
+  "rejected_pairs": [
+    {
+      "pair": "AAVE/ADA",
+      "token_a": "AAVE",
+      "token_b": "ADA",
+      "tradeable": false,
+      "correlation": 0.7319,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/ALGO",
+      "token_a": "AAVE",
+      "token_b": "ALGO",
+      "tradeable": false,
+      "correlation": 0.6978,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/ARB",
+      "token_a": "AAVE",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.5911,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/ATOM",
+      "token_a": "AAVE",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.7332,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/AVAX",
+      "token_a": "AAVE",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.1496,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/BONK",
+      "token_a": "AAVE",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.7815,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/BTC",
+      "token_a": "AAVE",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.1403,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/COMP",
+      "token_a": "AAVE",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.5972,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/CRV",
+      "token_a": "AAVE",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.4593,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/DOGE",
+      "token_a": "AAVE",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.7921,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/DOT",
+      "token_a": "AAVE",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": -0.2129,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/ETH",
+      "token_a": "AAVE",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.2079,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/FET",
+      "token_a": "AAVE",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.4173,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/FLOKI",
+      "token_a": "AAVE",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.7239,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/GRT",
+      "token_a": "AAVE",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.759,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/HBAR",
+      "token_a": "AAVE",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.6558,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/IMX",
+      "token_a": "AAVE",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.5907,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/INJ",
+      "token_a": "AAVE",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.5883,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/LINK",
+      "token_a": "AAVE",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.2434,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/NEAR",
+      "token_a": "AAVE",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.2387,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/OP",
+      "token_a": "AAVE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.7302,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/PEPE",
+      "token_a": "AAVE",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.816,
+      "coint_score": -3.673038,
+      "coint_pvalue": 0.01984,
+      "halflife_hours": 90.35,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "AAVE/RENDER",
+      "token_a": "AAVE",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.1451,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/RUNE",
+      "token_a": "AAVE",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.0523,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/SHIB",
+      "token_a": "AAVE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.7726,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/SNX",
+      "token_a": "AAVE",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.2367,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/SOL",
+      "token_a": "AAVE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.2309,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/STX",
+      "token_a": "AAVE",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.2428,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/SUI",
+      "token_a": "AAVE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.3557,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/TAO",
+      "token_a": "AAVE",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.1097,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/TIA",
+      "token_a": "AAVE",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.3574,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/UNI",
+      "token_a": "AAVE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.2176,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/WIF",
+      "token_a": "AAVE",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.7127,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AAVE/XLM",
+      "token_a": "AAVE",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.5763,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/ALGO",
+      "token_a": "ADA",
+      "token_b": "ALGO",
+      "tradeable": false,
+      "correlation": 0.7275,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/ARB",
+      "token_a": "ADA",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.5548,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/ATOM",
+      "token_a": "ADA",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.4138,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/AVAX",
+      "token_a": "ADA",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.3875,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/BONK",
+      "token_a": "ADA",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.8328,
+      "coint_score": -1.832711,
+      "coint_pvalue": 0.613702,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/BTC",
+      "token_a": "ADA",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.2527,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/COMP",
+      "token_a": "ADA",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.7352,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/CRV",
+      "token_a": "ADA",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.6558,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/DOGE",
+      "token_a": "ADA",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.8348,
+      "coint_score": -2.342881,
+      "coint_pvalue": 0.352362,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/DOT",
+      "token_a": "ADA",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.3198,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/ETH",
+      "token_a": "ADA",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.4081,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/FET",
+      "token_a": "ADA",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.5096,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/FLOKI",
+      "token_a": "ADA",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.6677,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/GRT",
+      "token_a": "ADA",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.8015,
+      "coint_score": -2.609141,
+      "coint_pvalue": 0.233163,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/HBAR",
+      "token_a": "ADA",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.8451,
+      "coint_score": -2.314048,
+      "coint_pvalue": 0.366564,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/IMX",
+      "token_a": "ADA",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.8104,
+      "coint_score": -3.285345,
+      "coint_pvalue": 0.056777,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/INJ",
+      "token_a": "ADA",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.5438,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/LINK",
+      "token_a": "ADA",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.5266,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/NEAR",
+      "token_a": "ADA",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.0327,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/OP",
+      "token_a": "ADA",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.4303,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/PEPE",
+      "token_a": "ADA",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.6481,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/RENDER",
+      "token_a": "ADA",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.2567,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/RUNE",
+      "token_a": "ADA",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.0674,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/SEI",
+      "token_a": "ADA",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.7768,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/SHIB",
+      "token_a": "ADA",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.6629,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/SNX",
+      "token_a": "ADA",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.2638,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/SOL",
+      "token_a": "ADA",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.4648,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/STX",
+      "token_a": "ADA",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.507,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/SUI",
+      "token_a": "ADA",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.4521,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/TAO",
+      "token_a": "ADA",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.2122,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/TIA",
+      "token_a": "ADA",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.5482,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/UNI",
+      "token_a": "ADA",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.1464,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/VET",
+      "token_a": "ADA",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.8091,
+      "coint_score": -2.397458,
+      "coint_pvalue": 0.32606,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ADA/WIF",
+      "token_a": "ADA",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.5748,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ADA/XLM",
+      "token_a": "ADA",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.6956,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/ARB",
+      "token_a": "ALGO",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.7695,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/ATOM",
+      "token_a": "ALGO",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.3762,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/AVAX",
+      "token_a": "ALGO",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.6928,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/BONK",
+      "token_a": "ALGO",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.9006,
+      "coint_score": -3.089356,
+      "coint_pvalue": 0.090461,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/BTC",
+      "token_a": "ALGO",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.6182,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/CRV",
+      "token_a": "ALGO",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.5027,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/DOGE",
+      "token_a": "ALGO",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.8722,
+      "coint_score": -2.968904,
+      "coint_pvalue": 0.117783,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/DOT",
+      "token_a": "ALGO",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.1795,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/ETH",
+      "token_a": "ALGO",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.6859,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/FET",
+      "token_a": "ALGO",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.8018,
+      "coint_score": -3.167135,
+      "coint_pvalue": 0.075598,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/FLOKI",
+      "token_a": "ALGO",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.9066,
+      "coint_score": -2.562961,
+      "coint_pvalue": 0.252029,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/GRT",
+      "token_a": "ALGO",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.8506,
+      "coint_score": -3.154958,
+      "coint_pvalue": 0.077789,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/HBAR",
+      "token_a": "ALGO",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.4772,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/IMX",
+      "token_a": "ALGO",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.823,
+      "coint_score": -2.918737,
+      "coint_pvalue": 0.130807,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/INJ",
+      "token_a": "ALGO",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.38,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/LINK",
+      "token_a": "ALGO",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6987,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/NEAR",
+      "token_a": "ALGO",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.2874,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/OP",
+      "token_a": "ALGO",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.5891,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/PEPE",
+      "token_a": "ALGO",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.4589,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/RENDER",
+      "token_a": "ALGO",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.7265,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/RUNE",
+      "token_a": "ALGO",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.5073,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/SEI",
+      "token_a": "ALGO",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.6108,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/SHIB",
+      "token_a": "ALGO",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.6961,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/SNX",
+      "token_a": "ALGO",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.0429,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/SOL",
+      "token_a": "ALGO",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6781,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/STX",
+      "token_a": "ALGO",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.458,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/SUI",
+      "token_a": "ALGO",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.827,
+      "coint_score": -2.269641,
+      "coint_pvalue": 0.388796,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/TAO",
+      "token_a": "ALGO",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.6669,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/TIA",
+      "token_a": "ALGO",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.8309,
+      "coint_score": -2.232509,
+      "coint_pvalue": 0.407668,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ALGO/UNI",
+      "token_a": "ALGO",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.2944,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/VET",
+      "token_a": "ALGO",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.7431,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/WIF",
+      "token_a": "ALGO",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.226,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ALGO/XLM",
+      "token_a": "ALGO",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.9339,
+      "coint_score": -2.795851,
+      "coint_pvalue": 0.167008,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/ATOM",
+      "token_a": "ARB",
+      "token_b": "ATOM",
+      "tradeable": false,
+      "correlation": 0.128,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/AVAX",
+      "token_a": "ARB",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": 0.5916,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/BONK",
+      "token_a": "ARB",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.7323,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/BTC",
+      "token_a": "ARB",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.5626,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/COMP",
+      "token_a": "ARB",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.6937,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/CRV",
+      "token_a": "ARB",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.7153,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/DOGE",
+      "token_a": "ARB",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.5999,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/DOT",
+      "token_a": "ARB",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.346,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/ETH",
+      "token_a": "ARB",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.5993,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/FET",
+      "token_a": "ARB",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.5295,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/FLOKI",
+      "token_a": "ARB",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.7239,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/GRT",
+      "token_a": "ARB",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.6071,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/HBAR",
+      "token_a": "ARB",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.5192,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/IMX",
+      "token_a": "ARB",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.6326,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/INJ",
+      "token_a": "ARB",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.0234,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/LINK",
+      "token_a": "ARB",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6273,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/NEAR",
+      "token_a": "ARB",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.3811,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/OP",
+      "token_a": "ARB",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.7547,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/PEPE",
+      "token_a": "ARB",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.2442,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/RENDER",
+      "token_a": "ARB",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.4233,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/RUNE",
+      "token_a": "ARB",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.4424,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/SEI",
+      "token_a": "ARB",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.5595,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/SHIB",
+      "token_a": "ARB",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.3652,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/SNX",
+      "token_a": "ARB",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.4511,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/SOL",
+      "token_a": "ARB",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.629,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/STX",
+      "token_a": "ARB",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.6856,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/SUI",
+      "token_a": "ARB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6669,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/TAO",
+      "token_a": "ARB",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.4864,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/TIA",
+      "token_a": "ARB",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.7555,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/UNI",
+      "token_a": "ARB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.3921,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/VET",
+      "token_a": "ARB",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.6076,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/WIF",
+      "token_a": "ARB",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.2423,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ARB/XLM",
+      "token_a": "ARB",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.72,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/AVAX",
+      "token_a": "ATOM",
+      "token_b": "AVAX",
+      "tradeable": false,
+      "correlation": -0.2566,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/BONK",
+      "token_a": "ATOM",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.4957,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/BTC",
+      "token_a": "ATOM",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": -0.2444,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/COMP",
+      "token_a": "ATOM",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.2497,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/CRV",
+      "token_a": "ATOM",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": -0.0163,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/DOGE",
+      "token_a": "ATOM",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.5903,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/DOT",
+      "token_a": "ATOM",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": -0.6707,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/ETH",
+      "token_a": "ATOM",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": -0.2327,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/FET",
+      "token_a": "ATOM",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.1454,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/FLOKI",
+      "token_a": "ATOM",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.5317,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/GRT",
+      "token_a": "ATOM",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.5761,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/HBAR",
+      "token_a": "ATOM",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.3495,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/IMX",
+      "token_a": "ATOM",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.2195,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/INJ",
+      "token_a": "ATOM",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.7491,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/LINK",
+      "token_a": "ATOM",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": -0.2209,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/NEAR",
+      "token_a": "ATOM",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.6466,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/OP",
+      "token_a": "ATOM",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.5875,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/PEPE",
+      "token_a": "ATOM",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.9053,
+      "coint_score": -2.699331,
+      "coint_pvalue": 0.199819,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ATOM/RENDER",
+      "token_a": "ATOM",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": -0.0665,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/RUNE",
+      "token_a": "ATOM",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.3625,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SEI",
+      "token_a": "ATOM",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.699,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SHIB",
+      "token_a": "ATOM",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8416,
+      "coint_score": -2.301775,
+      "coint_pvalue": 0.372668,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ATOM/SNX",
+      "token_a": "ATOM",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.5313,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SOL",
+      "token_a": "ATOM",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": -0.2481,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/STX",
+      "token_a": "ATOM",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": -0.2285,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/SUI",
+      "token_a": "ATOM",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.0233,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/TAO",
+      "token_a": "ATOM",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.1913,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/TIA",
+      "token_a": "ATOM",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": -0.0724,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/UNI",
+      "token_a": "ATOM",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.6828,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/VET",
+      "token_a": "ATOM",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.7768,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/WIF",
+      "token_a": "ATOM",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.7291,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ATOM/XLM",
+      "token_a": "ATOM",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.2436,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/BONK",
+      "token_a": "AVAX",
+      "token_b": "BONK",
+      "tradeable": false,
+      "correlation": 0.5976,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/COMP",
+      "token_a": "AVAX",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.5913,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/CRV",
+      "token_a": "AVAX",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.4815,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/DOGE",
+      "token_a": "AVAX",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.5024,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/DOT",
+      "token_a": "AVAX",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.6258,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/ETH",
+      "token_a": "AVAX",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9454,
+      "coint_score": -3.005927,
+      "coint_pvalue": 0.108803,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/FET",
+      "token_a": "AVAX",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.7416,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/FLOKI",
+      "token_a": "AVAX",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.6101,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/GRT",
+      "token_a": "AVAX",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.4626,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/HBAR",
+      "token_a": "AVAX",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.1526,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/IMX",
+      "token_a": "AVAX",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.6682,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/INJ",
+      "token_a": "AVAX",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.0259,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/LINK",
+      "token_a": "AVAX",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9485,
+      "coint_score": -2.335084,
+      "coint_pvalue": 0.356183,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/NEAR",
+      "token_a": "AVAX",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8067,
+      "coint_score": -3.100354,
+      "coint_pvalue": 0.088232,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/OP",
+      "token_a": "AVAX",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.0755,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/PEPE",
+      "token_a": "AVAX",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.2004,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/RENDER",
+      "token_a": "AVAX",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.827,
+      "coint_score": -3.015535,
+      "coint_pvalue": 0.106559,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/RUNE",
+      "token_a": "AVAX",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.8866,
+      "coint_score": -2.613871,
+      "coint_pvalue": 0.231278,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/SEI",
+      "token_a": "AVAX",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.0079,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/SHIB",
+      "token_a": "AVAX",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.1404,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/SNX",
+      "token_a": "AVAX",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.2593,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/STX",
+      "token_a": "AVAX",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.6224,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/SUI",
+      "token_a": "AVAX",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9276,
+      "coint_score": -2.603992,
+      "coint_pvalue": 0.235224,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/TAO",
+      "token_a": "AVAX",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.8497,
+      "coint_score": -3.655405,
+      "coint_pvalue": 0.020888,
+      "halflife_hours": null,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "AVAX/TIA",
+      "token_a": "AVAX",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.9268,
+      "coint_score": -2.915092,
+      "coint_pvalue": 0.131792,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AVAX/UNI",
+      "token_a": "AVAX",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7879,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/VET",
+      "token_a": "AVAX",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.1735,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/WIF",
+      "token_a": "AVAX",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.357,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "AVAX/XLM",
+      "token_a": "AVAX",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7876,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/BTC",
+      "token_a": "BONK",
+      "token_b": "BTC",
+      "tradeable": false,
+      "correlation": 0.5478,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/COMP",
+      "token_a": "BONK",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.7805,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/CRV",
+      "token_a": "BONK",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.6134,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/DOT",
+      "token_a": "BONK",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.1716,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/ETH",
+      "token_a": "BONK",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.6101,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/FET",
+      "token_a": "BONK",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.6789,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/HBAR",
+      "token_a": "BONK",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.6543,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/INJ",
+      "token_a": "BONK",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.519,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/LINK",
+      "token_a": "BONK",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.667,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/NEAR",
+      "token_a": "BONK",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.158,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/OP",
+      "token_a": "BONK",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.6039,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/PEPE",
+      "token_a": "BONK",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.6115,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/RENDER",
+      "token_a": "BONK",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.5066,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/RUNE",
+      "token_a": "BONK",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.3859,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/SEI",
+      "token_a": "BONK",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.7016,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/SHIB",
+      "token_a": "BONK",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.7555,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/SNX",
+      "token_a": "BONK",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.1529,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/SOL",
+      "token_a": "BONK",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6353,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/STX",
+      "token_a": "BONK",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.5252,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/SUI",
+      "token_a": "BONK",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.7422,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/TAO",
+      "token_a": "BONK",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.4569,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/TIA",
+      "token_a": "BONK",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.7463,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/UNI",
+      "token_a": "BONK",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.2047,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BONK/VET",
+      "token_a": "BONK",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.847,
+      "coint_score": -2.992356,
+      "coint_pvalue": 0.112034,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BONK/WIF",
+      "token_a": "BONK",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.4522,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/COMP",
+      "token_a": "BTC",
+      "token_b": "COMP",
+      "tradeable": false,
+      "correlation": 0.4912,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/CRV",
+      "token_a": "BTC",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.4585,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/DOGE",
+      "token_a": "BTC",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.4314,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/DOT",
+      "token_a": "BTC",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.5173,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/ETH",
+      "token_a": "BTC",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.9441,
+      "coint_score": -2.251267,
+      "coint_pvalue": 0.398105,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/FET",
+      "token_a": "BTC",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.6756,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/FLOKI",
+      "token_a": "BTC",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.5527,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/GRT",
+      "token_a": "BTC",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.3928,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/HBAR",
+      "token_a": "BTC",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.1039,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/IMX",
+      "token_a": "BTC",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.5156,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/INJ",
+      "token_a": "BTC",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.0449,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/LINK",
+      "token_a": "BTC",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9209,
+      "coint_score": -2.513143,
+      "coint_pvalue": 0.273303,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/NEAR",
+      "token_a": "BTC",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8256,
+      "coint_score": -3.1803,
+      "coint_pvalue": 0.073285,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/OP",
+      "token_a": "BTC",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.077,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/PEPE",
+      "token_a": "BTC",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.2448,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/RENDER",
+      "token_a": "BTC",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.7572,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/RUNE",
+      "token_a": "BTC",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.9349,
+      "coint_score": -2.727915,
+      "coint_pvalue": 0.1897,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/SEI",
+      "token_a": "BTC",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.0436,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/SHIB",
+      "token_a": "BTC",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.0498,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/SNX",
+      "token_a": "BTC",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.2383,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/SOL",
+      "token_a": "BTC",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9439,
+      "coint_score": -3.110747,
+      "coint_pvalue": 0.086165,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/STX",
+      "token_a": "BTC",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.6031,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/SUI",
+      "token_a": "BTC",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8851,
+      "coint_score": -2.758878,
+      "coint_pvalue": 0.17912,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/TAO",
+      "token_a": "BTC",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.813,
+      "coint_score": -2.767794,
+      "coint_pvalue": 0.176147,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/TIA",
+      "token_a": "BTC",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.8651,
+      "coint_score": -3.008502,
+      "coint_pvalue": 0.108198,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "BTC/UNI",
+      "token_a": "BTC",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7573,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/VET",
+      "token_a": "BTC",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.1161,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/WIF",
+      "token_a": "BTC",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.3198,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "BTC/XLM",
+      "token_a": "BTC",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.6957,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/CRV",
+      "token_a": "COMP",
+      "token_b": "CRV",
+      "tradeable": false,
+      "correlation": 0.4384,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/DOGE",
+      "token_a": "COMP",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.7404,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/DOT",
+      "token_a": "COMP",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.278,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/ETH",
+      "token_a": "COMP",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.6048,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/FET",
+      "token_a": "COMP",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.7553,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/FLOKI",
+      "token_a": "COMP",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.7652,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/GRT",
+      "token_a": "COMP",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.7769,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/HBAR",
+      "token_a": "COMP",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.5158,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/INJ",
+      "token_a": "COMP",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.3077,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/LINK",
+      "token_a": "COMP",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6347,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/NEAR",
+      "token_a": "COMP",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.2128,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/OP",
+      "token_a": "COMP",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.4773,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/PEPE",
+      "token_a": "COMP",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.4128,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/RENDER",
+      "token_a": "COMP",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.641,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/RUNE",
+      "token_a": "COMP",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.3975,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/SEI",
+      "token_a": "COMP",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.551,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/SHIB",
+      "token_a": "COMP",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.6049,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/SNX",
+      "token_a": "COMP",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.035,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/SOL",
+      "token_a": "COMP",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.5991,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/STX",
+      "token_a": "COMP",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.4315,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/SUI",
+      "token_a": "COMP",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6895,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/TAO",
+      "token_a": "COMP",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.5892,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/TIA",
+      "token_a": "COMP",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.7462,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/UNI",
+      "token_a": "COMP",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.2848,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/VET",
+      "token_a": "COMP",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.6651,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "COMP/WIF",
+      "token_a": "COMP",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.221,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/DOGE",
+      "token_a": "CRV",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.4876,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/DOT",
+      "token_a": "CRV",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.5669,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/ETH",
+      "token_a": "CRV",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.4875,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/FET",
+      "token_a": "CRV",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.2336,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/FLOKI",
+      "token_a": "CRV",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.4484,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/GRT",
+      "token_a": "CRV",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.4622,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/HBAR",
+      "token_a": "CRV",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.7756,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/IMX",
+      "token_a": "CRV",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.5224,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/INJ",
+      "token_a": "CRV",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.0025,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/LINK",
+      "token_a": "CRV",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6194,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/NEAR",
+      "token_a": "CRV",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.3434,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/OP",
+      "token_a": "CRV",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.4166,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/PEPE",
+      "token_a": "CRV",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.1919,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/RENDER",
+      "token_a": "CRV",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.0726,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/RUNE",
+      "token_a": "CRV",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.3012,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/SEI",
+      "token_a": "CRV",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.5446,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/SHIB",
+      "token_a": "CRV",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.1347,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/SNX",
+      "token_a": "CRV",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.215,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/SOL",
+      "token_a": "CRV",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6217,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/SUI",
+      "token_a": "CRV",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.4216,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/TAO",
+      "token_a": "CRV",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.1615,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/TIA",
+      "token_a": "CRV",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.6018,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/UNI",
+      "token_a": "CRV",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.4887,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/VET",
+      "token_a": "CRV",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.4927,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/WIF",
+      "token_a": "CRV",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.3982,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "CRV/XLM",
+      "token_a": "CRV",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.4646,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/DOT",
+      "token_a": "DOGE",
+      "token_b": "DOT",
+      "tradeable": false,
+      "correlation": 0.0324,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/ETH",
+      "token_a": "DOGE",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.4967,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/FET",
+      "token_a": "DOGE",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.6264,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/HBAR",
+      "token_a": "DOGE",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.641,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/IMX",
+      "token_a": "DOGE",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.7536,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/INJ",
+      "token_a": "DOGE",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.5915,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/LINK",
+      "token_a": "DOGE",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.5611,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/NEAR",
+      "token_a": "DOGE",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.0177,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/OP",
+      "token_a": "DOGE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.5668,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/PEPE",
+      "token_a": "DOGE",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.7009,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/RENDER",
+      "token_a": "DOGE",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.4949,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/RUNE",
+      "token_a": "DOGE",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.2952,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/SEI",
+      "token_a": "DOGE",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.7231,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/SHIB",
+      "token_a": "DOGE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8524,
+      "coint_score": -3.529713,
+      "coint_pvalue": 0.029851,
+      "halflife_hours": 65.52,
+      "hurst": 0.4016,
+      "adf_stat": -2.107582,
+      "adf_pvalue": 0.241477,
+      "reject_reason": "spread_not_stationary"
+    },
+    {
+      "pair": "DOGE/SNX",
+      "token_a": "DOGE",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.2652,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/SOL",
+      "token_a": "DOGE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.5062,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/STX",
+      "token_a": "DOGE",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.4083,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/SUI",
+      "token_a": "DOGE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6819,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/TAO",
+      "token_a": "DOGE",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.3917,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/TIA",
+      "token_a": "DOGE",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.6412,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/UNI",
+      "token_a": "DOGE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.08,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/WIF",
+      "token_a": "DOGE",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.4637,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOGE/XLM",
+      "token_a": "DOGE",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8353,
+      "coint_score": -2.407718,
+      "coint_pvalue": 0.321208,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/ETH",
+      "token_a": "DOT",
+      "token_b": "ETH",
+      "tradeable": false,
+      "correlation": 0.6106,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/FET",
+      "token_a": "DOT",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.2719,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/FLOKI",
+      "token_a": "DOT",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.0214,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/GRT",
+      "token_a": "DOT",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.0497,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/HBAR",
+      "token_a": "DOT",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.2837,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/IMX",
+      "token_a": "DOT",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.4073,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/INJ",
+      "token_a": "DOT",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.3431,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/LINK",
+      "token_a": "DOT",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6801,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/NEAR",
+      "token_a": "DOT",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7033,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/OP",
+      "token_a": "DOT",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": -0.2425,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/PEPE",
+      "token_a": "DOT",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.4576,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/RENDER",
+      "token_a": "DOT",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.2688,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/RUNE",
+      "token_a": "DOT",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.4822,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SEI",
+      "token_a": "DOT",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.1534,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SHIB",
+      "token_a": "DOT",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": -0.3624,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SNX",
+      "token_a": "DOT",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.3685,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SOL",
+      "token_a": "DOT",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6589,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/STX",
+      "token_a": "DOT",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.7016,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/SUI",
+      "token_a": "DOT",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.3724,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/TAO",
+      "token_a": "DOT",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.3768,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/TIA",
+      "token_a": "DOT",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.5565,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/UNI",
+      "token_a": "DOT",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8324,
+      "coint_score": -1.945607,
+      "coint_pvalue": 0.55671,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOT/VET",
+      "token_a": "DOT",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": -0.1678,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/WIF",
+      "token_a": "DOT",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.3103,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "DOT/XLM",
+      "token_a": "DOT",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.3057,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/FET",
+      "token_a": "ETH",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.8155,
+      "coint_score": -2.746964,
+      "coint_pvalue": 0.183144,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/FLOKI",
+      "token_a": "ETH",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.5864,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/GRT",
+      "token_a": "ETH",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.4624,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/HBAR",
+      "token_a": "ETH",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.1889,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/IMX",
+      "token_a": "ETH",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.6606,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/INJ",
+      "token_a": "ETH",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": -0.008,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/LINK",
+      "token_a": "ETH",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.9624,
+      "coint_score": -2.644431,
+      "coint_pvalue": 0.220198,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/NEAR",
+      "token_a": "ETH",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.8016,
+      "coint_score": -2.509289,
+      "coint_pvalue": 0.274988,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/OP",
+      "token_a": "ETH",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.0952,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/PEPE",
+      "token_a": "ETH",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.1609,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/RENDER",
+      "token_a": "ETH",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.7956,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/RUNE",
+      "token_a": "ETH",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.8551,
+      "coint_score": -0.857926,
+      "coint_pvalue": 0.926654,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/SEI",
+      "token_a": "ETH",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.0228,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/SHIB",
+      "token_a": "ETH",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.1073,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/SNX",
+      "token_a": "ETH",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.2357,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/SOL",
+      "token_a": "ETH",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.9547,
+      "coint_score": -2.878647,
+      "coint_pvalue": 0.141938,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/STX",
+      "token_a": "ETH",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.5927,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/SUI",
+      "token_a": "ETH",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8746,
+      "coint_score": -2.524781,
+      "coint_pvalue": 0.268251,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/TAO",
+      "token_a": "ETH",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.8743,
+      "coint_score": -3.061777,
+      "coint_pvalue": 0.096241,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ETH/UNI",
+      "token_a": "ETH",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7328,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/VET",
+      "token_a": "ETH",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.1851,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/WIF",
+      "token_a": "ETH",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.2864,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "ETH/XLM",
+      "token_a": "ETH",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7853,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/FLOKI",
+      "token_a": "FET",
+      "token_b": "FLOKI",
+      "tradeable": false,
+      "correlation": 0.713,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/GRT",
+      "token_a": "FET",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.6397,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/HBAR",
+      "token_a": "FET",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.1556,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/IMX",
+      "token_a": "FET",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.7775,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/INJ",
+      "token_a": "FET",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.2774,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/LINK",
+      "token_a": "FET",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.7287,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/NEAR",
+      "token_a": "FET",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.4692,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/OP",
+      "token_a": "FET",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.2647,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/PEPE",
+      "token_a": "FET",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.1937,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/RENDER",
+      "token_a": "FET",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.861,
+      "coint_score": -1.38772,
+      "coint_pvalue": 0.801692,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/RUNE",
+      "token_a": "FET",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.5655,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/SEI",
+      "token_a": "FET",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.2113,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/SHIB",
+      "token_a": "FET",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.4537,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/SNX",
+      "token_a": "FET",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.0414,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/SOL",
+      "token_a": "FET",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6924,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/STX",
+      "token_a": "FET",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.2365,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/SUI",
+      "token_a": "FET",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.7843,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/TAO",
+      "token_a": "FET",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.8848,
+      "coint_score": -2.095518,
+      "coint_pvalue": 0.47871,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/TIA",
+      "token_a": "FET",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.7851,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/UNI",
+      "token_a": "FET",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.3149,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/VET",
+      "token_a": "FET",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.4093,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/WIF",
+      "token_a": "FET",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.1242,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FET/XLM",
+      "token_a": "FET",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8776,
+      "coint_score": -3.695969,
+      "coint_pvalue": 0.018545,
+      "halflife_hours": null,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "FLOKI/GRT",
+      "token_a": "FLOKI",
+      "token_b": "GRT",
+      "tradeable": false,
+      "correlation": 0.8556,
+      "coint_score": -3.241621,
+      "coint_pvalue": 0.063239,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FLOKI/HBAR",
+      "token_a": "FLOKI",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.4634,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/IMX",
+      "token_a": "FLOKI",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.7502,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/INJ",
+      "token_a": "FLOKI",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.4404,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/LINK",
+      "token_a": "FLOKI",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.6047,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/NEAR",
+      "token_a": "FLOKI",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.1358,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/OP",
+      "token_a": "FLOKI",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.6667,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/PEPE",
+      "token_a": "FLOKI",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.5851,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/RENDER",
+      "token_a": "FLOKI",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.6217,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/RUNE",
+      "token_a": "FLOKI",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.4455,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/SEI",
+      "token_a": "FLOKI",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.5944,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/SHIB",
+      "token_a": "FLOKI",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8092,
+      "coint_score": -2.315273,
+      "coint_pvalue": 0.365957,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FLOKI/SNX",
+      "token_a": "FLOKI",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.0592,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/SOL",
+      "token_a": "FLOKI",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.5664,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/STX",
+      "token_a": "FLOKI",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.4146,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/SUI",
+      "token_a": "FLOKI",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8071,
+      "coint_score": -2.729622,
+      "coint_pvalue": 0.189106,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FLOKI/TAO",
+      "token_a": "FLOKI",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.5468,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/TIA",
+      "token_a": "FLOKI",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.744,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/UNI",
+      "token_a": "FLOKI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.1367,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/VET",
+      "token_a": "FLOKI",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.8193,
+      "coint_score": -1.440281,
+      "coint_pvalue": 0.783373,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FLOKI/WIF",
+      "token_a": "FLOKI",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.3092,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "FLOKI/XLM",
+      "token_a": "FLOKI",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8765,
+      "coint_score": -2.523938,
+      "coint_pvalue": 0.268615,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "GRT/HBAR",
+      "token_a": "GRT",
+      "token_b": "HBAR",
+      "tradeable": false,
+      "correlation": 0.6226,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/IMX",
+      "token_a": "GRT",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.811,
+      "coint_score": -3.147543,
+      "coint_pvalue": 0.079147,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "GRT/INJ",
+      "token_a": "GRT",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.6559,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/LINK",
+      "token_a": "GRT",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.5328,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/NEAR",
+      "token_a": "GRT",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.0236,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/OP",
+      "token_a": "GRT",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.541,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/PEPE",
+      "token_a": "GRT",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.6674,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/RENDER",
+      "token_a": "GRT",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.4824,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/RUNE",
+      "token_a": "GRT",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.2723,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/SEI",
+      "token_a": "GRT",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.7146,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/SHIB",
+      "token_a": "GRT",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8104,
+      "coint_score": -4.05994,
+      "coint_pvalue": 0.005887,
+      "halflife_hours": 53.59,
+      "hurst": 0.3318,
+      "adf_stat": -2.164286,
+      "adf_pvalue": 0.219462,
+      "reject_reason": "spread_not_stationary"
+    },
+    {
+      "pair": "GRT/SNX",
+      "token_a": "GRT",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.3076,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/SOL",
+      "token_a": "GRT",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.4938,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/STX",
+      "token_a": "GRT",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.3758,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/SUI",
+      "token_a": "GRT",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6294,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/TAO",
+      "token_a": "GRT",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.3821,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/TIA",
+      "token_a": "GRT",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.6465,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/UNI",
+      "token_a": "GRT",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.092,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/VET",
+      "token_a": "GRT",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.8433,
+      "coint_score": -3.711437,
+      "coint_pvalue": 0.017714,
+      "halflife_hours": 30.93,
+      "hurst": 0.396,
+      "adf_stat": -2.770626,
+      "adf_pvalue": 0.062594,
+      "reject_reason": "spread_not_stationary"
+    },
+    {
+      "pair": "GRT/WIF",
+      "token_a": "GRT",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.4895,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "GRT/XLM",
+      "token_a": "GRT",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7637,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/IMX",
+      "token_a": "HBAR",
+      "token_b": "IMX",
+      "tradeable": false,
+      "correlation": 0.5425,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/INJ",
+      "token_a": "HBAR",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.3845,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/LINK",
+      "token_a": "HBAR",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.3583,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/NEAR",
+      "token_a": "HBAR",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.159,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/OP",
+      "token_a": "HBAR",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.4478,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/PEPE",
+      "token_a": "HBAR",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.5915,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/RENDER",
+      "token_a": "HBAR",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": -0.0956,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/RUNE",
+      "token_a": "HBAR",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.0515,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/SEI",
+      "token_a": "HBAR",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.8051,
+      "coint_score": -3.760464,
+      "coint_pvalue": 0.015292,
+      "halflife_hours": 35.32,
+      "hurst": 0.3791,
+      "adf_stat": -2.720568,
+      "adf_pvalue": 0.070546,
+      "reject_reason": "spread_not_stationary"
+    },
+    {
+      "pair": "HBAR/SHIB",
+      "token_a": "HBAR",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.4536,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/SNX",
+      "token_a": "HBAR",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.2255,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/SOL",
+      "token_a": "HBAR",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.3174,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/STX",
+      "token_a": "HBAR",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.6414,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/SUI",
+      "token_a": "HBAR",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.1946,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/TAO",
+      "token_a": "HBAR",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.107,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/TIA",
+      "token_a": "HBAR",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.3579,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/UNI",
+      "token_a": "HBAR",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.1047,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/VET",
+      "token_a": "HBAR",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.7368,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/WIF",
+      "token_a": "HBAR",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.7406,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "HBAR/XLM",
+      "token_a": "HBAR",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.4105,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/INJ",
+      "token_a": "IMX",
+      "token_b": "INJ",
+      "tradeable": false,
+      "correlation": 0.4009,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/LINK",
+      "token_a": "IMX",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.71,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/NEAR",
+      "token_a": "IMX",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.3062,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/OP",
+      "token_a": "IMX",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.3597,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/PEPE",
+      "token_a": "IMX",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.3808,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/RENDER",
+      "token_a": "IMX",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.6219,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/RUNE",
+      "token_a": "IMX",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.3865,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/SEI",
+      "token_a": "IMX",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.4969,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/SHIB",
+      "token_a": "IMX",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.5869,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/SNX",
+      "token_a": "IMX",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.0813,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/SOL",
+      "token_a": "IMX",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6567,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/STX",
+      "token_a": "IMX",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.4755,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/SUI",
+      "token_a": "IMX",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.7074,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/TAO",
+      "token_a": "IMX",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.5866,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/TIA",
+      "token_a": "IMX",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.778,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/UNI",
+      "token_a": "IMX",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.3574,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/VET",
+      "token_a": "IMX",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.623,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "IMX/WIF",
+      "token_a": "IMX",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.1682,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/LINK",
+      "token_a": "INJ",
+      "token_b": "LINK",
+      "tradeable": false,
+      "correlation": 0.0485,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/NEAR",
+      "token_a": "INJ",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": -0.3942,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/OP",
+      "token_a": "INJ",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.1488,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/PEPE",
+      "token_a": "INJ",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.7262,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/RENDER",
+      "token_a": "INJ",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.1091,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/RUNE",
+      "token_a": "INJ",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.1686,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/SEI",
+      "token_a": "INJ",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.5365,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/SHIB",
+      "token_a": "INJ",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.7335,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/SNX",
+      "token_a": "INJ",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.8124,
+      "coint_score": -3.172487,
+      "coint_pvalue": 0.074651,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "INJ/SOL",
+      "token_a": "INJ",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.0127,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/STX",
+      "token_a": "INJ",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": -0.1688,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/SUI",
+      "token_a": "INJ",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.1459,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/TAO",
+      "token_a": "INJ",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.0313,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/TIA",
+      "token_a": "INJ",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.0704,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/UNI",
+      "token_a": "INJ",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.3474,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/VET",
+      "token_a": "INJ",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.6115,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/WIF",
+      "token_a": "INJ",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.5591,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "INJ/XLM",
+      "token_a": "INJ",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.301,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/NEAR",
+      "token_a": "LINK",
+      "token_b": "NEAR",
+      "tradeable": false,
+      "correlation": 0.7551,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/OP",
+      "token_a": "LINK",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.099,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/PEPE",
+      "token_a": "LINK",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.1042,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/RENDER",
+      "token_a": "LINK",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.7244,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/RUNE",
+      "token_a": "LINK",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.8406,
+      "coint_score": -2.348594,
+      "coint_pvalue": 0.349572,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/SEI",
+      "token_a": "LINK",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.1313,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/SHIB",
+      "token_a": "LINK",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.1459,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/SNX",
+      "token_a": "LINK",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.1617,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/STX",
+      "token_a": "LINK",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.7238,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/SUI",
+      "token_a": "LINK",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8744,
+      "coint_score": -2.724911,
+      "coint_pvalue": 0.190747,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "LINK/TAO",
+      "token_a": "LINK",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.7756,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/UNI",
+      "token_a": "LINK",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7972,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/VET",
+      "token_a": "LINK",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.2646,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/WIF",
+      "token_a": "LINK",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.1741,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "LINK/XLM",
+      "token_a": "LINK",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7836,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/OP",
+      "token_a": "NEAR",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": -0.2012,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/PEPE",
+      "token_a": "NEAR",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": -0.6321,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/RENDER",
+      "token_a": "NEAR",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.5987,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/RUNE",
+      "token_a": "NEAR",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.8214,
+      "coint_score": -2.135098,
+      "coint_pvalue": 0.45804,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "NEAR/SEI",
+      "token_a": "NEAR",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.3748,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SHIB",
+      "token_a": "NEAR",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": -0.3951,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SNX",
+      "token_a": "NEAR",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.4918,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SOL",
+      "token_a": "NEAR",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.7963,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/STX",
+      "token_a": "NEAR",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.4987,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/SUI",
+      "token_a": "NEAR",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.6217,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/TAO",
+      "token_a": "NEAR",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.7198,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/TIA",
+      "token_a": "NEAR",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.6796,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/UNI",
+      "token_a": "NEAR",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8641,
+      "coint_score": -1.59053,
+      "coint_pvalue": 0.72487,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "NEAR/VET",
+      "token_a": "NEAR",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": -0.3117,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/WIF",
+      "token_a": "NEAR",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.6009,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "NEAR/XLM",
+      "token_a": "NEAR",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.3775,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/PEPE",
+      "token_a": "OP",
+      "token_b": "PEPE",
+      "tradeable": false,
+      "correlation": 0.6195,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/RENDER",
+      "token_a": "OP",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.0795,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/RUNE",
+      "token_a": "OP",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.0537,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/SEI",
+      "token_a": "OP",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.7309,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/SHIB",
+      "token_a": "OP",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.6108,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/SNX",
+      "token_a": "OP",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.2279,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/SOL",
+      "token_a": "OP",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.1033,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/STX",
+      "token_a": "OP",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.2673,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/SUI",
+      "token_a": "OP",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.3006,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/TAO",
+      "token_a": "OP",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.0951,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/TIA",
+      "token_a": "OP",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.3068,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/UNI",
+      "token_a": "OP",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.2317,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/VET",
+      "token_a": "OP",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.7694,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/WIF",
+      "token_a": "OP",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.5585,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "OP/XLM",
+      "token_a": "OP",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.4669,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/RENDER",
+      "token_a": "PEPE",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": -0.0838,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/RUNE",
+      "token_a": "PEPE",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": -0.3865,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/SEI",
+      "token_a": "PEPE",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.8285,
+      "coint_score": -2.511548,
+      "coint_pvalue": 0.274,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "PEPE/SHIB",
+      "token_a": "PEPE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.8752,
+      "coint_score": -1.611857,
+      "coint_pvalue": 0.715859,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "PEPE/SNX",
+      "token_a": "PEPE",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.5097,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/SOL",
+      "token_a": "PEPE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": -0.1511,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/STX",
+      "token_a": "PEPE",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": -0.0613,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/SUI",
+      "token_a": "PEPE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.0502,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/TAO",
+      "token_a": "PEPE",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.1898,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/TIA",
+      "token_a": "PEPE",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.0239,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/UNI",
+      "token_a": "PEPE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.551,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "PEPE/VET",
+      "token_a": "PEPE",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.8859,
+      "coint_score": -2.404525,
+      "coint_pvalue": 0.322715,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "PEPE/WIF",
+      "token_a": "PEPE",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.8319,
+      "coint_score": -1.548303,
+      "coint_pvalue": 0.742208,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "PEPE/XLM",
+      "token_a": "PEPE",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.3294,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/RUNE",
+      "token_a": "RENDER",
+      "token_b": "RUNE",
+      "tradeable": false,
+      "correlation": 0.7701,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/SEI",
+      "token_a": "RENDER",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.034,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/SHIB",
+      "token_a": "RENDER",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.3188,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/SNX",
+      "token_a": "RENDER",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.1431,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/SOL",
+      "token_a": "RENDER",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.6999,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/STX",
+      "token_a": "RENDER",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.2037,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/SUI",
+      "token_a": "RENDER",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8674,
+      "coint_score": -3.032763,
+      "coint_pvalue": 0.102622,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/TAO",
+      "token_a": "RENDER",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.9439,
+      "coint_score": -2.175205,
+      "coint_pvalue": 0.437184,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/TIA",
+      "token_a": "RENDER",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.7905,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/UNI",
+      "token_a": "RENDER",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.4985,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/VET",
+      "token_a": "RENDER",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.1759,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/WIF",
+      "token_a": "RENDER",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.4331,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RENDER/XLM",
+      "token_a": "RENDER",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8042,
+      "coint_score": -2.768908,
+      "coint_pvalue": 0.175778,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RUNE/SEI",
+      "token_a": "RUNE",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": -0.1997,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/SHIB",
+      "token_a": "RUNE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": -0.055,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/SNX",
+      "token_a": "RUNE",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": -0.2838,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/SOL",
+      "token_a": "RUNE",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.8514,
+      "coint_score": -2.252075,
+      "coint_pvalue": 0.397695,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RUNE/STX",
+      "token_a": "RUNE",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.5425,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/SUI",
+      "token_a": "RUNE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8337,
+      "coint_score": -2.716449,
+      "coint_pvalue": 0.193719,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RUNE/TAO",
+      "token_a": "RUNE",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.7825,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/TIA",
+      "token_a": "RUNE",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.8108,
+      "coint_score": -2.525254,
+      "coint_pvalue": 0.268046,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RUNE/UNI",
+      "token_a": "RUNE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7949,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/VET",
+      "token_a": "RUNE",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": -0.044,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/WIF",
+      "token_a": "RUNE",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.4759,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "RUNE/XLM",
+      "token_a": "RUNE",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.5846,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/SHIB",
+      "token_a": "SEI",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.7146,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/SNX",
+      "token_a": "SEI",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.2308,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/SOL",
+      "token_a": "SEI",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.1096,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/STX",
+      "token_a": "SEI",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.3153,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/SUI",
+      "token_a": "SEI",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.1787,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/TAO",
+      "token_a": "SEI",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.0939,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/TIA",
+      "token_a": "SEI",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.2643,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/UNI",
+      "token_a": "SEI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.232,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SEI/VET",
+      "token_a": "SEI",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.9101,
+      "coint_score": -2.423796,
+      "coint_pvalue": 0.313669,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SEI/WIF",
+      "token_a": "SEI",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.8523,
+      "coint_score": -3.378152,
+      "coint_pvalue": 0.044836,
+      "halflife_hours": 90.3,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "SEI/XLM",
+      "token_a": "SEI",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.451,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/SNX",
+      "token_a": "SHIB",
+      "token_b": "SNX",
+      "tradeable": false,
+      "correlation": 0.4314,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/SOL",
+      "token_a": "SHIB",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": 0.0897,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/STX",
+      "token_a": "SHIB",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": -0.0052,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/SUI",
+      "token_a": "SHIB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.4123,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/TAO",
+      "token_a": "SHIB",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.1539,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/TIA",
+      "token_a": "SHIB",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.3023,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/UNI",
+      "token_a": "SHIB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.3395,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/VET",
+      "token_a": "SHIB",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.8825,
+      "coint_score": -2.126935,
+      "coint_pvalue": 0.462298,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SHIB/WIF",
+      "token_a": "SHIB",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.5513,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SHIB/XLM",
+      "token_a": "SHIB",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.6194,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/SOL",
+      "token_a": "SNX",
+      "token_b": "SOL",
+      "tradeable": false,
+      "correlation": -0.2027,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/STX",
+      "token_a": "SNX",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": -0.3146,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/SUI",
+      "token_a": "SNX",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": -0.1546,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/TAO",
+      "token_a": "SNX",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": -0.2867,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/TIA",
+      "token_a": "SNX",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": -0.236,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/UNI",
+      "token_a": "SNX",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": -0.3769,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/VET",
+      "token_a": "SNX",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.2664,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/WIF",
+      "token_a": "SNX",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.4223,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SNX/XLM",
+      "token_a": "SNX",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": -0.0753,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/STX",
+      "token_a": "SOL",
+      "token_b": "STX",
+      "tradeable": false,
+      "correlation": 0.7191,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/SUI",
+      "token_a": "SOL",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.8609,
+      "coint_score": -2.451685,
+      "coint_pvalue": 0.300783,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SOL/TAO",
+      "token_a": "SOL",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.7654,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/UNI",
+      "token_a": "SOL",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8045,
+      "coint_score": -2.099568,
+      "coint_pvalue": 0.476593,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SOL/VET",
+      "token_a": "SOL",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.2188,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/WIF",
+      "token_a": "SOL",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.1869,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SOL/XLM",
+      "token_a": "SOL",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7393,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/SUI",
+      "token_a": "STX",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.5269,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/TAO",
+      "token_a": "STX",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.2644,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/TIA",
+      "token_a": "STX",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.6918,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/UNI",
+      "token_a": "STX",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.6814,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/VET",
+      "token_a": "STX",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.3156,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/WIF",
+      "token_a": "STX",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.1377,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "STX/XLM",
+      "token_a": "STX",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.4773,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SUI/TAO",
+      "token_a": "SUI",
+      "token_b": "TAO",
+      "tradeable": false,
+      "correlation": 0.836,
+      "coint_score": -3.963036,
+      "coint_pvalue": 0.008102,
+      "halflife_hours": null,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "SUI/UNI",
+      "token_a": "SUI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.5995,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SUI/VET",
+      "token_a": "SUI",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.4015,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SUI/WIF",
+      "token_a": "SUI",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.1906,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "SUI/XLM",
+      "token_a": "SUI",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8805,
+      "coint_score": -2.524728,
+      "coint_pvalue": 0.268274,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "TAO/TIA",
+      "token_a": "TAO",
+      "token_b": "TIA",
+      "tradeable": false,
+      "correlation": 0.8051,
+      "coint_score": -2.040858,
+      "coint_pvalue": 0.507285,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "TAO/UNI",
+      "token_a": "TAO",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.5606,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TAO/VET",
+      "token_a": "TAO",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.092,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TAO/WIF",
+      "token_a": "TAO",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.4699,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TAO/XLM",
+      "token_a": "TAO",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.7727,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TIA/UNI",
+      "token_a": "TIA",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.7004,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TIA/VET",
+      "token_a": "TIA",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": 0.4071,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TIA/WIF",
+      "token_a": "TIA",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.1066,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "TIA/XLM",
+      "token_a": "TIA",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.8715,
+      "coint_score": -3.137606,
+      "coint_pvalue": 0.080997,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "UNI/VET",
+      "token_a": "UNI",
+      "token_b": "VET",
+      "tradeable": false,
+      "correlation": -0.2096,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "UNI/WIF",
+      "token_a": "UNI",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": -0.4667,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "UNI/XLM",
+      "token_a": "UNI",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.3687,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "VET/WIF",
+      "token_a": "VET",
+      "token_b": "WIF",
+      "tradeable": false,
+      "correlation": 0.756,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "VET/XLM",
+      "token_a": "VET",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.6336,
+      "reject_reason": "low_correlation"
+    },
+    {
+      "pair": "WIF/XLM",
+      "token_a": "WIF",
+      "token_b": "XLM",
+      "tradeable": false,
+      "correlation": 0.0578,
+      "reject_reason": "low_correlation"
+    }
+  ],
+  "total_pairs_tested": 666,
+  "tradeable_pair_count": 22
+}

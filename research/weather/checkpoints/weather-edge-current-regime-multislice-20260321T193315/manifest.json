@@ -1,0 +1,24 @@
+{
+  "checkpoint_id": "weather-edge-current-regime-multislice-20260321T193315",
+  "created_at": "2026-03-21T19:33:15.500628+00:00",
+  "status": "weather_edge_current_regime_multislice",
+  "category": "weather_edge",
+  "summary": "Aggregate current-regime weather-edge backtest across multiple scored report slices using the frozen current-regime filter.",
+  "artifacts": {
+    "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_similar_recent500_20260321T193315_v1/weather_edge_current_regime_multislice_report.json",
+    "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_multislice/runs/weather_edge_current_regime_multislice_similar_recent500_20260321T193315_v1/weather_edge_current_regime_multislice_report.md",
+    "source_report_jsons": [
+      "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json",
+      "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103530_v1/weather_edge_report.json"
+    ]
+  },
+  "metrics": {
+    "rows_scored": 2420,
+    "rows_eligible": 35,
+    "trade_rows_selected": 21,
+    "trade_count": 21,
+    "win_rate": 0.52381,
+    "total_net_bps": -1028.6711,
+    "max_drawdown": 0.131185
+  }
+}

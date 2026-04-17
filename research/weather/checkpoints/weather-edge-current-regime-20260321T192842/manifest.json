@@ -1,0 +1,21 @@
+{
+  "checkpoint_id": "weather-edge-current-regime-20260321T192842",
+  "created_at": "2026-03-21T19:28:42.187537+00:00",
+  "status": "weather_edge_current_regime",
+  "category": "weather_edge",
+  "summary": "Separate current-regime weather-edge backtest lane using the frozen legacy model and updated lead-time rules.",
+  "artifacts": {
+    "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch0/runs/weather_edge_current_regime_20260321T192842_v1/weather_edge_current_regime_report.json",
+    "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_current_regime_v1_recent500_batch0/runs/weather_edge_current_regime_20260321T192842_v1/weather_edge_current_regime_report.md",
+    "source_report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T103255_v1/weather_edge_report.json"
+  },
+  "metrics": {
+    "rows_scored": 1215,
+    "rows_eligible": 18,
+    "trade_rows_selected": 12,
+    "trade_count": 12,
+    "win_rate": 0.5,
+    "total_net_bps": -623.7512,
+    "max_drawdown": 0.080562
+  }
+}

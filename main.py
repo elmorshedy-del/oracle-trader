@@ -6,49 +6,288 @@ Runs the algo pipeline in background tasks.
 """
 
 import asyncio
+import concurrent.futures
+import json
 import logging
 import os
+import threading
+import zipfile
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 import io
 from fastapi.staticfiles import StaticFiles
 
 from config import PipelineConfig
 from engine.pipeline import Pipeline
+from engine.wallet_copy_store import WalletCopyResearchStore
+from engine.wallet_tracker import WalletTrackerService
+from engine.wallet_labeler import WalletLabelerService
+from engine.multiagent import (
+    MultiagentRuntime,
+    OrchestratorConfig,
+    consult_legacy_logs,
+    consult_multiagent_logs,
+    dataclass_to_dict,
+)
+from runtime_paths import DATA_DIR, LOG_DIR, STATE_PATH, resolve_runtime_file
 
 # Logging
+stream_handler = logging.StreamHandler()
+file_handler = logging.FileHandler(LOG_DIR / "app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
+    handlers=[stream_handler, file_handler],
+    force=True,
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 # Global pipeline instance
 pipeline: Pipeline | None = None
+multiagent_runtime: MultiagentRuntime | None = None
+wallet_copy_store: WalletCopyResearchStore | None = None
+wallet_copy_tracker: WalletTrackerService | None = None
+wallet_copy_labeler: WalletLabelerService | None = None
+wallet_copy_collector = None
+runtime_loop: asyncio.AbstractEventLoop | None = None
+runtime_thread: threading.Thread | None = None
+pipeline_future = None
+multiagent_future = None
+wallet_copy_tracker_future = None
+wallet_copy_labeler_future = None
+OPUS_RUNTIME_ENABLED = os.getenv("OPUS_RUNTIME_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
+
+
+class MultiagentConsultRequest(BaseModel):
+    question: str
+    provider: str | None = "auto"
+    history: list[dict[str, str]] | None = None
+
+
+def _iter_legacy_export_files() -> list[tuple[Path, str]]:
+    files: list[tuple[Path, str]] = []
+    allowed_suffixes = {".jsonl", ".json", ".log", ".sqlite"}
+
+    for path in sorted(LOG_DIR.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.suffix not in allowed_suffixes:
+            continue
+        relative = path.relative_to(LOG_DIR)
+        if relative.name.startswith("multiagent_"):
+            continue
+        if any(part.startswith("multiagent_") for part in relative.parts):
+            continue
+        files.append((path, f"logs/{relative.as_posix()}"))
+
+    for path in sorted(STATE_PATH.parent.glob("state*.json")):
+        if path.is_file():
+            files.append((path, f"state/{path.name}"))
+
+    weather_state = STATE_PATH.with_name("weather_state.json")
+    if weather_state.exists():
+        files.append((weather_state, f"state/{weather_state.name}"))
+
+    return files
+
+
+def _build_legacy_export_response():
+    if pipeline is None:
+        return JSONResponse(
+            {"ok": False, "error": "legacy pipeline not initialized"},
+            status_code=503,
+        )
+
+    bundle = io.BytesIO()
+    state = pipeline.get_state()
+    llm_context = pipeline.llm_context()
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "status.json",
+            json.dumps(state, indent=2, default=str),
+        )
+        archive.writestr(
+            "llm_context.json",
+            json.dumps(llm_context, indent=2, default=str),
+        )
+        archive.writestr(
+            "README.txt",
+            "\n".join(
+                [
+                    "Oracle legacy-engine export",
+                    "",
+                    "Contents:",
+                    "- status.json: current legacy dashboard payload used by /",
+                    "- llm_context.json: compact legacy-engine diagnostic context for on-request LLM review",
+                    "- logs/*: legacy engine logs and compact diagnostics only",
+                    "- state/*: legacy engine state files and comparison-book state files",
+                    "",
+                    "This export intentionally excludes Opus / multiagent artifacts.",
+                ]
+            ),
+        )
+
+        for path, archive_name in _iter_legacy_export_files():
+            try:
+                archive.write(path, archive_name)
+            except OSError as exc:
+                archive.writestr(
+                    f"errors/{Path(archive_name).name}.txt",
+                    f"Failed to include {path}: {exc}",
+                )
+
+    bundle.seek(0)
+    return StreamingResponse(
+        bundle,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=oracle-legacy-engine-export.zip"},
+    )
+
+
+def _run_runtime_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Own a separate event loop for long-running trading runtimes."""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+
+def _log_runtime_future(name: str, future) -> None:
+    try:
+        future.result()
+        logger.info("%s background task exited cleanly", name)
+    except (asyncio.CancelledError, concurrent.futures.CancelledError):
+        logger.info("%s background task cancelled", name)
+    except Exception:
+        logger.exception("%s background task crashed", name)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start pipeline on startup, stop on shutdown."""
-    global pipeline
+    global pipeline, multiagent_runtime, wallet_copy_store, wallet_copy_tracker, wallet_copy_labeler, wallet_copy_collector
+    global runtime_loop, runtime_thread, pipeline_future, multiagent_future, wallet_copy_tracker_future, wallet_copy_labeler_future
     config = PipelineConfig()
     pipeline = Pipeline(config)
+    multiagent_runtime = MultiagentRuntime(pipeline_config=config) if OPUS_RUNTIME_ENABLED else None
+    wallet_copy_db_path = (
+        Path(config.wallet_copy_research.db_path).expanduser()
+        if config.wallet_copy_research.db_path
+        else resolve_runtime_file(
+            DATA_DIR / config.wallet_copy_research.db_filename,
+            Path(config.wallet_copy_research.db_filename),
+        )
+    )
+    wallet_copy_store = WalletCopyResearchStore(
+        wallet_copy_db_path,
+        schema_version=config.wallet_copy_research.schema_version,
+        collector_version=config.wallet_copy_research.collector_version,
+        target_labeled_buys=config.wallet_copy_research.target_labeled_buys,
+    )
+    from data.collector import PolymarketCollector
 
-    # Start pipeline in background
-    task = asyncio.create_task(pipeline.start())
-    logger.info("Pipeline background task started")
+    wallet_copy_collector = PolymarketCollector(
+        config.api.gamma_host,
+        config.api.clob_host,
+        config.api.data_host,
+    )
+    wallet_copy_tracker = WalletTrackerService(
+        pipeline_config=config,
+        collector=wallet_copy_collector,
+        store=wallet_copy_store,
+    )
+    wallet_copy_labeler = WalletLabelerService(
+        pipeline_config=config,
+        collector=wallet_copy_collector,
+        store=wallet_copy_store,
+    )
+
+    runtime_loop = asyncio.new_event_loop()
+    runtime_thread = threading.Thread(
+        target=_run_runtime_loop,
+        args=(runtime_loop,),
+        name="oracle-runtime-loop",
+        daemon=True,
+    )
+    runtime_thread.start()
+
+    pipeline_future = asyncio.run_coroutine_threadsafe(pipeline.start(), runtime_loop)
+    pipeline_future.add_done_callback(lambda future: _log_runtime_future("Pipeline", future))
+    logger.info("Pipeline background task started on dedicated runtime loop")
+    if multiagent_runtime is not None:
+        multiagent_future = asyncio.run_coroutine_threadsafe(multiagent_runtime.start(), runtime_loop)
+        multiagent_future.add_done_callback(lambda future: _log_runtime_future("Multi-agent runtime", future))
+        logger.info("Multi-agent runtime background task started on dedicated runtime loop")
+    else:
+        multiagent_future = None
+        logger.info("Multi-agent runtime disabled by OPUS_RUNTIME_ENABLED=0")
+    if config.wallet_copy_research.enabled:
+        wallet_copy_tracker_future = asyncio.run_coroutine_threadsafe(wallet_copy_tracker.start(), runtime_loop)
+        wallet_copy_tracker_future.add_done_callback(lambda future: _log_runtime_future("Wallet copy tracker", future))
+        wallet_copy_labeler_future = asyncio.run_coroutine_threadsafe(wallet_copy_labeler.start(), runtime_loop)
+        wallet_copy_labeler_future.add_done_callback(lambda future: _log_runtime_future("Wallet copy labeler", future))
+        logger.info("Wallet-copy research tracker + labeler started on dedicated runtime loop")
+    else:
+        wallet_copy_tracker_future = None
+        wallet_copy_labeler_future = None
+        logger.info("Wallet-copy research disabled by WALLET_COPY_RESEARCH_ENABLED=0")
 
     yield
 
     # Shutdown
-    if pipeline:
-        await pipeline.stop()
-    task.cancel()
+    stop_futures = []
+    if pipeline and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(pipeline.stop(), runtime_loop))
+    if multiagent_runtime and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(multiagent_runtime.stop(), runtime_loop))
+    if wallet_copy_tracker and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_tracker.stop(), runtime_loop))
+    if wallet_copy_labeler and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_labeler.stop(), runtime_loop))
+    if wallet_copy_collector and runtime_loop:
+        stop_futures.append(asyncio.run_coroutine_threadsafe(wallet_copy_collector.close(), runtime_loop))
+
+    for future in stop_futures:
+        try:
+            future.result(timeout=15)
+        except Exception:
+            logger.exception("Runtime shutdown future failed")
+
+    if pipeline_future:
+        pipeline_future.cancel()
+    if multiagent_future:
+        multiagent_future.cancel()
+    if wallet_copy_tracker_future:
+        wallet_copy_tracker_future.cancel()
+    if wallet_copy_labeler_future:
+        wallet_copy_labeler_future.cancel()
+
+    if runtime_loop:
+        runtime_loop.call_soon_threadsafe(runtime_loop.stop)
+    if runtime_thread:
+        runtime_thread.join(timeout=10)
+    if runtime_loop:
+        runtime_loop.close()
+
+    pipeline_future = None
+    multiagent_future = None
+    wallet_copy_tracker_future = None
+    wallet_copy_labeler_future = None
+    runtime_loop = None
+    runtime_thread = None
+    wallet_copy_store = None
+    wallet_copy_tracker = None
+    wallet_copy_labeler = None
+    wallet_copy_collector = None
 
 
 app = FastAPI(
@@ -63,6 +302,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +315,7 @@ async def get_state():
     if pipeline is None:
         return {"mode":"paper","uptime_human":"starting...","scan_count":0,"active_markets":0,"portfolio":{"total_value":0,"cash":0,"positions_value":0,"total_pnl":0,"total_pnl_pct":0,"total_trades":0,"win_rate":0,"max_drawdown":0,"total_fees":0,"positions":[]},"signals":[],"trades":[],"strategies":{},"whale_wallets":[],"recent_news":[],"performance":{"by_strategy":{}},"errors":["Initializing..."],"markets_sample":[]}
     try:
-        return pipeline.get_state()
+        return Response(content=pipeline.get_state_json(), media_type="application/json")
     except Exception as e:
         return {"mode":"paper","uptime_human":"error","scan_count":0,"active_markets":0,"portfolio":{"total_value":0,"cash":0,"positions_value":0,"total_pnl":0,"total_pnl_pct":0,"total_trades":0,"win_rate":0,"max_drawdown":0,"total_fees":0,"positions":[]},"signals":[],"trades":[],"strategies":{},"whale_wallets":[],"recent_news":[],"performance":{"by_strategy":{}},"errors":[str(e)],"markets_sample":[]}
 
@@ -136,45 +376,35 @@ async def get_whales():
 
 @app.get("/api/logs/download")
 async def download_logs():
-    """Download all logs as a JSON bundle."""
-    import json as _json
-    from pathlib import Path as _Path
-    log_dir = _Path("logs")
-    bundle = {}
-    for log_file in log_dir.glob("*.jsonl"):
-        lines = []
-        try:
-            for line in log_file.read_text().strip().split("\n"):
-                if line:
-                    try:
-                        lines.append(_json.loads(line))
-                    except _json.JSONDecodeError:
-                        lines.append({"raw": line})
-        except Exception:
-            pass
-        bundle[log_file.stem] = lines
-    # Add current state
-    if pipeline:
-        try:
-            bundle["current_state"] = pipeline.get_state()
-        except Exception:
-            pass
-    content = _json.dumps(bundle, indent=2, default=str)
-    return StreamingResponse(
-        io.BytesIO(content.encode()),
-        media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=oracle-trader-logs.json"}
-    )
+    """Legacy-only log export kept for backward compatibility."""
+    return _build_legacy_export_response()
+
+
+@app.get("/api/legacy/logs/export")
+async def legacy_logs_export():
+    """Export compact legacy-engine logs, diagnostics, and state without mixing Opus data."""
+    return _build_legacy_export_response()
 
 
 @app.get("/api/reset")
 async def reset_portfolio():
     """Reset portfolio to fresh start with current config capital."""
-    import os
-    state_path = "/data/state.json"
-    if os.path.exists(state_path):
-        os.remove(state_path)
-    return {"status": "reset", "message": "Restart the service to apply"}
+    if pipeline is not None:
+        await pipeline.reset_state()
+        return {
+            "status": "reset",
+            "message": "Portfolio and strategy caches reset in-memory and on disk",
+            "state_path": str(STATE_PATH),
+            "log_dir": str(LOG_DIR),
+        }
+
+    STATE_PATH.unlink(missing_ok=True)
+    return {
+        "status": "reset",
+        "message": "State file deleted",
+        "state_path": str(STATE_PATH),
+        "log_dir": str(LOG_DIR),
+    }
 
 @app.get("/api/health/detail")
 async def health_detail():
@@ -215,11 +445,267 @@ async def health():
     return {"status": "ok", "mode": pipeline.config.mode if pipeline else "unknown"}
 
 
+@app.get("/api/wallet_trades")
+async def wallet_trades(limit: int = 50, wallet_address: str | None = None, market_slug: str | None = None):
+    """Recent wallet-copy research trades from tracked wallets."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(
+        wallet_copy_store.list_wallet_trades(
+            limit=max(1, min(limit, 500)),
+            wallet_address=wallet_address,
+            market_slug=market_slug,
+        )
+    )
+
+
+@app.get("/api/tracked_wallets")
+async def tracked_wallets(limit: int = 100):
+    """Current wallet-copy research watchlist with leaderboard stats."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(wallet_copy_store.list_tracked_wallets(limit=max(1, min(limit, 200))))
+
+
+@app.get("/api/collection_stats")
+async def collection_stats():
+    """Progress, ETA, and health for wallet-copy data collection."""
+    if wallet_copy_store is None or pipeline is None:
+        return JSONResponse({"error": "Wallet-copy collection not initialized"}, status_code=503)
+    cfg = pipeline.config.wallet_copy_research
+    return JSONResponse(
+        wallet_copy_store.collection_stats(
+            now_ts=datetime.now(timezone.utc).timestamp(),
+            tracker_poll_seconds=cfg.wallet_activity_poll_seconds,
+            labeler_poll_seconds=cfg.labeler_poll_seconds,
+            leaderboard_refresh_seconds=cfg.leaderboard_refresh_seconds,
+            positions_refresh_seconds=cfg.positions_refresh_seconds,
+            ml_min_category_labeled_buys=cfg.ml_min_category_labeled_buys,
+            ml_min_categories_at_floor=cfg.ml_min_categories_at_floor,
+            ml_max_top_category_share=cfg.ml_max_top_category_share,
+            ml_min_wallet_labeled_buys=cfg.ml_min_wallet_labeled_buys,
+            ml_min_wallets_at_floor=cfg.ml_min_wallets_at_floor,
+            ml_max_top_wallet_share=cfg.ml_max_top_wallet_share,
+            ml_min_unique_labeled_markets=cfg.ml_min_unique_labeled_markets,
+            ml_max_top_market_share=cfg.ml_max_top_market_share,
+            ml_min_resolution_labeled_buys=cfg.ml_min_resolution_labeled_buys,
+            ml_min_wallet_sell_labeled_buys=cfg.ml_min_wallet_sell_labeled_buys,
+        )
+    )
+
+
+@app.get("/api/wallet_resolution_rows")
+async def wallet_resolution_rows(after_id: int = 0, limit: int = 500):
+    """Paginated resolved BUY rows for offline wallet-copy ML research."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    rows = wallet_copy_store.list_resolution_training_rows_after_id(
+        last_id=max(0, after_id),
+        limit=max(1, min(limit, 500)),
+    )
+    next_after_id = int(rows[-1]["id"]) if rows else max(0, after_id)
+    return JSONResponse(
+        {
+            "rows": rows,
+            "next_after_id": next_after_id,
+            "has_more": len(rows) >= max(1, min(limit, 500)),
+        }
+    )
+
+
+@app.get("/api/copy_signal")
+async def copy_signal(limit: int = 50, strategy_key: str | None = None):
+    """Recent heuristic copy decisions scored from the real wallet-copy trade tape."""
+    if wallet_copy_store is None:
+        return JSONResponse({"error": "Wallet-copy store not initialized"}, status_code=503)
+    return JSONResponse(
+        wallet_copy_store.list_copy_decisions(
+            limit=max(1, min(limit, 500)),
+            strategy_key=strategy_key,
+        )
+    )
+
+
+@app.get("/api/multiagent/defaults")
+async def multiagent_defaults():
+    """Expose the current recommended multi-agent defaults."""
+    config = OrchestratorConfig()
+    return JSONResponse(dataclass_to_dict(config))
+
+
+@app.get("/api/multiagent/status")
+async def multiagent_status():
+    """Expose the isolated Opus runtime status."""
+    if multiagent_runtime is None:
+        config = OrchestratorConfig()
+        return JSONResponse(
+            {
+                "bridge": {
+                    "mode": "isolated_runtime",
+                    "state": "disabled",
+                    "next_step": "set_OPUS_RUNTIME_ENABLED=1_to_resume",
+                },
+                "summary": {
+                    "scan_count": 0,
+                    "active_markets": 0,
+                    "open_positions": 0,
+                    "top_blocker": "Multi-agent runtime is disabled",
+                },
+                "defaults": dataclass_to_dict(config),
+                "portfolio": {},
+                "health": {},
+                "diagnostics": {},
+                "market_mix": {},
+                "market_preview": [],
+                "module_cards": [],
+                "strategy_cards": [],
+                "comparison_views": [],
+                "blockers": [],
+            }
+        )
+    return JSONResponse(multiagent_runtime.get_status())
+
+
+@app.get("/api/multiagent/logs/export")
+async def multiagent_logs_export():
+    """Export compact Opus runtime logs, metrics, and snapshots."""
+    if multiagent_runtime is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "multiagent runtime disabled",
+            },
+            status_code=503,
+        )
+
+    bundle = io.BytesIO()
+    llm_context = multiagent_runtime.llm_context()
+    with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "status.json",
+            json.dumps(multiagent_runtime.get_status(), indent=2, default=str),
+        )
+        archive.writestr(
+            "llm_context.json",
+            json.dumps(llm_context, indent=2, default=str),
+        )
+        archive.writestr(
+            "README.txt",
+            "\n".join(
+                [
+                    "Oracle Opus runtime export",
+                    "",
+                    "Contents:",
+                    "- status.json: current runtime payload used by /multiagent",
+                    "- llm_context.json: compact diagnostic context for on-request LLM review",
+                    "- logs/multiagent_metrics.jsonl: compact per-cycle metrics log",
+                    "- logs/multiagent_runtime.sqlite: persisted compact runtime database",
+                    "- logs/multiagent_runtime_state.json: persisted Opus portfolio state",
+                    "- logs/multiagent_runtime_meta.json: persisted Opus scan counters/totals",
+                    "- snapshots/: recent scan-cycle snapshots",
+                ]
+            ),
+        )
+
+        for key in ("metrics_log_path", "metrics_db_path", "state_path", "runtime_meta_path"):
+            raw_path = llm_context.get(key)
+            if not raw_path:
+                continue
+            path = Path(raw_path)
+            if path.exists():
+                archive.write(path, arcname=f"logs/{path.name}")
+
+        for snapshot in sorted(
+            multiagent_runtime.snapshot_store.config.snapshot_dir.glob("cycle_*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )[:50]:
+            archive.write(snapshot, arcname=f"snapshots/{snapshot.name}")
+
+    bundle.seek(0)
+    return StreamingResponse(
+        bundle,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=oracle-opus-runtime-export.zip"},
+    )
+
+
+@app.post("/api/multiagent/consult")
+async def multiagent_consult(payload: MultiagentConsultRequest):
+    """Consult an LLM against compact Opus runtime diagnostics."""
+    if multiagent_runtime is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "The isolated Opus runtime is disabled.",
+                "model": None,
+            },
+            status_code=503,
+        )
+    if not payload.question.strip():
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Ask a non-empty diagnostic question.",
+                "model": None,
+            },
+            status_code=400,
+        )
+
+    result = await consult_multiagent_logs(
+        question=payload.question.strip(),
+        context=multiagent_runtime.llm_context(),
+        preferred_provider=payload.provider,
+        history=payload.history or [],
+    )
+    return JSONResponse(result)
+
+
+@app.post("/api/legacy/consult")
+async def legacy_consult(payload: MultiagentConsultRequest):
+    """Consult an LLM against compact legacy-engine diagnostics only."""
+    if pipeline is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Legacy engine is still starting.",
+                "provider": None,
+                "model": None,
+            },
+            status_code=503,
+        )
+
+    question = (payload.question or "").strip()
+    if not question:
+        return JSONResponse(
+            {
+                "ok": False,
+                "answer": "Ask a non-empty diagnostic question.",
+                "provider": None,
+                "model": None,
+            },
+            status_code=400,
+        )
+
+    result = await consult_legacy_logs(
+        question=question,
+        context=pipeline.llm_context(),
+        preferred_provider=payload.provider,
+        history=payload.history or [],
+    )
+    return JSONResponse(result)
+
+
 # ---------------------------------------------------------------------------
 # Dashboard — serves the React build or inline HTML
 # ---------------------------------------------------------------------------
 
 DASHBOARD_HTML = Path(__file__).parent / "dashboard" / "index.html"
+WALLET_COPY_HTML = Path(__file__).parent / "dashboard" / "wallet_copy.html"
+MULTIAGENT_DIR = Path(__file__).parent / "dashboard" / "multiagent"
+MULTIAGENT_HTML = MULTIAGENT_DIR / "index.html"
+
+app.mount("/multiagent-assets", StaticFiles(directory=MULTIAGENT_DIR), name="multiagent-assets")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -228,6 +714,22 @@ async def dashboard():
     if DASHBOARD_HTML.exists():
         return HTMLResponse(DASHBOARD_HTML.read_text())
     return HTMLResponse("<h1>Polymarket Algo Trader</h1><p>Dashboard loading...</p>")
+
+
+@app.get("/multiagent", response_class=HTMLResponse)
+async def multiagent_dashboard():
+    """Serve the separate multi-agent section."""
+    if MULTIAGENT_HTML.exists():
+        return HTMLResponse(MULTIAGENT_HTML.read_text())
+    return HTMLResponse("<h1>Oracle Multi-Agent Lab</h1><p>Multi-agent dashboard unavailable.</p>")
+
+
+@app.get("/wallet-copy", response_class=HTMLResponse)
+async def wallet_copy_dashboard():
+    """Serve the separate wallet-copy research collection dashboard."""
+    if WALLET_COPY_HTML.exists():
+        return HTMLResponse(WALLET_COPY_HTML.read_text())
+    return HTMLResponse("<h1>Wallet Copy Research</h1><p>Dashboard unavailable.</p>")
 
 
 # ---------------------------------------------------------------------------

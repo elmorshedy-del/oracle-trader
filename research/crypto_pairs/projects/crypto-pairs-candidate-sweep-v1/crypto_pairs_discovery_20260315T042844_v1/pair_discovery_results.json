@@ -1,0 +1,699 @@
+{
+  "run_name": "crypto_pairs_discovery_20260315T042844_v1",
+  "started_at": "2026-03-15T04:28:44.021125+00:00",
+  "start_date": "2026-01-13",
+  "end_date": "2026-03-13",
+  "interval": "1h",
+  "symbols_requested": [
+    "DOGEUSDT",
+    "SHIBUSDT",
+    "ARBUSDT",
+    "OPUSDT",
+    "AAVEUSDT",
+    "UNIUSDT",
+    "FETUSDT",
+    "RENDERUSDT",
+    "SUIUSDT",
+    "SEIUSDT"
+  ],
+  "symbols_loaded": [
+    "AAVEUSDT",
+    "ARBUSDT",
+    "DOGEUSDT",
+    "FETUSDT",
+    "OPUSDT",
+    "RENDERUSDT",
+    "SEIUSDT",
+    "SHIBUSDT",
+    "SUIUSDT",
+    "UNIUSDT"
+  ],
+  "download_report": {
+    "start_date": "2026-01-13",
+    "end_date": "2026-03-13",
+    "interval": "1h",
+    "symbols": [
+      "DOGEUSDT",
+      "SHIBUSDT",
+      "ARBUSDT",
+      "OPUSDT",
+      "AAVEUSDT",
+      "UNIUSDT",
+      "FETUSDT",
+      "RENDERUSDT",
+      "SUIUSDT",
+      "SEIUSDT"
+    ],
+    "download_count": 600,
+    "output_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h",
+    "downloads_preview": [
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-13",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-13.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-13.zip",
+        "bytes": 1369,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-14",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-14.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-14.zip",
+        "bytes": 1325,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-15",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-15.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-15.zip",
+        "bytes": 1346,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-16",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-16.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-16.zip",
+        "bytes": 1304,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-17",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-17.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-17.zip",
+        "bytes": 1300,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-18",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-18.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-18.zip",
+        "bytes": 1309,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-19",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-19.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-19.zip",
+        "bytes": 1305,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-20",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-20.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-20.zip",
+        "bytes": 1334,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-21",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-21.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-21.zip",
+        "bytes": 1359,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-22",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-22.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-22.zip",
+        "bytes": 1306,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-23",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-23.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-23.zip",
+        "bytes": 1319,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-24",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-24.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-24.zip",
+        "bytes": 1257,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-25",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-25.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-25.zip",
+        "bytes": 1305,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-26",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-26.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-26.zip",
+        "bytes": 1343,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-27",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-27.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-27.zip",
+        "bytes": 1310,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-28",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-28.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-28.zip",
+        "bytes": 1340,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-29",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-29.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-29.zip",
+        "bytes": 1345,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-30",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-30.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-30.zip",
+        "bytes": 1377,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-01-31",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-31.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-01-31.zip",
+        "bytes": 1365,
+        "status": "cached"
+      },
+      {
+        "symbol": "AAVEUSDT",
+        "interval": "1h",
+        "date": "2026-02-01",
+        "path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/raw/spot_klines_1h/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-01.zip",
+        "url": "https://data.binance.vision/data/spot/daily/klines/AAVEUSDT/1h/AAVEUSDT-1h-2026-02-01.zip",
+        "bytes": 1357,
+        "status": "cached"
+      }
+    ]
+  },
+  "tradeable_pairs": [
+    {
+      "pair": "AAVE/DOGE",
+      "token_a": "AAVE",
+      "token_b": "DOGE",
+      "tradeable": true,
+      "correlation": 0.9852,
+      "coint_score": -5.114316,
+      "coint_pvalue": 0.000101,
+      "halflife_hours": 45.18,
+      "hurst": 0.4095,
+      "adf_stat": -3.754443,
+      "adf_pvalue": 0.003409,
+      "spread_mean": 7.10548,
+      "spread_std": 0.032294,
+      "spread_z_range": 5.03,
+      "score": 6.1357
+    }
+  ],
+  "rejected_pairs": [
+    {
+      "pair": "AAVE/ARB",
+      "token_a": "AAVE",
+      "token_b": "ARB",
+      "tradeable": false,
+      "correlation": 0.9675,
+      "coint_score": -2.232388,
+      "coint_pvalue": 0.40773,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/FET",
+      "token_a": "AAVE",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.9781,
+      "coint_score": -3.150773,
+      "coint_pvalue": 0.078553,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/OP",
+      "token_a": "AAVE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9326,
+      "coint_score": -2.148753,
+      "coint_pvalue": 0.450926,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/RENDER",
+      "token_a": "AAVE",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.9547,
+      "coint_score": -0.356389,
+      "coint_pvalue": 0.97312,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SEI",
+      "token_a": "AAVE",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9717,
+      "coint_score": -2.814155,
+      "coint_pvalue": 0.161223,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SHIB",
+      "token_a": "AAVE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9722,
+      "coint_score": -2.785748,
+      "coint_pvalue": 0.170261,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/SUI",
+      "token_a": "AAVE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9739,
+      "coint_score": -2.806063,
+      "coint_pvalue": 0.163763,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "AAVE/UNI",
+      "token_a": "AAVE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9279,
+      "coint_score": -1.498582,
+      "coint_pvalue": 0.761735,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/DOGE",
+      "token_a": "ARB",
+      "token_b": "DOGE",
+      "tradeable": false,
+      "correlation": 0.9753,
+      "coint_score": -3.990483,
+      "coint_pvalue": 0.007409,
+      "halflife_hours": 530.49,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "ARB/FET",
+      "token_a": "ARB",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.9822,
+      "coint_score": -1.913117,
+      "coint_pvalue": 0.57334,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/OP",
+      "token_a": "ARB",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.9755,
+      "coint_score": -2.076602,
+      "coint_pvalue": 0.488602,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/RENDER",
+      "token_a": "ARB",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.9441,
+      "coint_score": -0.089524,
+      "coint_pvalue": 0.98359,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SEI",
+      "token_a": "ARB",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9921,
+      "coint_score": -2.752378,
+      "coint_pvalue": 0.181308,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SHIB",
+      "token_a": "ARB",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9639,
+      "coint_score": -2.2564,
+      "coint_pvalue": 0.395499,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/SUI",
+      "token_a": "ARB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9894,
+      "coint_score": -2.527826,
+      "coint_pvalue": 0.266937,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "ARB/UNI",
+      "token_a": "ARB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9264,
+      "coint_score": -1.295587,
+      "coint_pvalue": 0.831063,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/FET",
+      "token_a": "DOGE",
+      "token_b": "FET",
+      "tradeable": false,
+      "correlation": 0.9887,
+      "coint_score": -4.989007,
+      "coint_pvalue": 0.000172,
+      "halflife_hours": 131.26,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/OP",
+      "token_a": "DOGE",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.941,
+      "coint_score": -3.0427,
+      "coint_pvalue": 0.100401,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/RENDER",
+      "token_a": "DOGE",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.9628,
+      "coint_score": -1.131944,
+      "coint_pvalue": 0.874833,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/SEI",
+      "token_a": "DOGE",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9781,
+      "coint_score": -3.569628,
+      "coint_pvalue": 0.026702,
+      "halflife_hours": 363.34,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/SHIB",
+      "token_a": "DOGE",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9819,
+      "coint_score": -2.632521,
+      "coint_pvalue": 0.22478,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "DOGE/SUI",
+      "token_a": "DOGE",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9836,
+      "coint_score": -4.342793,
+      "coint_pvalue": 0.002194,
+      "halflife_hours": 270.61,
+      "reject_reason": "bad_halflife"
+    },
+    {
+      "pair": "DOGE/UNI",
+      "token_a": "DOGE",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9302,
+      "coint_score": -1.71205,
+      "coint_pvalue": 0.671377,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/OP",
+      "token_a": "FET",
+      "token_b": "OP",
+      "tradeable": false,
+      "correlation": 0.941,
+      "coint_score": -2.25571,
+      "coint_pvalue": 0.395848,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/RENDER",
+      "token_a": "FET",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.9755,
+      "coint_score": 0.047542,
+      "coint_pvalue": 0.986946,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/SEI",
+      "token_a": "FET",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9779,
+      "coint_score": -1.837796,
+      "coint_pvalue": 0.611188,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/SHIB",
+      "token_a": "FET",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9763,
+      "coint_score": -1.473073,
+      "coint_pvalue": 0.771372,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/SUI",
+      "token_a": "FET",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9915,
+      "coint_score": -2.828897,
+      "coint_pvalue": 0.156663,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "FET/UNI",
+      "token_a": "FET",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9342,
+      "coint_score": -1.965837,
+      "coint_pvalue": 0.546284,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/RENDER",
+      "token_a": "OP",
+      "token_b": "RENDER",
+      "tradeable": false,
+      "correlation": 0.8786,
+      "coint_score": 0.113188,
+      "coint_pvalue": 0.988211,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SEI",
+      "token_a": "OP",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9808,
+      "coint_score": -2.690711,
+      "coint_pvalue": 0.202937,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SHIB",
+      "token_a": "OP",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9599,
+      "coint_score": -2.491242,
+      "coint_pvalue": 0.282945,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/SUI",
+      "token_a": "OP",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9431,
+      "coint_score": -1.437657,
+      "coint_pvalue": 0.784314,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "OP/UNI",
+      "token_a": "OP",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8393,
+      "coint_score": -0.698195,
+      "coint_pvalue": 0.946833,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/SEI",
+      "token_a": "RENDER",
+      "token_b": "SEI",
+      "tradeable": false,
+      "correlation": 0.9332,
+      "coint_score": 0.137131,
+      "coint_pvalue": 0.988625,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/SHIB",
+      "token_a": "RENDER",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9347,
+      "coint_score": 0.735751,
+      "coint_pvalue": 0.993712,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/SUI",
+      "token_a": "RENDER",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9747,
+      "coint_score": -1.009862,
+      "coint_pvalue": 0.900961,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "RENDER/UNI",
+      "token_a": "RENDER",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9606,
+      "coint_score": -2.390471,
+      "coint_pvalue": 0.329381,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SEI/SHIB",
+      "token_a": "SEI",
+      "token_b": "SHIB",
+      "tradeable": false,
+      "correlation": 0.9767,
+      "coint_score": -2.0159,
+      "coint_pvalue": 0.520304,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SEI/SUI",
+      "token_a": "SEI",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9805,
+      "coint_score": -1.366523,
+      "coint_pvalue": 0.808758,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SEI/UNI",
+      "token_a": "SEI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9067,
+      "coint_score": -0.918958,
+      "coint_pvalue": 0.917171,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SHIB/SUI",
+      "token_a": "SHIB",
+      "token_b": "SUI",
+      "tradeable": false,
+      "correlation": 0.9601,
+      "coint_score": -1.828724,
+      "coint_pvalue": 0.615668,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SHIB/UNI",
+      "token_a": "SHIB",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.8679,
+      "coint_score": -0.918951,
+      "coint_pvalue": 0.917173,
+      "reject_reason": "not_cointegrated"
+    },
+    {
+      "pair": "SUI/UNI",
+      "token_a": "SUI",
+      "token_b": "UNI",
+      "tradeable": false,
+      "correlation": 0.9564,
+      "coint_score": -2.044675,
+      "coint_pvalue": 0.505291,
+      "reject_reason": "not_cointegrated"
+    }
+  ],
+  "total_pairs_tested": 45,
+  "tradeable_pair_count": 1
+}

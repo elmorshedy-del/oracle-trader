@@ -1,0 +1,234 @@
+{
+  "model_type": "catboost",
+  "model_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/models/wallet_copy_ml/30m_plus_2c_v1/catboost.cbm",
+  "target_slug": "30min_plus_200bps",
+  "target_mode": "forward_abs_move",
+  "forward_column": "price_30min_after",
+  "forward_threshold": 0.02,
+  "feature_columns": [
+    "price",
+    "price_distance_from_50",
+    "size_shares",
+    "size_usd",
+    "log_size_shares",
+    "log_size_usd",
+    "token_best_bid",
+    "token_best_ask",
+    "token_best_bid_size",
+    "token_best_ask_size",
+    "token_depth_within_2pct",
+    "token_spread",
+    "token_midpoint",
+    "price_vs_token_mid",
+    "market_yes_bid",
+    "market_yes_ask",
+    "market_no_bid",
+    "market_no_ask",
+    "market_spread",
+    "spread_frac_of_price",
+    "market_volume_24h",
+    "market_volume_total",
+    "market_liquidity",
+    "market_midpoint",
+    "price_vs_market_mid",
+    "market_reward_pool",
+    "hours_to_expiry",
+    "wallet_leaderboard_rank",
+    "wallet_leaderboard_rank_recip",
+    "wallet_leaderboard_profit",
+    "wallet_leaderboard_profit_log",
+    "wallet_leaderboard_win_rate_norm",
+    "wallet_open_positions",
+    "wallet_trade_count_24h",
+    "wallet_trade_rate_per_hour",
+    "is_adding_to_position",
+    "size_vs_wallet_avg",
+    "detection_delay_seconds",
+    "hour_of_day",
+    "hour_sin",
+    "hour_cos",
+    "day_of_week",
+    "btc_price",
+    "btc_momentum_60s",
+    "observed_market_age_hours",
+    "prior_wallet_resolution_trades",
+    "prior_wallet_resolution_win_rate",
+    "prior_wallet_avg_resolution_return",
+    "prior_wallet_avg_hold_hours",
+    "market_category",
+    "market_primary_tag"
+  ],
+  "categorical_features": [
+    "market_category",
+    "market_primary_tag"
+  ],
+  "numeric_features": [
+    "price",
+    "price_distance_from_50",
+    "size_shares",
+    "size_usd",
+    "log_size_shares",
+    "log_size_usd",
+    "token_best_bid",
+    "token_best_ask",
+    "token_best_bid_size",
+    "token_best_ask_size",
+    "token_depth_within_2pct",
+    "token_spread",
+    "token_midpoint",
+    "price_vs_token_mid",
+    "market_yes_bid",
+    "market_yes_ask",
+    "market_no_bid",
+    "market_no_ask",
+    "market_spread",
+    "spread_frac_of_price",
+    "market_volume_24h",
+    "market_volume_total",
+    "market_liquidity",
+    "market_midpoint",
+    "price_vs_market_mid",
+    "market_reward_pool",
+    "hours_to_expiry",
+    "wallet_leaderboard_rank",
+    "wallet_leaderboard_rank_recip",
+    "wallet_leaderboard_profit",
+    "wallet_leaderboard_profit_log",
+    "wallet_leaderboard_win_rate_norm",
+    "wallet_open_positions",
+    "wallet_trade_count_24h",
+    "wallet_trade_rate_per_hour",
+    "is_adding_to_position",
+    "size_vs_wallet_avg",
+    "detection_delay_seconds",
+    "hour_of_day",
+    "hour_sin",
+    "hour_cos",
+    "day_of_week",
+    "btc_price",
+    "btc_momentum_60s",
+    "observed_market_age_hours",
+    "prior_wallet_resolution_trades",
+    "prior_wallet_resolution_win_rate",
+    "prior_wallet_avg_resolution_return",
+    "prior_wallet_avg_hold_hours"
+  ],
+  "recommended_score_threshold": 0.5958846445123337,
+  "valid_metrics": {
+    "rows": 698,
+    "positive_rate": 0.21060171919770773,
+    "auc": 0.8975517611763398,
+    "average_precision": 0.6191048683169044,
+    "logloss": 0.32732597573174227,
+    "brier": 0.11004996772250814,
+    "accuracy": 0.829512893982808,
+    "balanced_accuracy": 0.6725496006024915,
+    "precision": 0.6555555555555556,
+    "recall": 0.4013605442176871,
+    "f1": 0.4978902953586498,
+    "precision_top_decile": 0.7428571428571429,
+    "score_top_decile_cutoff": 0.5958846445123337,
+    "score_top_5pct_cutoff": 0.7648923118526361
+  },
+  "test_metrics": {
+    "rows": 1401,
+    "positive_rate": 0.22840827980014275,
+    "auc": 0.7428249306197965,
+    "average_precision": 0.48663967126191177,
+    "logloss": 0.5332438456253524,
+    "brier": 0.1570109721326342,
+    "accuracy": 0.7737330478229836,
+    "balanced_accuracy": 0.6190838922294172,
+    "precision": 0.5071090047393365,
+    "recall": 0.334375,
+    "f1": 0.4030131826741996,
+    "precision_top_decile": 0.5531914893617021,
+    "score_top_decile_cutoff": 0.6043911003894133,
+    "score_top_5pct_cutoff": 0.7315271415078377
+  },
+  "top_catboost_features": [
+    {
+      "feature": "token_depth_within_2pct",
+      "importance": 13.434137489797218
+    },
+    {
+      "feature": "token_best_bid_size",
+      "importance": 9.22611920853611
+    },
+    {
+      "feature": "hours_to_expiry",
+      "importance": 5.34007648009277
+    },
+    {
+      "feature": "market_liquidity",
+      "importance": 5.192237143195366
+    },
+    {
+      "feature": "token_best_ask_size",
+      "importance": 4.633090497341376
+    },
+    {
+      "feature": "price_vs_market_mid",
+      "importance": 3.9838103902320214
+    },
+    {
+      "feature": "market_reward_pool",
+      "importance": 3.791457474528201
+    },
+    {
+      "feature": "wallet_leaderboard_profit",
+      "importance": 3.6696772655923207
+    },
+    {
+      "feature": "price_distance_from_50",
+      "importance": 3.4096334265634023
+    },
+    {
+      "feature": "wallet_leaderboard_rank",
+      "importance": 3.1038292836949
+    },
+    {
+      "feature": "market_volume_total",
+      "importance": 3.0455271682052585
+    },
+    {
+      "feature": "market_volume_24h",
+      "importance": 2.753964125160627
+    },
+    {
+      "feature": "hour_sin",
+      "importance": 2.7360662910901303
+    },
+    {
+      "feature": "price",
+      "importance": 2.7302898239648385
+    },
+    {
+      "feature": "wallet_leaderboard_profit_log",
+      "importance": 2.699961389777235
+    },
+    {
+      "feature": "price_vs_token_mid",
+      "importance": 2.5901192112666616
+    },
+    {
+      "feature": "observed_market_age_hours",
+      "importance": 2.544776853549465
+    },
+    {
+      "feature": "spread_frac_of_price",
+      "importance": 2.4707442120245067
+    },
+    {
+      "feature": "hour_of_day",
+      "importance": 2.439370981598965
+    },
+    {
+      "feature": "wallet_leaderboard_rank_recip",
+      "importance": 2.3893434965259006
+    }
+  ],
+  "trained_at": "2026-04-17T00:23:04.124639+00:00",
+  "source": "json:/Users/ahmedelmorshedy/Downloads/oracle-trader/output/wallet_copy_ml/live_forward_rows_price5m.json",
+  "row_count": 7003
+}

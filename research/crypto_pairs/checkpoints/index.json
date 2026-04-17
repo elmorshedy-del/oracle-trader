@@ -1,0 +1,369 @@
+[
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260314T222257",
+    "created_at": "2026-03-14T22:22:57.799819+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 16,
+      "pairs_tested": 120,
+      "tradeable_pairs": 3
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-runtime-v1-20260314T231300",
+    "created_at": "2026-03-14T23:13:32.866369+00:00",
+    "status": "runtime_scaffold",
+    "category": "runtime_v1",
+    "summary": "Implemented the rule-based crypto pairs runtime scaffold, first backtester, and live streamer fallback after Phase 1 discovery.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json",
+      "backtest_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260314T223158_v1/report.json",
+      "live_smoke_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260314T231223_v1/summary.json"
+    },
+    "metrics": {
+      "active_pairs": 3,
+      "backtest_trades": 44,
+      "backtest_win_rate": 0.7045454545454546,
+      "backtest_total_pnl_bps": 233.7625,
+      "live_messages": 17,
+      "live_bars": 6
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-corrected-backtests-20260315T001600",
+    "created_at": "2026-03-15T00:16:16.093617+00:00",
+    "status": "corrected_backtest",
+    "category": "backtest_v1",
+    "summary": "Corrected crypto pairs V1 single-pair and basket backtests after fixing Binance spot archive timestamp parsing from ms to us.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1",
+      "link_sol_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358537377_v1/report.json",
+      "avax_eth_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358857144_v1/report.json",
+      "aave_doge_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001358640288_v1/report.json",
+      "basket_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T001400250642_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_bps": 624.5312,
+      "avax_eth_bps": -166.8219,
+      "aave_doge_bps": 475.8089,
+      "basket_bps": 687.4537,
+      "basket_trades": 69,
+      "basket_win_rate": 0.5797101449275363
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-shadow-supervisor-v1-20260315T003100",
+    "created_at": "2026-03-15T00:30:52.577379+00:00",
+    "status": "supervisor_ready",
+    "category": "supervision",
+    "summary": "Added a detached external supervisor for the crypto pairs shadow runner with start/status/stop and restart-aware state management.",
+    "artifacts": {
+      "supervisor_tool": "/Users/ahmedelmorshedy/Downloads/oracle-trader/tools/supervise_crypto_pairs_shadow.py",
+      "smoke_supervisor_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_smoke2_20260315T0031_v1"
+    },
+    "metrics": {
+      "smoke_runtime_seconds": 30,
+      "smoke_stop_returncode": -15
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-live-ratio-unblocked-20260315T033800",
+    "created_at": "2026-03-15T03:37:38.393651+00:00",
+    "status": "live_pipeline_fixed",
+    "category": "live_runtime",
+    "summary": "Unblocked live crypto pairs ratio updates by widening leg lag tolerance, updating on every fresh bar, and adding reject counters.",
+    "artifacts": {
+      "session_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T033639_v1/summary.json"
+    },
+    "metrics": {
+      "ratio_ticks": 5,
+      "no_price_reject": 27,
+      "lag_reject": 0,
+      "warmup_reject": 5,
+      "streamer_messages": 283,
+      "streamer_bars": 33
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-60day-backtests-20260315T034500",
+    "created_at": "2026-03-15T03:44:49.481365+00:00",
+    "status": "extended_backtest",
+    "category": "backtest_v1",
+    "summary": "Extended crypto pairs V1 backtests to a 60-day window using the same frozen pair selection and rule-based signal engine.",
+    "artifacts": {
+      "link_sol_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038366_v1/report.json",
+      "avax_eth_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351038837_v1/report.json",
+      "aave_doge_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351040225_v1/report.json",
+      "basket_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034351328792_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_bps": 439.3625,
+      "avax_eth_bps": -263.601,
+      "aave_doge_bps": 634.6798,
+      "basket_bps": 595.2121,
+      "basket_trades": 156,
+      "basket_win_rate": 0.532051282051282
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-v1-split-robustness-20260315T035300",
+    "created_at": "2026-03-15T03:51:58.114339+00:00",
+    "status": "robustness_check",
+    "category": "backtest_v1",
+    "summary": "Split the 60-day V1 pairs into first/last 30 days and 15-day quarters to check whether profitability survives out-of-window slices without changing any rules.",
+    "artifacts": {
+      "link_sol_first_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957851054_v1/report.json",
+      "link_sol_second_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957850673_v1/report.json",
+      "aave_doge_first_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957849753_v1/report.json",
+      "aave_doge_second_half": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/backtests/crypto_pairs_backtest_20260315T034957853835_v1/report.json"
+    },
+    "metrics": {
+      "link_sol_first_half_bps": -153.195,
+      "link_sol_second_half_bps": 624.5312,
+      "aave_doge_first_half_bps": 296.1293,
+      "aave_doge_second_half_bps": 475.8089,
+      "link_sol_profitable_both_halves": 0,
+      "aave_doge_profitable_both_halves": 1,
+      "link_sol_q1_bps": 81.9375,
+      "link_sol_q2_bps": -211.2614,
+      "link_sol_q3_bps": 278.7251,
+      "link_sol_q4_bps": 237.9989,
+      "aave_doge_q1_bps": 51.2314,
+      "aave_doge_q2_bps": 285.492,
+      "aave_doge_q3_bps": -47.6122,
+      "aave_doge_q4_bps": 423.1097
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-live-aave-focus-20260315T035500",
+    "created_at": "2026-03-15T03:54:28.161858+00:00",
+    "status": "runtime_focus",
+    "category": "runtime_v1",
+    "summary": "Added explicit pair-key selection to the crypto pairs live shadow runtime and started a focused AAVE/DOGE supervisor run after the split-half robustness check favored that pair.",
+    "artifacts": {
+      "smoke_summary": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/sessions/crypto_pairs_shadow_20260315T035315_v1/summary.json",
+      "supervisor_state": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/crypto_pairs/shadow_supervision/crypto_pairs_shadow_supervisor_aave_doge_20260315T0354_v1/state.json"
+    },
+    "metrics": {
+      "focused_pair": "AAVE/DOGE",
+      "smoke_ratio_ticks": 1,
+      "smoke_signals": 0,
+      "smoke_trades": 0
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260315T042844",
+    "created_at": "2026-03-15T04:28:44.074637+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 10,
+      "pairs_tested": 45,
+      "tradeable_pairs": 1
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-candidate-sweep-20260315T043800",
+    "created_at": "2026-03-15T04:38:57.335916+00:00",
+    "status": "candidate_screen",
+    "category": "pair_discovery",
+    "summary": "Screened five requested candidate pairs on the frozen 60-day discovery window before any backtests; none passed the cointegration gate required to continue the pipeline.",
+    "artifacts": {
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "doge_shib_pvalue": 0.22478,
+      "arb_op_pvalue": 0.488602,
+      "aave_uni_pvalue": 0.761735,
+      "fet_render_pvalue": 0.986946,
+      "sei_sui_pvalue": 0.808758,
+      "passed_pairs": 0
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-oracle-aave-shadow-20260315T044500",
+    "created_at": "2026-03-15T04:44:20.371462+00:00",
+    "status": "oracle_shadow_live",
+    "category": "runtime_v1",
+    "summary": "Deployed the focused AAVE/DOGE crypto pairs shadow sleeve into Oracle with durable ratio/trade/daily/hourly audit files and verified live feed activity plus ratio tick recording on Railway.",
+    "artifacts": {
+      "deployment_id": "1136d74d-9d32-4e45-a194-1cf6a7db553d",
+      "monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_aave_doge_monitor/latest.json",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-v1/crypto_pairs_discovery_20260314T222257_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "ratio_updates": 26,
+      "streamer_messages": 507,
+      "streamer_bars": 48,
+      "entry_signals": 0,
+      "closed_trades": 0
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260315T050434",
+    "created_at": "2026-03-15T05:04:35.226065+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 44
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-bruteforce-20260315T051554",
+    "created_at": "2026-03-15T05:15:54.739152+00:00",
+    "status": "bruteforce_screen_complete",
+    "category": "pair_discovery",
+    "summary": "Brute-force crypto pairs discovery on a 40-token Binance spot universe with 60-day backtests and split filters on all cointegrated pairs.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260315T051554_v1/summary.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "cointegrated_pairs": 44,
+      "survivors": 29
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-oracle-triple-shadow-20260315T064100",
+    "created_at": "2026-03-15T06:41:00+00:00",
+    "status": "oracle_shadow_live",
+    "category": "runtime_v1",
+    "summary": "Deployed three frozen crypto-pairs shadow sleeves into Oracle paper using the brute-force survivor universe and verified live ratio tick logging for AAVE/DOGE, COMP/FLOKI, and COMP/LINK.",
+    "artifacts": {
+      "deployment_id": "aa6f2fcb-9cc2-46c2-ad5f-23de2165f6e7",
+      "failed_deployment_id": "bc87003d-b822-4a71-8dc1-5b94425062b2",
+      "monitor_latest": "/Users/ahmedelmorshedy/Downloads/oracle-trader/logs/comparison/crypto_pairs_shadow_monitor/latest.json",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260315T050434_v1/pair_discovery_results.json",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260315T051554_v1/summary.json"
+    },
+    "metrics": {
+      "pairs_live": 3,
+      "aave_doge_ratio_updates": 43,
+      "comp_floki_ratio_updates": 66,
+      "comp_link_ratio_updates": 59,
+      "total_signals": 0,
+      "total_entries": 0,
+      "total_closed_trades": 0
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211735",
+    "created_at": "2026-03-19T21:17:35.678023+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260319T211735_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 41
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211750",
+    "created_at": "2026-03-19T21:17:50.743149+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-v1/crypto_pairs_discovery_20260319T211750_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 16,
+      "pairs_tested": 120,
+      "tradeable_pairs": 6
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211800",
+    "created_at": "2026-03-19T21:18:00.963665+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-v1/crypto_pairs_discovery_20260319T211800_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 16,
+      "pairs_tested": 120,
+      "tradeable_pairs": 3
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-bruteforce-20260319T211858",
+    "created_at": "2026-03-19T21:18:58.669155+00:00",
+    "status": "bruteforce_screen_complete",
+    "category": "pair_discovery",
+    "summary": "Brute-force crypto pairs discovery on a 40-token Binance spot universe with 60-day backtests and split filters on all cointegrated pairs.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1",
+      "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_discovery_20260319T211735_v1/pair_discovery_results.json",
+      "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-bruteforce-v1/crypto_pairs_bruteforce_20260319T211858_v1/summary.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "cointegrated_pairs": 41,
+      "survivors": 23
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T211950",
+    "created_at": "2026-03-19T21:19:50.970474+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-wide-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-60d-wide-v1/crypto_pairs_discovery_20260319T211950_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 41
+    }
+  },
+  {
+    "checkpoint_id": "crypto-pairs-discovery-20260319T212010",
+    "created_at": "2026-03-19T21:20:10.754566+00:00",
+    "status": "initial_discovery",
+    "category": "pair_discovery",
+    "summary": "Initial crypto pairs discovery from Binance spot 1h klines over a 30-day lookback.",
+    "artifacts": {
+      "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-wide-v1",
+      "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-current-30d-wide-v1/crypto_pairs_discovery_20260319T212010_v1/pair_discovery_results.json"
+    },
+    "metrics": {
+      "symbols_loaded": 37,
+      "pairs_tested": 666,
+      "tradeable_pairs": 22
+    }
+  }
+]

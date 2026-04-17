@@ -1,0 +1,20 @@
+{
+  "checkpoint_id": "weather-edge-v1-20260315T102109",
+  "created_at": "2026-03-15T10:21:09.617247+00:00",
+  "status": "standalone_weather_edge",
+  "category": "weather_edge",
+  "summary": "Standalone weather edge replay/backtest lane built around the frozen legacy CatBoost weather bundle.",
+  "artifacts": {
+    "run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1",
+    "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1/weather_edge_report.json",
+    "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T102107_v1/weather_edge_report.md"
+  },
+  "metrics": {
+    "markets_loaded": 5,
+    "market_horizon_rows": 0,
+    "scored_rows": 0,
+    "eligible_rows": 0,
+    "backtest_trades": 0,
+    "backtest_total_net_bps": 0.0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "checkpoint_id": "btc-tardis-multivenue-free-days-summary-20260314T194500",
+  "created_at": "2026-03-14T22:08:44.323272+00:00",
+  "status": "historical_multivenue_postmortem",
+  "category": "tardis_multivenue_validation",
+  "summary": "Frozen March 13 BTC mean-reversion model failed on 12 Tardis free first-of-month multivenue days; keep frozen and do not promote.",
+  "artifacts": {
+    "project_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1",
+    "summary_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/btc/projects/btc-tardis-multivenue-validation-v1/tardis_free_days_summary.json"
+  },
+  "metrics": {
+    "day_count": 12,
+    "total_trades": 594,
+    "total_net_bps": -1844.2536416682283,
+    "positive_days": 2
+  }
+}

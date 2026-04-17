@@ -152,6 +152,20 @@ class MeanReversionConfig:
 
 
 @dataclass
+class WalletMLDriftConfig:
+    """Wallet ML 30m drift shadow — detects price drift using ML on 30-min windows."""
+    enabled: bool = True
+    # Number of 30-min price samples to keep per token
+    window_size: int = 6  # 3 hours of 30-min samples
+    # Min drift z-score to trigger a signal
+    min_drift_zscore: float = 1.5
+    # Min confidence to emit signal
+    min_confidence: float = 0.35
+    # EMA smoothing factor for drift detection
+    ema_alpha: float = 0.3
+
+
+@dataclass
 class RiskConfig:
     """Risk management — applies across all strategies."""
     max_position_usd: float = float(os.getenv("MAX_POSITION_USD", "50"))
@@ -172,8 +186,7 @@ class PipelineConfig:
     mean_reversion: MeanReversionConfig = field(default_factory=MeanReversionConfig)
     crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
     weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
-    crypto_arb: CryptoArbConfig = field(default_factory=CryptoArbConfig)
-    weather: WeatherForecastConfig = field(default_factory=WeatherForecastConfig)
+    wallet_ml_drift: WalletMLDriftConfig = field(default_factory=WalletMLDriftConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     # Pipeline modes

@@ -188,6 +188,7 @@
   .strat-whale { background: var(--purple-dim); color: var(--purple); }
   .strat-news { background: var(--yellow-dim); color: var(--yellow); }
   .strat-mean { background: var(--red-dim); color: var(--red); }
+  .strat-drift { background: #00bcd422; color: #00bcd4; }
 
   /* Confidence bar */
   .conf-bar {
@@ -501,6 +502,7 @@ function stratBadge(source) {
     'whale_tracking': ['WHALE', 'strat-whale'],
     'news_latency': ['NEWS', 'strat-news'],
     'mean_reversion': ['MEAN', 'strat-mean'],
+    'wallet_ml_30m_drift_shadow': ['ML DRIFT', 'strat-drift'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;

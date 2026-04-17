@@ -19,8 +19,7 @@ from strategies.news import NewsLatencyStrategy
 from strategies.mean_reversion import MeanReversionStrategy
 from strategies.crypto_arb import CryptoTemporalArbStrategy
 from strategies.weather import WeatherForecastStrategy
-from strategies.crypto_arb import CryptoTemporalArbStrategy
-from strategies.weather import WeatherForecastStrategy
+from strategies.wallet_ml_drift import WalletMLDriftStrategy
 from engine.paper_trader import PaperTrader
 from engine.slippage import SlippageModel
 from engine.ab_tester import ABTester
@@ -53,6 +52,7 @@ class Pipeline:
             "mean_reversion": MeanReversionStrategy(self.config, collector=self.collector),
             "crypto_arb": CryptoTemporalArbStrategy(self.config),
             "weather": WeatherForecastStrategy(self.config),
+            "wallet_ml_drift": WalletMLDriftStrategy(self.config),
         }
 
         # Engine

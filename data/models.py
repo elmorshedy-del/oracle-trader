@@ -29,8 +29,7 @@ class SignalSource(str, Enum):
     MEAN_REVERSION = "mean_reversion"
     CRYPTO_ARB = "crypto_temporal_arb"
     WEATHER = "weather_forecast"
-    CRYPTO_ARB = "crypto_temporal_arb"
-    WEATHER = "weather_forecast"
+    WALLET_ML_DRIFT = "wallet_ml_30m_drift_shadow"
 
 
 class TradeStatus(str, Enum):

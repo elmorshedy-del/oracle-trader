@@ -378,7 +378,7 @@ class CopyTraderShadowStrategy(BaseStrategy):
         token_id = str(row.get("asset") or "")
         outcome_label = str(row.get("outcome") or self._outcome_label(market, token_id))
         entry_price = float(row.get("price") or self._token_price(market, token_id) or 0.0)
-        size_usd = min(wallet_usd * self.cfg.copy_size_multiplier, self.cfg.max_trade_usd, self.cash_balance)
+        size_usd = min(wallet_usd * self.cfg.copy_size_multiplier, self.cfg.max_trade_usd)
         activity_at = self._parse_timestamp(row.get("timestamp"), now)
         trade_id = f"copy:{wallet.address[-6:]}:{row.get('transactionHash') or row.get('timestamp')}"
         token_price = self._token_price(market, token_id)

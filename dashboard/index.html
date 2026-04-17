@@ -1314,10 +1314,10 @@ function renderSanity(d) {
       {
         label: activeView.key === 'copy_trader_shadow' ? 'Deployable cash' : 'Capacity headroom',
         ok: activeView.key === 'copy_trader_shadow'
-          ? (p.cash || 0) >= copyTraderMinTrade
+          ? true
           : ((p.cash || 0) > 25 || positions.length < resolvedOpenCap),
         note: activeView.key === 'copy_trader_shadow'
-          ? `$${(p.cash || 0).toFixed(0)} cash / min $${copyTraderMinTrade.toFixed(0)} deploy / ${positions.length} open`
+          ? `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (no cash gate)`
           : `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
       },
     ];

@@ -1,0 +1,24 @@
+{
+  "checkpoint_id": "weather-edge-batch-sweep-20260315T105431",
+  "created_at": "2026-03-15T10:54:31.548655+00:00",
+  "status": "weather_edge_batch_sweep",
+  "category": "weather_edge",
+  "summary": "Batch-swept standalone weather edge summary across multiple pipeline runs.",
+  "artifacts": {
+    "report_json": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_full_sweep_20260315T105431_v1/weather_edge_report.json",
+    "report_md": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/aggregates/weather_edge_full_sweep_20260315T105431_v1/weather_edge_report.md",
+    "source_runs": [
+      "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105141_v1",
+      "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/weather_edge_v1/runs/weather_edge_pipeline_20260315T105314_v1"
+    ]
+  },
+  "metrics": {
+    "rows_scored": 2420,
+    "rows_eligible": 208,
+    "trade_rows_selected": 85,
+    "trade_count": 85,
+    "win_rate": 0.894118,
+    "total_net_bps": 32213.7398,
+    "max_drawdown": 0.057499
+  }
+}

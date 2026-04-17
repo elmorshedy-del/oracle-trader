@@ -1,0 +1,22 @@
+{
+  "bundle_version": "btc_impulse_c075_20251211_20260310",
+  "symbol": "BTCUSDT",
+  "bucket_seconds": 5,
+  "horizon_seconds": 60,
+  "cost_bps": 4.0,
+  "profit_bps": 8.0,
+  "stop_bps": 6.0,
+  "min_signed_ratio": 0.04,
+  "min_depth_imbalance": 0.01,
+  "min_trade_z": 0.25,
+  "min_directional_efficiency": 0.15,
+  "model_variant": "c075",
+  "long_threshold": 0.6552729109179557,
+  "short_threshold": 0.7616295043498632,
+  "long_auc": 0.7412066416672676,
+  "short_auc": 0.7281761185016784,
+  "models": {
+    "long": "long_followthrough_label.cbm",
+    "short": "short_followthrough_label.cbm"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "checkpoint_id": "btc-multivenue-catboost-20260313T203338",
+  "created_at": "2026-03-13T20:33:38.504689+00:00",
+  "status": "trained_baseline",
+  "category": "multivenue",
+  "summary": "First CatBoost multivenue baselines built from Binance futures + spot + Coinbase level2.",
+  "artifacts": {
+    "session_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260313_144242_multivenue_v1_live",
+    "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz",
+    "training_run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_20260313T203335_v1",
+    "training_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_20260313T203335_v1/reports/metadata.json",
+    "continuation_long_30s": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_20260313T203335_v1/models/continuation_long_30s.cbm",
+    "continuation_short_30s": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_20260313T203335_v1/models/continuation_short_30s.cbm"
+  },
+  "metrics": {
+    "continuation_long_30s_test_auc": 0.3501516628750948,
+    "continuation_short_30s_test_auc": 0.6693014545771274
+  }
+}

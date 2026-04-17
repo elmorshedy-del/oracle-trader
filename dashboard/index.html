@@ -70,6 +70,14 @@
   .mode-paper { background: var(--yellow-dim); color: var(--yellow); border: 1px solid var(--yellow); }
   .mode-live { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); animation: pulse 2s infinite; }
   .header-right { display: flex; align-items: center; gap: 16px; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .header-link {
+    color: var(--blue);
+    text-decoration: none;
+    border: 1px solid var(--blue);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
 
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -188,6 +196,9 @@
   .strat-whale { background: var(--purple-dim); color: var(--purple); }
   .strat-news { background: var(--yellow-dim); color: var(--yellow); }
   .strat-mean { background: var(--red-dim); color: var(--red); }
+  .strat-crypto { background: #1de9b622; color: #1de9b6; }
+  .strat-weather { background: #ffab4022; color: #ffab40; }
+  .strat-sports { background: #40c4ff22; color: #40c4ff; }
 
   /* Confidence bar */
   .conf-bar {
@@ -261,6 +272,112 @@
   .perf-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
   .perf-val { font-family: var(--mono); font-size: 11px; width: 60px; text-align: right; }
 
+  .sanity-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .sanity-left { display: flex; align-items: center; gap: 8px; }
+  .sanity-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .sanity-ok { background: var(--green-dim); color: var(--green); }
+  .sanity-warn { background: var(--yellow-dim); color: var(--yellow); }
+  .sanity-bad { background: var(--red-dim); color: var(--red); }
+  .sanity-note { color: var(--text-dim); text-align: right; }
+
+  .view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 8px;
+  }
+  .view-tab {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .view-tab:hover {
+    border-color: var(--blue);
+    color: var(--text);
+  }
+  .view-tab.active {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+  .view-meta {
+    margin-bottom: 14px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .consult-select,
+  .consult-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+  }
+  .consult-textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  .consult-button {
+    border: 1px solid var(--blue);
+    background: var(--blue-dim);
+    color: var(--blue);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .consult-button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+  .consult-response {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    line-height: 1.55;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .consult-meta {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
   /* Responsive */
   @media (max-width: 1200px) {
     .grid { grid-template-columns: 1fr 1fr; }
@@ -285,7 +402,8 @@
     <span>|</span>
     <span id="scan-count">Scans: 0</span>
     <span>|</span>
-    <a href="/api/logs/download" style="color:var(--blue);text-decoration:none;border:1px solid var(--blue);padding:2px 8px;border-radius:3px;font-size:11px">⬇ LOGS</a>
+    <a href="/multiagent" class="header-link">OPUS LAB</a>
+    <a href="/api/legacy/logs/export" class="header-link">⬇ LOGS</a>
     <span id="last-update" class="dot-pulse">Connecting...</span>
   </div>
 </div>
@@ -313,6 +431,9 @@
     <div class="stat-sub" id="signal-count">0 signals</div>
   </div>
 </div>
+
+<div class="view-tabs" id="view-tabs"></div>
+<div class="view-meta" id="view-meta">Viewing all strategies</div>
 
 <!-- Main Grid -->
 <div class="grid">
@@ -387,12 +508,53 @@
     </div>
   </div>
 
-  <!-- Strategy Performance -->
-  <div class="card">
+  <!-- Strategy Compare -->
+  <div class="card card-wide">
     <div class="card-header">
-      <span class="card-title">Strategy Performance</span>
+      <span class="card-title">Strategy Compare</span>
     </div>
     <div id="strategy-perf" class="scrollable"></div>
+  </div>
+
+  <!-- Sanity Panel -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Sanity Panel</span>
+      <span class="card-badge" id="sanity-badge">—</span>
+    </div>
+    <div class="scrollable" id="sanity-panel" style="font-family: var(--mono); font-size: 11px;">
+      <div style="color:var(--text-dim)">Waiting for diagnostics...</div>
+    </div>
+  </div>
+
+  <!-- Legacy LLM Consultant -->
+  <div class="card card-wide">
+    <div class="card-header">
+      <span class="card-title">LLM Consultant</span>
+      <span class="card-badge" id="legacy-consult-badge">LEGACY ONLY</span>
+    </div>
+    <div class="consult-meta" style="margin-bottom:10px">
+      This consultant reads compact legacy-engine diagnostics, trade tape, strategy rollups, headlines, and blocker summaries only. It does not read Opus.
+    </div>
+    <div style="display:grid;grid-template-columns:180px 1fr auto;gap:10px;align-items:center;margin-bottom:10px">
+      <select id="legacy-consult-provider" class="consult-select">
+        <option value="auto">Auto</option>
+        <option value="fireworks">GLM-5</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+      </select>
+      <div class="consult-meta" id="legacy-consult-meta">Ready to inspect the old engine.</div>
+      <a href="/api/legacy/logs/export" class="header-link" style="justify-self:end">⬇ LEGACY EXPORT</a>
+    </div>
+    <textarea
+      id="legacy-consult-question"
+      class="consult-textarea"
+      placeholder="Why is the old engine underperforming today? Which blocker matters most? What should I fix next?"
+    ></textarea>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button id="legacy-consult-button" class="consult-button" onclick="runLegacyConsult()">CONSULT LLM</button>
+    </div>
+    <div id="legacy-consult-response" class="consult-response">Ask about legacy blockers, concentration, quiet cycles, strategy performance, or whether a recent loser was a model problem or an execution problem.</div>
   </div>
 
   <!-- Whale Activity -->
@@ -492,18 +654,104 @@
 
 <script>
 const API = window.location.origin + '/api/state';
+const STATE_POLL_INTERVAL_MS = 8000;
+const STATE_HIDDEN_POLL_INTERVAL_MS = 20000;
+const STATE_FETCH_TIMEOUT_MS = 7000;
 let lastState = null;
+let lastStateSuccessAt = null;
+let selectedView = 'all';
+let legacyConsultLoading = false;
+let legacyConsultResponse = null;
+let stateFetchInFlight = false;
+let statePollTimer = null;
+const CRYPTO_PAIRS_VIEW_KEYS = ['crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt'];
+const COPY_HEURISTIC_VIEW_KEYS = ['wallet_selective_copy_shadow', 'wallet_whale_consensus_shadow', 'wallet_contrarian_exit_shadow', 'wallet_fresh_market_shadow'];
+const SELF_MANAGED_SHADOW_VIEW_KEYS = ['weather_edge_live', 'copy_trader_shadow', ...COPY_HEURISTIC_VIEW_KEYS, 'wallet_ml_30m_drift_shadow', 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', ...CRYPTO_PAIRS_VIEW_KEYS];
+
+function isCryptoPairsShadowView(viewKey) {
+  return CRYPTO_PAIRS_VIEW_KEYS.includes(viewKey);
+}
+
+function isSelfManagedShadowView(viewKey) {
+  return SELF_MANAGED_SHADOW_VIEW_KEYS.includes(viewKey);
+}
 
 function stratBadge(source) {
   const map = {
     'liquidity_provision': ['LIQ', 'strat-liquidity'],
     'multi_outcome_arbitrage': ['ARB', 'strat-arbitrage'],
+    'bundle_arb_strict': ['BUNDLE', 'strat-arbitrage'],
     'whale_tracking': ['WHALE', 'strat-whale'],
     'news_latency': ['NEWS', 'strat-news'],
+    'news_whale': ['N+W', 'strat-whale'],
     'mean_reversion': ['MEAN', 'strat-mean'],
+    'crypto_temporal_arb': ['CRYPTO', 'strat-crypto'],
+    'bitcoin_futures_ml': ['BTC ML', 'strat-crypto'],
+    'bitcoin_latency_shadow': ['BTC LAT', 'strat-crypto'],
+    'bitcoin_meanrev_shadow': ['BTC MR', 'strat-crypto'],
+    'copy_trader_shadow': ['COPY', 'strat-whale'],
+    'wallet_selective_copy_shadow': ['SEL', 'strat-whale'],
+    'wallet_whale_consensus_shadow': ['CONS', 'strat-whale'],
+    'wallet_contrarian_exit_shadow': ['XREV', 'strat-whale'],
+    'wallet_fresh_market_shadow': ['FRESH', 'strat-whale'],
+    'wallet_ml_30m_drift_shadow': ['ML DFT', 'strat-whale'],
+    'kalshi_btc_arb_shadow': ['PK ARB', 'strat-arbitrage'],
+    'crypto_pairs_aave_doge_shadow': ['PAIRS', 'strat-crypto'],
+    'crypto_pairs_comp_floki_shadow': ['PAIRS', 'strat-crypto'],
+    'crypto_pairs_comp_link_shadow': ['PAIRS', 'strat-crypto'],
+    'crypto_pairs_bonk_grt_shadow': ['PAIRS', 'strat-crypto'],
+    'sports_nba_model': ['SPORTS', 'strat-sports'],
+    'bitcoin_whale': ['B+W', 'strat-whale'],
+    'crypto_structure': ['CSTR', 'strat-crypto'],
+    'weather_forecast': ['WX', 'strat-weather'],
+    'weather_all': ['WX', 'strat-weather'],
+    'weather_sniper': ['SNIPER', 'strat-weather'],
+    'weather_latency_hunter': ['LAT', 'strat-weather'],
+    'weather_swing_trader': ['SWING', 'strat-weather'],
+    'weather_model_trader': ['ML TR', 'strat-weather'],
+    'weather_model_signal': ['ML SIG', 'strat-weather'],
+    'weather_model_v2_trader': ['ML2 TR', 'strat-weather'],
+    'weather_model_v2_signal': ['ML2 SIG', 'strat-weather'],
+    'weather_edge_live': ['WEDGE', 'strat-weather'],
   };
   const [label, cls] = map[source] || [source.slice(0, 4).toUpperCase(), ''];
   return `<span class="strat-badge ${cls}">${label}</span>`;
+}
+
+function normalizeStrategyKey(key) {
+  const aliases = {
+    liquidity: 'liquidity_provision',
+    arbitrage: 'multi_outcome_arbitrage',
+    whale: 'whale_tracking',
+    news: 'news_latency',
+    mean_reversion: 'mean_reversion',
+    crypto_arb: 'crypto_temporal_arb',
+    bitcoin_model: 'bitcoin_futures_ml',
+    bitcoin_latency_shadow: 'bitcoin_latency_shadow',
+    bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
+    copy_trader_shadow: 'copy_trader_shadow',
+    wallet_selective_copy_shadow: 'wallet_selective_copy_shadow',
+    wallet_whale_consensus_shadow: 'wallet_whale_consensus_shadow',
+    wallet_contrarian_exit_shadow: 'wallet_contrarian_exit_shadow',
+    wallet_fresh_market_shadow: 'wallet_fresh_market_shadow',
+    wallet_ml_30m_drift_shadow: 'wallet_ml_30m_drift_shadow',
+    kalshi_btc_arb_shadow: 'kalshi_btc_arb_shadow',
+    crypto_pairs_shadow: 'crypto_pairs_aave_doge_shadow',
+    crypto_pairs_shadow_comp_floki: 'crypto_pairs_comp_floki_shadow',
+    crypto_pairs_shadow_comp_link: 'crypto_pairs_comp_link_shadow',
+    crypto_pairs_shadow_bonk_grt: 'crypto_pairs_bonk_grt_shadow',
+    sports_model: 'sports_nba_model',
+    weather: 'weather_forecast',
+    weather_sniper: 'weather_sniper',
+    weather_latency: 'weather_latency_hunter',
+    weather_swing: 'weather_swing_trader',
+    weather_model_trader: 'weather_model_trader',
+    weather_model_signal: 'weather_model_signal',
+    weather_model_v2_trader: 'weather_model_v2_trader',
+    weather_model_v2_signal: 'weather_model_v2_signal',
+    weather_edge_live: 'weather_edge_live',
+  };
+  return aliases[key] || key;
 }
 
 function confBar(conf) {
@@ -530,32 +778,157 @@ function truncate(s, n) {
   return s && s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+function checkState(check) {
+  if (check.state) return check.state;
+  return check.ok ? 'ok' : 'bad';
+}
+
+function checkIcon(state) {
+  if (state === 'ok') return '✓';
+  if (state === 'warn') return '!';
+  return '✕';
+}
+
+function checkClass(state) {
+  if (state === 'ok') return 'sanity-ok';
+  if (state === 'warn') return 'sanity-warn';
+  return 'sanity-bad';
+}
+
+function viewBadge(view) {
+  if (!view || view.source === 'all') {
+    return '<span class="strat-badge">ALL</span>';
+  }
+  return stratBadge(view.source);
+}
+
+function getActiveView(d) {
+  const views = d.comparison_views || {};
+  if (!views[selectedView]) {
+    selectedView = 'all';
+  }
+  return views[selectedView] || views.all || {
+    key: 'all',
+    label: 'All',
+    source: 'all',
+    portfolio: d.portfolio || {},
+    signals: d.signals || [],
+    trades: d.trades || [],
+    performance: d.performance || {},
+  };
+}
+
+function renderViewTabs(d) {
+  const views = d.comparison_views || {};
+  const order = [
+    'all',
+    'weather_all',
+    'weather_sniper',
+    'weather_latency',
+    'weather_swing',
+    'weather_model_trader',
+    'weather_model_signal',
+    'weather_model_v2_trader',
+    'weather_model_v2_signal',
+    'weather_edge_live',
+    'news',
+    'news_whale',
+    'bitcoin',
+    'bitcoin_model',
+    'bitcoin_latency_shadow',
+    'copy_trader_shadow',
+    'wallet_selective_copy_shadow',
+    'wallet_whale_consensus_shadow',
+    'wallet_contrarian_exit_shadow',
+    'wallet_fresh_market_shadow',
+    'wallet_ml_30m_drift_shadow',
+    'kalshi_btc_arb_shadow',
+    'bitcoin_meanrev_shadow',
+    'crypto_pairs_aave_doge',
+    'crypto_pairs_comp_floki',
+    'crypto_pairs_comp_link',
+    'crypto_pairs_bonk_grt',
+    'sports',
+    'bitcoin_whale',
+    'arbitrage',
+    'bundle_arb',
+    'whale_follow',
+    'momentum',
+  ];
+  const tabs = order
+    .filter(key => views[key])
+    .map(key => {
+      const view = views[key];
+      return `<button class="view-tab ${key === selectedView ? 'active' : ''}" onclick="selectView('${key}')">${view.label}</button>`;
+    })
+    .join('');
+  document.getElementById('view-tabs').innerHTML = tabs;
+}
+
+function selectView(key) {
+  selectedView = key;
+  if (lastState) render(lastState);
+}
+
+window.selectView = selectView;
+window.runLegacyConsult = runLegacyConsult;
+
 async function fetchState() {
+  if (stateFetchInFlight) {
+    return;
+  }
+  stateFetchInFlight = true;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STATE_FETCH_TIMEOUT_MS);
   try {
-    const resp = await fetch(API);
+    const resp = await fetch(API, { cache: 'no-store', signal: controller.signal });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     lastState = data;
+    lastStateSuccessAt = new Date().toISOString();
     render(data);
     document.getElementById('last-update').textContent = 'Live';
     document.getElementById('last-update').className = '';
   } catch (err) {
-    document.getElementById('last-update').textContent = 'Disconnected';
-    document.getElementById('last-update').className = 'dot-pulse';
+    const lastUpdateEl = document.getElementById('last-update');
+    if (lastState && lastStateSuccessAt) {
+      lastUpdateEl.textContent = `Stale ${timeAgo(lastStateSuccessAt)}`;
+      lastUpdateEl.className = '';
+    } else {
+      lastUpdateEl.textContent = 'Disconnected';
+      lastUpdateEl.className = 'dot-pulse';
+    }
     console.error('Fetch error:', err);
+  } finally {
+    clearTimeout(timeoutId);
+    stateFetchInFlight = false;
+    scheduleStateFetch();
   }
 }
 
+function scheduleStateFetch() {
+  if (statePollTimer) {
+    clearTimeout(statePollTimer);
+  }
+  const delay = document.hidden ? STATE_HIDDEN_POLL_INTERVAL_MS : STATE_POLL_INTERVAL_MS;
+  statePollTimer = setTimeout(fetchState, delay);
+}
+
 function render(d) {
+  renderViewTabs(d);
+  const activeView = getActiveView(d);
+
   // Header
   const badge = document.getElementById('mode-badge');
   badge.textContent = d.mode.toUpperCase();
   badge.className = `mode-badge mode-${d.mode}`;
   document.getElementById('uptime').textContent = `Uptime: ${d.uptime_human || '--'}`;
   document.getElementById('scan-count').textContent = `Scans: ${d.scan_count || 0}`;
+  const viewModeLabel = isSelfManagedShadowView(activeView.key) ? 'shadow book' : 'paper portfolio';
+  document.getElementById('view-meta').innerHTML = `Viewing ${viewBadge(activeView)} <span style="margin-left:6px">${activeView.label} ${viewModeLabel}</span> <span style="margin-left:10px;color:var(--text-dim)">Budget $${((activeView.portfolio || {}).starting_capital || 0).toFixed(0)}</span>`;
 
   // Stats
-  const p = d.portfolio || {};
+  const p = activeView.portfolio || {};
   document.getElementById('total-value').textContent = `$${(p.total_value || 0).toFixed(2)}`;
   const pnlEl = document.getElementById('total-pnl');
   pnlEl.textContent = `${p.total_pnl >= 0 ? '+' : ''}$${(p.total_pnl || 0).toFixed(2)} (${(p.total_pnl_pct || 0).toFixed(1)}%)`;
@@ -566,34 +939,34 @@ function render(d) {
   document.getElementById('drawdown').textContent = `${(p.max_drawdown || 0).toFixed(1)}%`;
   document.getElementById('fees-paid').textContent = `Fees: $${(p.total_fees || 0).toFixed(2)}`;
   document.getElementById('market-count').textContent = d.active_markets || 0;
-  document.getElementById('signal-count').textContent = `${(d.signals || []).length} signals`;
+  document.getElementById('signal-count').textContent = `${(activeView.signals || []).length} signals`;
 
   // Signals
-  const signals = d.signals || [];
+  const signals = activeView.signals || [];
   document.getElementById('signal-badge').textContent = signals.length;
   document.getElementById('signals-table').innerHTML = signals.map(s => `
     <tr>
-      <td>${stratBadge(s.source)}</td>
-      <td title="${s.market}">${truncate(s.market, 25)}</td>
-      <td>${s.action.replace('_', ' ')}</td>
-      <td>${confBar(s.confidence)}</td>
-      <td>${s.edge.toFixed(1)}¢</td>
-      <td>$${s.size.toFixed(0)}</td>
-      <td>${s.whale ? '✓' : ''}</td>
+      <td>${stratBadge(s.source || activeView.source)}</td>
+      <td title="${s.market || '—'}">${truncate(s.market || '—', 25)}</td>
+      <td>${String(s.action || s.event || 'signal').replace('_', ' ')}</td>
+      <td>${confBar(Number.isFinite(s.confidence) ? s.confidence : 0.5)}</td>
+      <td>${(Number.isFinite(s.edge) ? s.edge : 0).toFixed(1)}¢</td>
+      <td>$${(Number.isFinite(s.size) ? s.size : (Number.isFinite(s.size_usd) ? s.size_usd : 0)).toFixed(0)}</td>
+      <td>${s.whale || s.wallet ? '✓' : ''}</td>
     </tr>
   `).join('');
 
   // Trades
-  const trades = d.trades || [];
+  const trades = activeView.trades || [];
   document.getElementById('trade-badge').textContent = trades.length;
-  document.getElementById('trades-table').innerHTML = trades.reverse().map(t => `
+  document.getElementById('trades-table').innerHTML = trades.slice().reverse().map(t => `
     <tr>
-      <td>${timeAgo(t.time)}</td>
-      <td>${stratBadge(t.source)}</td>
-      <td title="${t.market}">${truncate(t.market, 20)}</td>
-      <td>${t.side}</td>
-      <td>$${t.price.toFixed(3)}</td>
-      <td>$${t.usd.toFixed(2)}</td>
+      <td>${timeAgo(t.time || t.timestamp)}</td>
+      <td>${stratBadge(t.source || activeView.source)}</td>
+      <td title="${t.market || '—'}">${truncate(t.market || '—', 20)}</td>
+      <td>${t.side || t.outcome || t.event || '—'}</td>
+      <td>$${(Number.isFinite(t.price) ? t.price : (Number.isFinite(t.exit) ? t.exit : (Number.isFinite(t.entry) ? t.entry : 0))).toFixed(3)}</td>
+      <td>$${(Number.isFinite(t.usd) ? t.usd : (Number.isFinite(t.size_usd) ? t.size_usd : 0)).toFixed(2)}</td>
       <td class="${pnlColor(t.pnl)}">${t.pnl != null ? '$' + t.pnl.toFixed(2) : '—'}</td>
     </tr>
   `).join('');
@@ -612,21 +985,63 @@ function render(d) {
   `).join('');
 
   // Strategy Performance
-  const perf = d.performance?.by_strategy || {};
   const perfEl = document.getElementById('strategy-perf');
-  perfEl.innerHTML = Object.entries(perf).map(([name, s]) => {
-    const wr = s.win_rate ? (s.win_rate * 100).toFixed(0) : 0;
-    const barColor = s.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    return `
-      <div class="perf-row">
-        <div class="perf-label">${stratBadge(name)}</div>
-        <div class="perf-bar-bg">
-          <div class="perf-bar-fill" style="width:${Math.min(Math.abs(wr), 100)}%;background:${barColor}"></div>
-        </div>
-        <div class="perf-val ${pnlColor(s.total_pnl)}">$${(s.total_pnl || 0).toFixed(2)}</div>
-      </div>
-    `;
-  }).join('') || '<div style="color:var(--text-dim);padding:20px;text-align:center">No data yet</div>';
+  const comparisonViews = d.comparison_views || {};
+  const order = ['all', 'weather_all', 'weather_sniper', 'weather_latency', 'weather_swing', 'weather_model_trader', 'weather_model_signal', 'weather_model_v2_trader', 'weather_model_v2_signal', 'weather_edge_live', 'news', 'news_whale', 'bitcoin', 'bitcoin_model', 'bitcoin_latency_shadow', 'copy_trader_shadow', 'wallet_selective_copy_shadow', 'wallet_whale_consensus_shadow', 'wallet_contrarian_exit_shadow', 'wallet_fresh_market_shadow', 'wallet_ml_30m_drift_shadow', 'kalshi_btc_arb_shadow', 'bitcoin_meanrev_shadow', 'crypto_pairs_aave_doge', 'crypto_pairs_comp_floki', 'crypto_pairs_comp_link', 'crypto_pairs_bonk_grt', 'bitcoin_whale', 'arbitrage', 'bundle_arb', 'whale_follow', 'momentum'];
+  const sportsIndex = order.indexOf('bitcoin_whale');
+  order.splice(sportsIndex, 0, 'sports');
+  const rows = order.filter(key => comparisonViews[key]).map(key => {
+    const view = comparisonViews[key];
+    const perfStats = view.performance || {};
+    const portfolio = view.portfolio || {};
+    return {
+      key,
+      label: view.label,
+      source: view.source,
+      pnl: perfStats.total_pnl || 0,
+      winRate: (perfStats.win_rate || 0) * 100,
+      trades: perfStats.total_trades || portfolio.total_trades || 0,
+      open: (portfolio.positions || []).length,
+      signals: (view.signals || []).length,
+      cash: portfolio.cash || 0,
+      budget: portfolio.starting_capital || 0,
+    };
+  }).sort((a, b) => {
+    if (a.key === 'all') return -1;
+    if (b.key === 'all') return 1;
+    return (b.pnl - a.pnl) || (b.trades - a.trades) || a.label.localeCompare(b.label);
+  });
+
+  perfEl.innerHTML = rows.length ? `
+    <table>
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>P&L</th>
+          <th>Win%</th>
+          <th>Trades</th>
+          <th>Open</th>
+          <th>Signals</th>
+          <th>Budget</th>
+          <th>Cash</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => `
+          <tr>
+            <td>${viewBadge({source: row.source})} <span style="margin-left:6px">${row.label}</span></td>
+            <td class="${pnlColor(row.pnl)}">$${row.pnl.toFixed(2)}</td>
+            <td>${row.winRate.toFixed(0)}%</td>
+            <td>${row.trades}</td>
+            <td>${row.open}</td>
+            <td>${row.signals}</td>
+            <td>$${row.budget.toFixed(0)}</td>
+            <td>$${row.cash.toFixed(2)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  ` : '<div style="color:var(--text-dim);padding:20px;text-align:center">No strategy data yet</div>';
 
   // Whale wallets
   const whales = d.whale_wallets || [];
@@ -656,7 +1071,7 @@ function render(d) {
   const news = d.recent_news || [];
   const newsFeed = document.getElementById('news-feed');
   if (news.length > 0) {
-    newsFeed.innerHTML = news.reverse().map(n => {
+    newsFeed.innerHTML = news.slice().reverse().map(n => {
       const cls = n.classification;
       let classLabel = '';
       if (cls && cls.direction && cls.direction !== 'neutral') {
@@ -672,9 +1087,11 @@ function render(d) {
   }
 
   // Health, Slippage, A/B
+  renderSanity(d);
   renderHealth(d);
   renderSlippage(d);
   renderAB(d);
+  renderLegacyConsultPanel(d);
 
   // Errors
   const errors = d.errors || [];
@@ -682,6 +1099,69 @@ function render(d) {
     document.getElementById('error-log').innerHTML = errors.map(e =>
       `<div style="padding:3px 0;border-bottom:1px solid var(--border);color:var(--red)">${e}</div>`
     ).join('');
+  }
+}
+
+function renderLegacyConsultPanel(d) {
+  const button = document.getElementById('legacy-consult-button');
+  const meta = document.getElementById('legacy-consult-meta');
+  const response = document.getElementById('legacy-consult-response');
+  const badge = document.getElementById('legacy-consult-badge');
+  const blocker = (d.diagnostics?.filtered_signals && Object.keys(d.diagnostics.filtered_signals).length)
+    ? Object.entries(d.diagnostics.filtered_signals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+
+  button.disabled = legacyConsultLoading;
+  button.textContent = legacyConsultLoading ? 'CONSULTING…' : 'CONSULT LLM';
+  badge.textContent = `LEGACY ${d.scan_count || 0}`;
+  meta.textContent = blocker
+    ? `Latest legacy blocker signal: ${blocker[0]} (${blocker[1]})`
+    : 'Legacy consultant sees compact diagnostics only, not Opus.';
+
+  if (legacyConsultLoading) {
+    response.textContent = 'Consulting legacy diagnostics...';
+    return;
+  }
+
+  if (legacyConsultResponse) {
+    response.textContent = legacyConsultResponse.ok
+      ? legacyConsultResponse.answer || 'No answer returned.'
+      : legacyConsultResponse.answer || 'Legacy consult failed.';
+    return;
+  }
+
+  response.textContent = 'Ask about legacy blockers, concentration, quiet cycles, strategy performance, or whether a recent loser was a model problem or an execution problem.';
+}
+
+async function runLegacyConsult() {
+  const textarea = document.getElementById('legacy-consult-question');
+  const provider = document.getElementById('legacy-consult-provider').value || 'auto';
+  const question = (textarea.value || '').trim();
+  if (!question) {
+    legacyConsultResponse = { ok: false, answer: 'Ask a non-empty diagnostic question.' };
+    if (lastState) renderLegacyConsultPanel(lastState);
+    return;
+  }
+
+  legacyConsultLoading = true;
+  legacyConsultResponse = null;
+  if (lastState) renderLegacyConsultPanel(lastState);
+
+  try {
+    const resp = await fetch('/api/legacy/consult', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, provider }),
+    });
+    legacyConsultResponse = await resp.json();
+  } catch (err) {
+    legacyConsultResponse = {
+      ok: false,
+      answer: `Legacy consult failed: ${err.message || err}`,
+    };
+  } finally {
+    legacyConsultLoading = false;
+    if (lastState) renderLegacyConsultPanel(lastState);
   }
 }
 
@@ -730,6 +1210,638 @@ function renderHealth(d) {
   document.getElementById('health-panel').innerHTML = html;
 }
 
+function renderSanity(d) {
+  const activeView = getActiveView(d);
+  if (activeView.key !== 'all') {
+    const strategyKeyMap = {
+      weather_all: 'weather',
+      weather_sniper: 'weather',
+      weather_latency: 'weather',
+      weather_swing: 'weather',
+      weather_model_trader: 'weather_model',
+      weather_model_signal: 'weather_model',
+      weather_model_v2_trader: 'weather_model_v2',
+      weather_model_v2_signal: 'weather_model_v2',
+      weather_edge_live: 'weather_edge_live',
+      news: 'news',
+      bitcoin: 'crypto_arb',
+      bitcoin_model: 'bitcoin_model',
+      bitcoin_latency_shadow: 'bitcoin_latency_shadow',
+      copy_trader_shadow: 'copy_trader_shadow',
+      wallet_selective_copy_shadow: 'wallet_selective_copy_shadow',
+      wallet_whale_consensus_shadow: 'wallet_whale_consensus_shadow',
+      wallet_contrarian_exit_shadow: 'wallet_contrarian_exit_shadow',
+      wallet_fresh_market_shadow: 'wallet_fresh_market_shadow',
+      wallet_ml_30m_drift_shadow: 'wallet_ml_30m_drift_shadow',
+      kalshi_btc_arb_shadow: 'kalshi_btc_arb_shadow',
+      bitcoin_meanrev_shadow: 'bitcoin_meanrev_shadow',
+      crypto_pairs_aave_doge: 'crypto_pairs_shadow',
+      crypto_pairs_comp_floki: 'crypto_pairs_shadow_comp_floki',
+      crypto_pairs_comp_link: 'crypto_pairs_shadow_comp_link',
+      crypto_pairs_bonk_grt: 'crypto_pairs_shadow_bonk_grt',
+      sports: 'sports_model',
+      arbitrage: 'arbitrage',
+      momentum: 'mean_reversion',
+    };
+    const runtime = d.strategies?.[strategyKeyMap[activeView.key]] || {};
+    const weatherVariantKeyMap = {
+      weather_all: 'all',
+      weather_sniper: 'sniper',
+      weather_latency: 'latency',
+      weather_swing: 'swing',
+      weather_model_trader: 'trader',
+      weather_model_signal: 'signal',
+      weather_model_v2_trader: 'trader',
+      weather_model_v2_signal: 'signal',
+      weather_edge_live: 'live',
+    };
+    const weatherVariants = runtime.variants || {};
+    const weatherVariant = weatherVariants[weatherVariantKeyMap[activeView.key]] || {};
+    const p = activeView.portfolio || {};
+    const signals = activeView.signals || [];
+    const positions = p.positions || [];
+    const recentHeadlineCount = (d.recent_news || []).length;
+    const baseLoopAlive = (runtime.scans_completed || 0) > 0 && runtime.enabled !== false;
+    const newsLoopHealthy = baseLoopAlive && (
+      recentHeadlineCount > 0 ||
+      (runtime.pending_headlines || 0) > 0 ||
+      (runtime.classified_headlines || 0) > 0 ||
+      (p.total_trades || 0) > 0
+    );
+    const weatherFeedHealthy = (runtime.forecast_cities || 0) > 0 && (
+      (runtime.models_ready || 0) >= 2 ||
+      !!runtime.last_forecast_refresh ||
+      !!runtime.state_loaded ||
+      (runtime.matched_markets || 0) > 0 ||
+      (weatherVariant.last_candidates || 0) > 0
+    );
+    const openCap = activeView.key === 'weather_sniper'
+      ? 30
+      : (activeView.key === 'weather_latency' || activeView.key === 'weather_swing'
+        ? 12
+        : (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_v2_trader' ? 20 : (activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_signal' ? 14 : (activeView.key === 'bitcoin_model' ? 12 : (activeView.key === 'bitcoin_latency_shadow' ? 8 : ((activeView.key === 'copy_trader_shadow') ? 10 : (activeView.key === 'wallet_ml_30m_drift_shadow' ? (runtime.max_open_positions || 20) : ((COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) ? (runtime.max_open_positions || 6) : ((activeView.key === 'kalshi_btc_arb_shadow' || activeView.key === 'bitcoin_meanrev_shadow' || isCryptoPairsShadowView(activeView.key)) ? 1 : 10)))))))));
+    const resolvedOpenCap = activeView.key === 'sports' ? 16 : openCap;
+    const copyTraderMinTrade = Number(runtime.min_trade_usd || 10);
+    const checks = [
+      {
+        label: 'Portfolio funded',
+        ok: (p.total_value || 0) > 0,
+        note: `$${(p.cash || 0).toFixed(0)} cash`,
+      },
+      {
+        label: 'Strategy loop alive',
+        ok: activeView.key === 'news'
+          ? newsLoopHealthy
+          : baseLoopAlive && (runtime.errors || 0) === 0,
+        note: `${runtime.scans_completed || 0} scans / ${runtime.errors || 0} errors`,
+      },
+      {
+        label: 'Signal or trade flow',
+        ok:
+          signals.length > 0
+          || (p.total_trades || 0) > 0
+          || (runtime.signals_generated || 0) > 0
+          || (activeView.key === 'copy_trader_shadow' && (((runtime.entries || 0) > 0) || ((runtime.target_wallets || 0) > 0)))
+          || (COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key) && (((runtime.copied_trades || 0) > 0) || ((runtime.decisions_logged || 0) > 0)))
+          || (activeView.key === 'wallet_ml_30m_drift_shadow' && (((runtime.paper_trades || 0) > 0) || ((runtime.decisions_logged || 0) > 0)))
+          || (activeView.key === 'kalshi_btc_arb_shadow' && (((runtime.entries || 0) > 0) || ((runtime.candidate_opportunities || 0) > 0)))
+          || (activeView.key === 'bitcoin_meanrev_shadow' && ((runtime.evaluated_buckets || 0) > 0 || (runtime.candidate_events || 0) > 0)),
+        note: activeView.key === 'bitcoin_meanrev_shadow'
+          ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.candidate_events || 0} shock / ${runtime.evaluated_buckets || 0} eval`
+          : activeView.key === 'copy_trader_shadow'
+            ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.target_wallets || 0} wallets / ${runtime.entries || 0} entries`
+            : activeView.key === 'wallet_ml_30m_drift_shadow'
+              ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.decisions_logged || 0} decisions / ${runtime.paper_trades || 0} paper`
+            : COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)
+              ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.decisions_logged || 0} decisions / ${runtime.copied_trades || 0} copied`
+            : activeView.key === 'kalshi_btc_arb_shadow'
+              ? `${signals.length} live / ${p.total_trades || 0} trades / ${runtime.candidate_opportunities || 0} arbs / ${runtime.entries || 0} entries`
+          : `${signals.length} live / ${p.total_trades || 0} trades`,
+      },
+      {
+        label: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow') ? 'Deployable cash' : 'Capacity headroom',
+        ok: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow')
+          ? true
+          : ((p.cash || 0) > 25 || positions.length < resolvedOpenCap),
+        note: (activeView.key === 'copy_trader_shadow' || activeView.key === 'wallet_ml_30m_drift_shadow')
+          ? `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (no cash gate)`
+          : `$${(p.cash || 0).toFixed(0)} cash / ${positions.length} open (cap ${resolvedOpenCap})`,
+      },
+    ];
+
+    if (activeView.key === 'weather_all') {
+      const variantSignals = Object.values(weatherVariants).reduce((sum, item) => sum + (item.last_signals || 0), 0);
+      checks.splice(2, 0, {
+        label: 'Forecast models ready',
+        ok: (runtime.models_ready || 0) >= 2 && (runtime.forecast_cities || 0) > 0,
+        note: `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`,
+      });
+      checks.splice(3, 0, {
+        label: 'Variant flow',
+        ok: variantSignals > 0 || (p.total_trades || 0) > 0,
+        note: `${variantSignals} live variant signals`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin') {
+      checks.splice(2, 0, {
+        label: 'Market match + price feed',
+        ok: (runtime.matched_markets || 0) > 0 && (runtime.last_price_provider_count || 0) > 0,
+        note: `${runtime.matched_markets || 0} markets / ${runtime.last_price_provider_count || 0} providers`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin_latency_shadow') {
+      checks.splice(2, 0, {
+        label: 'BTC feed + market match',
+        ok: (runtime.inner_matched_markets || 0) > 0 && (runtime.inner_price_provider_count || 0) > 0,
+        note: `${runtime.inner_matched_markets || 0} matched / ${runtime.inner_price_provider_count || 0} providers`,
+      });
+      checks.splice(3, 0, {
+        label: 'Dedicated BTC flow',
+        ok: (runtime.candidate_signals || 0) > 0 || (runtime.emitted_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.candidate_signals || 0} candidates / ${runtime.emitted_signals || 0} emitted`,
+      });
+    }
+
+    if (activeView.key === 'copy_trader_shadow') {
+      checks.splice(2, 0, {
+        label: 'Wallet roster live',
+        ok: (runtime.target_wallets || 0) > 0,
+        note: `${runtime.target_wallets || 0} tracked / ${runtime.activity_events_seen || 0} seen`,
+      });
+      checks.splice(3, 0, {
+        label: 'Mirror engine active',
+        ok: (runtime.entries || 0) > 0 || (runtime.last_activity_refresh_at || '') !== '',
+        note: `${runtime.entries || 0} entries / ${runtime.resolved_trades || 0} resolved`,
+      });
+    }
+
+    if (COPY_HEURISTIC_VIEW_KEYS.includes(activeView.key)) {
+      checks.splice(2, 0, {
+        label: 'Real trade tape linked',
+        ok: (runtime.last_processed_trade_id || 0) > 0 || (runtime.decisions_logged || 0) > 0,
+        note: `${runtime.last_processed_trade_id || 0} last trade id / ${runtime.kind || 'heuristic'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Heuristic scorer active',
+        ok: (runtime.decisions_logged || 0) > 0 || (runtime.scans_completed || 0) > 0,
+        note: `${runtime.decisions_logged || 0} decisions / ${runtime.copied_trades || 0} copied`,
+      });
+    }
+
+    if (activeView.key === 'wallet_ml_30m_drift_shadow') {
+      checks.splice(2, 0, {
+        label: 'ML model loaded',
+        ok: !!runtime.model_loaded,
+        note: runtime.model_error ? `Error: ${runtime.model_error}` : `${runtime.score_threshold != null ? 'threshold ' + Number(runtime.score_threshold).toFixed(3) : 'ready'} / ${runtime.horizon_seconds || 0}s horizon`,
+      });
+      checks.splice(3, 0, {
+        label: 'Drift scorer active',
+        ok: (runtime.decisions_logged || 0) > 0 || (runtime.scans_completed || 0) > 0,
+        note: `${runtime.decisions_logged || 0} decisions / ${runtime.paper_trades || 0} paper / ${runtime.closed_trades || 0} closed / ${runtime.wins || 0}W-${runtime.losses || 0}L`,
+      });
+    }
+
+    if (activeView.key === 'kalshi_btc_arb_shadow') {
+      checks.splice(2, 0, {
+        label: 'Hourly pair discovery',
+        ok: !!runtime.last_event_ticker && !!runtime.last_price_to_beat,
+        note: `${runtime.last_event_ticker || 'no event'} / ${runtime.last_price_to_beat ? '$' + Number(runtime.last_price_to_beat).toFixed(2) : 'waiting priceToBeat'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Cross-venue arb flow',
+        ok: (runtime.candidate_opportunities || 0) > 0 || (runtime.entries || 0) > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.candidate_opportunities || 0} arbs / ${runtime.entries || 0} entries / $${Number(runtime.last_best_margin_dollars || 0).toFixed(3)} best`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin_model') {
+      const feedStats = runtime.feed_stats || {};
+      const marketFeedStats = runtime.market_feed_stats || {};
+      const contextStats = runtime.context_stats || {};
+      const minFresh = runtime.min_source_fresh_score || 0.5;
+      const effectiveFresh = runtime.last_effective_source_fresh_score || runtime.last_source_fresh_score || 0;
+      checks.splice(2, 0, {
+        label: 'Model bundle loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && (runtime.feature_count || 0) > 0,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error} / ${runtime.bundle_version || 'unknown'}`
+          : `${runtime.feature_count || 0} features / ${runtime.bundle_version || 'unknown'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Fast lane ready',
+        ok: !!feedStats.stream_connected && !!feedStats.warmup_ready && !!feedStats.fast_lane_ready && effectiveFresh >= minFresh,
+        note: `${feedStats.trade_events || 0} trades / ${feedStats.book_ticker_updates || 0} quotes / fresh ${(effectiveFresh).toFixed(2)} / ${(minFresh).toFixed(2)}${(runtime.metrics_supported === false || runtime.funding_supported === false) ? ' degraded-live' : ''}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Polymarket lag lane',
+        ok: !!marketFeedStats.connected && (((marketFeedStats.quoted_assets || 0) > 0) || ((marketFeedStats.recent_quoted_assets || 0) > 0) || (marketFeedStats.watched_assets || 0) > 0),
+        note: `${marketFeedStats.quoted_assets || 0} fresh / ${marketFeedStats.recent_quoted_assets || 0} recent / ${marketFeedStats.watched_assets || 0} watched / ${runtime.last_live_lagged_markets || 0} lagged`,
+      });
+      checks.splice(5, 0, {
+        label: 'Context lane',
+        ok: !(runtime.context_enabled === false) && ((contextStats.healthy_provider_count || 0) > 0 || (contextStats.recent_item_count || 0) > 0 || (runtime.last_context_regime || 'disabled') !== 'disabled'),
+        note: `${runtime.last_context_regime || 'unknown'} / ${runtime.last_context_bias || 'neutral'} / ${(runtime.last_context_intensity || 0).toFixed(2)} / ${contextStats.healthy_provider_count || 0} healthy`,
+      });
+      checks.splice(6, 0, {
+        label: 'Scored BTC markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.matched_markets || 0} matched`,
+      });
+      checks.splice(7, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
+      });
+      checks.splice(8, 0, {
+        label: 'BTC ML flow',
+        ok: (runtime.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.last_signals || 0} live / ${p.total_trades || 0} trades | dir ${runtime.last_direction || 'neutral'}${runtime.last_direction_mode ? ` (${runtime.last_direction_mode})` : ''} | L ${Number(runtime.last_long_score || 0).toFixed(3)} / S ${Number(runtime.last_short_score || 0).toFixed(3)}`,
+      });
+    }
+
+    if (activeView.key === 'bitcoin_meanrev_shadow') {
+      const feedStats = runtime.feed_stats || {};
+      const futuresStats = feedStats.futures || {};
+      const spotStats = feedStats.spot || {};
+      const coinbaseStats = feedStats.coinbase || {};
+      const archiveStats = feedStats.archive || {};
+      const latestArchiveWriteAt = archiveStats.last_archive_write_at || feedStats.archive_last_write_at || runtime.last_archive_write_at;
+      const archiveFresh = !!latestArchiveWriteAt && (Date.now() - new Date(latestArchiveWriteAt).getTime()) <= 120000;
+      const venueConnectedCount = [futuresStats, spotStats, coinbaseStats].filter((venue) => !!venue.connected).length;
+      const venueEventCount =
+        (futuresStats.agg_trade_events || 0)
+        + (spotStats.agg_trade_events || 0)
+        + (coinbaseStats.level2_events || 0);
+      const feedWarm = !!feedStats.warmup_ready;
+      const feedAlive = feedWarm && archiveFresh && venueEventCount > 0 && venueConnectedCount >= 2;
+      const feedDegraded = !feedAlive && !!runtime.enabled && (
+        (runtime.heartbeat_logs || 0) > 0
+        || (runtime.warmup_rejects || 0) > 0
+        || venueConnectedCount > 0
+        || venueEventCount > 0
+        || !!runtime.last_loop_at
+      );
+      const tradeFlowAlive =
+        (runtime.entries || 0) > 0
+        || (runtime.closed_trades || 0) > 0
+        || !!runtime.open_position
+        || (runtime.candidate_events || 0) > 0
+        || (runtime.evaluated_buckets || 0) > 0;
+      const tradeFlowDegraded = !tradeFlowAlive && !!runtime.enabled && (
+        (runtime.heartbeat_logs || 0) > 0
+        || (runtime.warmup_rejects || 0) > 0
+        || !!runtime.last_loop_at
+      );
+      checks.splice(2, 0, {
+        label: 'Frozen model loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && !!runtime.frozen_model_only && runtime.online_learning_enabled === false,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error}`
+          : `${runtime.feature_count || 0} features / score ${Number(runtime.score_threshold || 0).toFixed(2)}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Multivenue live feeds',
+        ok: feedAlive,
+        state: feedAlive ? 'ok' : (feedDegraded ? 'warn' : 'bad'),
+        note: `${venueConnectedCount}/3 connected / fut ${futuresStats.agg_trade_events || 0} / spot ${spotStats.agg_trade_events || 0} / cb ${coinbaseStats.level2_events || 0} / arch ${timeAgo(latestArchiveWriteAt)}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Future data archived',
+        ok: (archiveStats.archive_entries || 0) > 0 && !!latestArchiveWriteAt,
+        state: ((archiveStats.archive_entries || 0) > 0 && !!latestArchiveWriteAt) ? 'ok' : (((runtime.heartbeat_logs || 0) > 0 || !!runtime.last_loop_at) ? 'warn' : 'bad'),
+        note: `${archiveStats.archive_entries || 0} archived / ${latestArchiveWriteAt || 'no writes yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'Shadow trade flow',
+        ok: tradeFlowAlive,
+        state: tradeFlowAlive ? 'ok' : (tradeFlowDegraded ? 'warn' : 'bad'),
+        note: `${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed / ${runtime.candidate_events || 0} shock / ${runtime.qualified_candidates || 0} qualified / ${runtime.evaluated_buckets || 0} eval`,
+      });
+      checks.splice(6, 0, {
+        label: 'PnL book updating',
+        ok: !!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.evaluated_buckets || 0) > 0),
+        state: (!!runtime.last_loop_at && (((runtime.closed_trades || 0) > 0) || !!runtime.open_position || (runtime.evaluated_buckets || 0) > 0))
+          ? 'ok'
+          : (!!runtime.last_loop_at ? 'warn' : 'bad'),
+        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}% / ${runtime.last_reject_reason || 'no-reject'}`,
+      });
+      checks.splice(7, 0, {
+        label: 'Trigger diagnostics',
+        ok: (runtime.evaluated_buckets || 0) > 0,
+        state: (runtime.evaluated_buckets || 0) > 0 ? 'ok' : (((runtime.heartbeat_logs || 0) > 0 || (runtime.warmup_rejects || 0) > 0) ? 'warn' : 'bad'),
+        note: `worst ${Number(runtime.worst_past_return_bps || 0).toFixed(2)}bps / best rej ${Number(runtime.best_rejected_score || 0).toFixed(3)} / miss ${runtime.shock_filter_misses || 0} shock / ${runtime.score_filter_misses || 0} score`,
+      });
+    }
+
+    if (isCryptoPairsShadowView(activeView.key)) {
+      const streamerStats = runtime.streamer_stats || {};
+      const ratioStats = runtime.ratio_engine_stats || {};
+      const lastRatioTickAt = runtime.last_ratio_tick_at;
+      const lastHourlyCheckAt = runtime.last_hourly_check_at;
+      const ratioFresh = !!lastRatioTickAt && (Date.now() - new Date(lastRatioTickAt).getTime()) <= 120000;
+      const hourlyFresh = !!lastHourlyCheckAt && (Date.now() - new Date(lastHourlyCheckAt).getTime()) <= 3900000;
+      const cointegration = runtime.current_cointegration_pvalue;
+      const tradeFlowAlive =
+        (runtime.entries || 0) > 0
+        || (runtime.closed_trades || 0) > 0
+        || !!runtime.open_position
+        || (runtime.entry_signals || 0) > 0;
+      checks.splice(2, 0, {
+        label: 'Pair feed live',
+        ok: (streamerStats.messages || 0) > 0 && (streamerStats.bars_emitted || 0) > 0 && ratioFresh,
+        state: ((streamerStats.messages || 0) > 0 && (streamerStats.bars_emitted || 0) > 0 && ratioFresh) ? 'ok' : (((streamerStats.messages || 0) > 0 || !!runtime.last_ratio_tick_at) ? 'warn' : 'bad'),
+        note: `${streamerStats.messages || 0} msgs / ${streamerStats.bars_emitted || 0} bars / ${timeAgo(lastRatioTickAt)}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Ratio ledger running',
+        ok: (runtime.ratio_updates || 0) > 0 && !!runtime.ratio_ticks_csv,
+        state: ((runtime.ratio_updates || 0) > 0 && !!runtime.ratio_ticks_csv) ? 'ok' : (((streamerStats.messages || 0) > 0) ? 'warn' : 'bad'),
+        note: `${runtime.ratio_updates || 0} ticks / csv live / no-price ${ratioStats.no_price_reject || 0} / lag ${ratioStats.lag_reject || 0} / warmup ${ratioStats.warmup_reject || 0}`,
+      });
+      checks.splice(4, 0, {
+        label: 'Hourly checks writing',
+        ok: hourlyFresh,
+        state: hourlyFresh ? 'ok' : (!!runtime.hourly_checks_path ? 'warn' : 'bad'),
+        note: `${runtime.hourly_checks_path || 'no file'} / ${lastHourlyCheckAt || 'no hourly check yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'Trade ledger writing',
+        ok: tradeFlowAlive && !!runtime.trade_ledger_csv,
+        state: (tradeFlowAlive && !!runtime.trade_ledger_csv) ? 'ok' : (((runtime.entry_signals || 0) > 0 || (runtime.ratio_updates || 0) > 0) ? 'warn' : 'bad'),
+        note: `${runtime.entry_signals || 0} entry sig / ${runtime.entries || 0} entries / ${runtime.closed_trades || 0} closed`,
+      });
+      checks.splice(6, 0, {
+        label: 'Cointegration holding',
+        ok: cointegration == null || cointegration <= 0.05,
+        state: cointegration == null ? 'warn' : (cointegration <= 0.05 ? 'ok' : 'bad'),
+        note: cointegration == null ? 'not enough daily data yet' : `p=${Number(cointegration).toFixed(4)}`,
+      });
+      checks.splice(7, 0, {
+        label: 'PnL book updating',
+        ok: (runtime.ratio_updates || 0) > 0,
+        state: (runtime.ratio_updates || 0) > 0 ? 'ok' : (((streamerStats.messages || 0) > 0) ? 'warn' : 'bad'),
+        note: `${Number(runtime.total_net_bps || 0).toFixed(2)} bps / $${Number(runtime.total_pnl_usd || 0).toFixed(2)} / ${Number((runtime.win_rate || 0) * 100).toFixed(1)}%`,
+      });
+    }
+
+    if (activeView.key === 'sports') {
+      const feedStats = runtime.feed_stats || {};
+      checks.splice(2, 0, {
+        label: 'NBA feed ready',
+        ok: (runtime.games_loaded || 0) > 0 && !feedStats.last_error,
+        note: `${runtime.games_loaded || 0} games / ${feedStats.line_move_candidates || 0} movers`,
+      });
+      checks.splice(3, 0, {
+        label: 'Matched sports markets',
+        ok: (runtime.matched_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.matched_markets || 0} matched / ${runtime.candidate_markets || 0} candidates`,
+      });
+      checks.splice(4, 0, {
+        label: 'Scored markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.last_signals || 0} live`,
+      });
+      checks.splice(5, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
+      });
+    }
+
+    if (activeView.key === 'news') {
+      checks.splice(2, 0, {
+        label: 'Headline intake',
+        ok: recentHeadlineCount > 0 || (runtime.pending_headlines || 0) > 0,
+        note: `${recentHeadlineCount} recent headlines`,
+      });
+    }
+
+    if (activeView.key === 'weather_sniper' || activeView.key === 'weather_latency' || activeView.key === 'weather_swing') {
+      checks.splice(2, 0, {
+        label: 'Forecast models ready',
+        ok: weatherFeedHealthy,
+        note: (runtime.models_ready || 0) > 0
+          ? `${runtime.models_ready || 0} models / ${runtime.forecast_cities || 0} cities`
+          : `${runtime.forecast_cities || 0} cities / ${runtime.last_forecast_refresh ? 'forecast refresh live' : 'waiting refresh'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Variant candidates',
+        ok: (weatherVariant.last_candidates || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${weatherVariant.last_candidates || 0} candidates / ${weatherVariant.last_signals || 0} live`,
+      });
+    }
+
+    if (activeView.key === 'weather_model_trader' || activeView.key === 'weather_model_signal' || activeView.key === 'weather_model_v2_trader' || activeView.key === 'weather_model_v2_signal') {
+      const loadedModelCount = Array.isArray(runtime.models_loaded)
+        ? runtime.models_loaded.length
+        : Object.keys(runtime.models_loaded || {}).length;
+      checks.splice(2, 0, {
+        label: 'Model bundle loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready && loadedModelCount > 0,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error} / ${runtime.bundle_version || 'unknown'}`
+          : `${loadedModelCount} models / ${runtime.bundle_version || 'unknown'}`,
+      });
+      checks.splice(3, 0, {
+        label: 'Scored weather markets',
+        ok: (runtime.scored_markets || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.scored_markets || 0} scored / ${runtime.candidate_markets || 0} candidates`,
+      });
+      checks.splice(4, 0, {
+        label: 'Separate log stream live',
+        ok: (runtime.log_entries || 0) > 0 && !!runtime.last_log_at,
+        note: `${runtime.log_entries || 0} entries / ${runtime.last_log_at || 'no writes yet'}`,
+      });
+      checks.splice(5, 0, {
+        label: 'ML sleeve flow',
+        ok: (weatherVariant.last_signals || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${weatherVariant.last_signals || 0} live / ${p.total_trades || 0} trades`,
+      });
+      if (activeView.key === 'weather_model_v2_trader' || activeView.key === 'weather_model_v2_signal') {
+        checks.splice(4, 0, {
+          label: 'V2 bundle route',
+          ok: !!runtime.active_model_dir,
+          note: `${runtime.using_fallback_bundle ? 'fallback' : 'requested'} / ${runtime.active_model_dir || 'none'}`,
+        });
+      }
+    }
+
+    if (activeView.key === 'weather_edge_live') {
+      const weatherHasHistoricalFlow = (runtime.entries || 0) > 0 || (runtime.resolved_trades || 0) > 0 || (runtime.pending_positions || 0) > 0;
+      checks.splice(2, 0, {
+        label: 'Frozen model loaded',
+        ok: !!runtime.enabled && !!runtime.bundle_ready,
+        note: runtime.bundle_error
+          ? `${runtime.bundle_error}`
+          : `${(runtime.bundle_models || []).length} models`,
+      });
+      checks.splice(3, 0, {
+        label: 'Edge candidate flow',
+        state: ((runtime.candidate_markets || 0) > 0 || (runtime.selected_markets || 0) > 0)
+          ? 'ok'
+          : (weatherHasHistoricalFlow || !!runtime.last_scan_at ? 'warn' : 'bad'),
+        ok: (runtime.candidate_markets || 0) > 0 || (runtime.selected_markets || 0) > 0 || weatherHasHistoricalFlow,
+        note: `${runtime.candidate_markets || 0} candidates / ${runtime.selected_markets || 0} selected / ${runtime.resolved_trades || 0} resolved / ${runtime.pending_positions || 0} pending`,
+      });
+      checks.splice(4, 0, {
+        label: 'Trade ledger live',
+        ok: !!runtime.trade_ledger_csv && ((runtime.entries || 0) > 0 || (runtime.resolved_trades || 0) > 0 || !!runtime.last_scan_at),
+        note: `${runtime.entries || 0} entries / ${runtime.resolved_trades || 0} resolved`,
+      });
+      checks.splice(5, 0, {
+        label: 'Daily summary live',
+        state: runtime.last_daily_summary_at ? 'ok' : 'warn',
+        ok: !!runtime.last_daily_summary_at,
+        note: runtime.last_daily_summary_at || 'awaiting first 00:00 UTC summary',
+      });
+      checks.splice(6, 0, {
+        label: 'Telegram alerts configured',
+        state: runtime.telegram_enabled ? 'ok' : 'warn',
+        ok: !!runtime.telegram_enabled,
+        note: runtime.telegram_enabled ? 'bot env present' : 'bot env missing',
+      });
+    }
+
+    if (activeView.key === 'weather_latency') {
+      checks.splice(4, 0, {
+        label: 'Forecast comparison ready',
+        ok: (weatherVariant.previous_ready_markets || 0) > 0 || (runtime.state_loaded || false),
+        note: `${weatherVariant.previous_ready_markets || 0} markets with old vs new forecast`,
+      });
+    }
+
+    if (activeView.key === 'weather_swing') {
+      checks.splice(4, 0, {
+        label: 'Price history ready',
+        ok: (weatherVariant.history_ready_markets || 0) > 0 || (runtime.state_loaded || false),
+        note: `${weatherVariant.history_ready_markets || 0} markets with dip history`,
+      });
+    }
+
+    if (activeView.key === 'arbitrage') {
+      checks.splice(2, 0, {
+        label: 'Opportunity flow',
+        ok: (runtime.signals_generated || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.signals_generated || 0} raw opportunities`,
+      });
+    }
+
+    if (activeView.key === 'momentum') {
+      checks.splice(2, 0, {
+        label: 'Momentum flow',
+        ok: (runtime.signals_generated || 0) > 0 || signals.length > 0 || (p.total_trades || 0) > 0,
+        note: `${runtime.signals_generated || 0} generated`,
+      });
+    }
+
+    const blockers = checks.filter(check => checkState(check) === 'bad').map(check => check.label);
+    const warnings = checks.filter(check => checkState(check) === 'warn').map(check => check.label);
+    const badge = document.getElementById('sanity-badge');
+    const overallState = blockers.length > 0 ? 'bad' : (warnings.length > 0 ? 'warn' : 'ok');
+    badge.textContent = overallState === 'ok' ? 'GREEN' : (overallState === 'warn' ? 'YELLOW' : 'RED');
+    badge.style.background = overallState === 'ok' ? 'var(--green-dim)' : (overallState === 'warn' ? 'var(--yellow-dim)' : 'var(--red-dim)');
+    badge.style.color = overallState === 'ok' ? 'var(--green)' : (overallState === 'warn' ? 'var(--yellow)' : 'var(--red)');
+
+    const rows = checks.map(check => `
+      <div class="sanity-item">
+        <div class="sanity-left">
+          <span class="sanity-icon ${checkClass(checkState(check))}">${checkIcon(checkState(check))}</span>
+          <span>${check.label}</span>
+        </div>
+        <div class="sanity-note">${check.note}</div>
+      </div>
+    `).join('');
+
+    const footer = blockers.length
+      ? `<div style="margin-top:10px;color:var(--red);font-family:var(--mono);font-size:11px">${activeView.label} blockers: ${blockers.join(' | ')}</div>`
+      : warnings.length
+        ? `<div style="margin-top:10px;color:var(--yellow);font-family:var(--mono);font-size:11px">${activeView.label} degraded: ${warnings.join(' | ')}</div>`
+        : `<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">${activeView.label} checks look healthy</div>`;
+
+    document.getElementById('sanity-panel').innerHTML = rows + footer;
+    return;
+  }
+
+  const diag = d.diagnostics || {};
+  const filtered = diag.filtered_signals || {};
+  const heldLoopCount = (filtered.held_market || 0) + (filtered.held_group || 0);
+  const signalsByStrategy = diag.signals_by_strategy || {};
+  const executedByStrategy = diag.executed_by_strategy || {};
+  const totalSignals = Object.values(signalsByStrategy).reduce((sum, val) => sum + val, 0);
+  const activeStrategies = Object.values(signalsByStrategy).filter(val => val > 0).length;
+  const openBySource = diag.portfolio?.positions_by_source || {};
+  const executedEntries = Object.entries(executedByStrategy);
+  const dominantEntries = executedEntries.length ? executedEntries : Object.entries(openBySource);
+  const dominant = dominantEntries.sort((a, b) => b[1] - a[1])[0];
+  const dominantTotal = dominantEntries.reduce((sum, [, count]) => sum + count, 0);
+  const dominantShare = dominant && dominantTotal ? dominant[1] / dominantTotal : 0;
+  const executedSummary = executedEntries.length
+    ? executedEntries.map(([source, count]) => `${source}:${count}`).join(', ')
+    : '0 executed';
+  const checks = [
+    {
+      label: 'Fresh tradeable markets',
+      ok: (diag.markets_tradeable || 0) > 0,
+      note: `${diag.markets_tradeable || 0} available`,
+    },
+    {
+      label: 'Held-thesis loop',
+      ok: heldLoopCount === 0,
+      note: `${heldLoopCount} filtered`,
+    },
+    {
+      label: 'Strategy caps clear',
+      ok: (filtered.source_exposure_cap || 0) === 0 && (filtered.source_position_cap || 0) === 0,
+      note: `${(filtered.source_exposure_cap || 0) + (filtered.source_position_cap || 0)} blocked`,
+    },
+    {
+      label: 'Strategy coverage',
+      ok: totalSignals === 0 || activeStrategies >= 2,
+      note: `${activeStrategies} strategies firing`,
+    },
+    {
+      label: 'Strategy concentration',
+      ok: !dominant || dominantShare <= 0.8,
+      note: dominant ? `${dominant[0]} ${(dominantShare * 100).toFixed(0)}% of fills` : 'No concentration yet',
+    },
+    {
+      label: 'New trades this scan',
+      ok: (diag.executed || 0) > 0 || totalSignals === 0,
+      note: `${diag.executed || 0} executed / ${totalSignals} candidates | ${executedSummary} | cooldown ${(filtered.cooldown || 0)}`,
+    },
+    {
+      label: 'Exit flow active',
+      ok: (diag.exits || 0) > 0 || (diag.resolved || 0) > 0 || ((diag.portfolio?.open_positions || 0) === 0),
+      note: `${diag.exits || 0} exits / ${diag.resolved || 0} resolved`,
+    },
+  ];
+
+  const blockers = checks.filter(check => !check.ok).map(check => check.label);
+  const overallOk = blockers.length === 0;
+  const badge = document.getElementById('sanity-badge');
+  badge.textContent = overallOk ? 'GREEN' : 'RED';
+  badge.style.background = overallOk ? 'var(--green-dim)' : 'var(--red-dim)';
+  badge.style.color = overallOk ? 'var(--green)' : 'var(--red)';
+
+  const rows = checks.map(check => `
+    <div class="sanity-item">
+      <div class="sanity-left">
+        <span class="sanity-icon ${check.ok ? 'sanity-ok' : 'sanity-bad'}">${check.ok ? '✓' : '✕'}</span>
+        <span>${check.label}</span>
+      </div>
+      <div class="sanity-note">${check.note}</div>
+    </div>
+  `).join('');
+
+  const footer = blockers.length
+    ? `<div style="margin-top:10px;color:var(--red);font-family:var(--mono);font-size:11px">Blockers: ${blockers.join(' | ')}</div>`
+    : '<div style="margin-top:10px;color:var(--green);font-family:var(--mono);font-size:11px">No immediate blockers detected in latest scan</div>';
+
+  document.getElementById('sanity-panel').innerHTML = rows + footer;
+}
+
 function renderSlippage(d) {
   const s = d.slippage;
   if (!s) return;
@@ -761,9 +1873,15 @@ function renderAB(d) {
   document.getElementById('ab-panel').innerHTML = html;
 }
 
-// Poll every 5 seconds
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    fetchState();
+    return;
+  }
+  scheduleStateFetch();
+});
+
 fetchState();
-setInterval(fetchState, 5000);
 </script>
 </body>
 </html>

@@ -56,7 +56,6 @@ class PolymarketCollector:
                 if market:
                     markets.append(market)
                     self._market_cache[market.condition_id] = market
-            logger.info(f"Fetched {len(markets)} active markets")
             return markets
         except Exception as e:
             logger.error(f"Failed to fetch markets: {e}")
@@ -67,15 +66,22 @@ class PolymarketCollector:
         all_markets = []
         offset = 0
         batch_size = 100
+        pages = 0
         while True:
             batch = await self.get_active_markets(limit=batch_size, offset=offset)
             if not batch:
                 break
             all_markets.extend(batch)
+            pages += 1
             if len(batch) < batch_size:
                 break
             offset += batch_size
             await asyncio.sleep(0.2)  # rate limit courtesy
+        logger.info(
+            "[COLLECTOR] Active markets refresh: %s markets across %s pages",
+            len(all_markets),
+            pages,
+        )
         return all_markets
 
     async def get_events(self, limit: int = 50, offset: int = 0) -> list[Event]:
@@ -91,7 +97,7 @@ class PolymarketCollector:
                 if event:
                     events.append(event)
                     self._event_cache[event.event_id] = event
-            logger.info(f"Fetched {len(events)} events")
+            logger.info("[COLLECTOR] Events refresh: %s events", len(events))
             return events
         except Exception as e:
             logger.error(f"Failed to fetch events: {e}")
@@ -99,14 +105,70 @@ class PolymarketCollector:
 
     async def get_market_by_slug(self, slug: str) -> Optional[Market]:
         """Get a specific market by slug."""
+        query_variants = (
+            {"slug": slug},
+            {"slug": slug, "closed": "true"},
+            {"slug": slug, "archived": "true"},
+            {"slug": slug, "closed": "true", "archived": "true"},
+        )
+        last_error: Exception | None = None
+        for params in query_variants:
+            try:
+                resp = await self.client.get(f"{self.gamma}/markets", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if data and len(data) > 0:
+                    return self._parse_gamma_market(data[0])
+            except Exception as e:
+                last_error = e
+        if last_error is not None:
+            logger.error(f"Failed to fetch market {slug}: {last_error}")
+        return None
+
+    async def get_market_by_condition_id(self, condition_id: str) -> Optional[Market]:
+        """Get a specific market by condition id."""
+        query_variants = (
+            {"condition_ids": condition_id},
+            {"condition_ids": condition_id, "closed": "true"},
+            {"condition_ids": condition_id, "archived": "true"},
+            {"condition_ids": condition_id, "closed": "true", "archived": "true"},
+        )
+        last_error: Exception | None = None
+        for params in query_variants:
+            try:
+                resp = await self.client.get(f"{self.gamma}/markets", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if data and len(data) > 0:
+                    return self._parse_gamma_market(data[0])
+            except Exception as e:
+                last_error = e
+        if last_error is not None:
+            logger.error(f"Failed to fetch market for condition %s: %s", condition_id, last_error)
+        return None
+
+    async def get_gamma_market_payload_by_slug(self, slug: str) -> Optional[dict]:
+        """Get the raw Gamma payload for a specific market slug."""
         try:
             resp = await self.client.get(f"{self.gamma}/markets", params={"slug": slug})
             resp.raise_for_status()
             data = resp.json()
-            if data and len(data) > 0:
-                return self._parse_gamma_market(data[0])
+            if data and len(data) > 0 and isinstance(data[0], dict):
+                return data[0]
         except Exception as e:
-            logger.error(f"Failed to fetch market {slug}: {e}")
+            logger.error(f"Failed to fetch raw market payload {slug}: {e}")
+        return None
+
+    async def get_gamma_market_payload_by_condition_id(self, condition_id: str) -> Optional[dict]:
+        """Get the raw Gamma payload for a specific market condition id."""
+        try:
+            resp = await self.client.get(f"{self.gamma}/markets", params={"condition_ids": condition_id})
+            resp.raise_for_status()
+            data = resp.json()
+            if data and len(data) > 0 and isinstance(data[0], dict):
+                return data[0]
+        except Exception as e:
+            logger.error(f"Failed to fetch raw market payload for condition %s: %s", condition_id, e)
         return None
 
     # ------------------------------------------------------------------
@@ -205,13 +267,26 @@ class PolymarketCollector:
             return []
 
     async def get_wallet_activity(
-        self, address: str, limit: int = 50
+        self,
+        address: str,
+        limit: int = 50,
+        *,
+        activity_type: str | None = None,
+        side: str | None = None,
+        condition_id: str | None = None,
     ) -> list[dict]:
         """Get recent activity for a wallet."""
         try:
+            params: dict[str, object] = {"user": address, "limit": limit}
+            if activity_type:
+                params["type"] = activity_type
+            if side:
+                params["side"] = side
+            if condition_id:
+                params["conditionId"] = condition_id
             resp = await self.client.get(
                 f"{self.data}/activity",
-                params={"user": address, "limit": limit}
+                params=params,
             )
             resp.raise_for_status()
             return resp.json()
@@ -219,33 +294,64 @@ class PolymarketCollector:
             logger.error(f"Failed to fetch activity for {address}: {e}")
             return []
 
-    async def get_leaderboard(self, limit: int = 50) -> list[dict]:
+    async def get_leaderboard(
+        self,
+        limit: int = 50,
+        *,
+        period: str = "all",
+        sort_by: str = "profit",
+    ) -> list[dict]:
         """Get top traders from Polymarket leaderboard."""
-        try:
-            resp = await self.client.get(
+        window = "all" if period == "all" else "month"
+        attempts = [
+            (
+                f"{self.data}/leaderboard",
+                {"period": period, "limit": limit, "sortBy": sort_by},
+            ),
+            (
                 f"{self.data}/v1/leaderboard",
-                params={"limit": limit, "window": "all"}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # Handle different response formats (list vs paginated dict)
-            if isinstance(data, list):
-                return data
-            if isinstance(data, dict):
-                return data.get("results", data.get("data", data.get("leaderboard", [])))
-            return []
-        except Exception as e:
-            logger.error(f"Failed to fetch leaderboard: {e}")
-            return []
+                {"limit": limit, "window": window},
+            ),
+        ]
+        last_error: Exception | None = None
+        for url, params in attempts:
+            try:
+                resp = await self.client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                rows: list[dict]
+                if isinstance(data, list):
+                    rows = data
+                elif isinstance(data, dict):
+                    rows = data.get("results", data.get("data", data.get("leaderboard", [])))
+                else:
+                    rows = []
+                if sort_by == "volume":
+                    rows = sorted(
+                        rows,
+                        key=lambda row: float(row.get("vol") or row.get("volume") or 0.0),
+                        reverse=True,
+                    )
+                elif sort_by == "profit":
+                    rows = sorted(
+                        rows,
+                        key=lambda row: float(row.get("pnl") or row.get("profit") or 0.0),
+                        reverse=True,
+                    )
+                return rows[:limit]
+            except Exception as exc:
+                last_error = exc
+        logger.error(f"Failed to fetch leaderboard: {last_error}")
+        return []
 
     # ------------------------------------------------------------------
     # Price History
     # ------------------------------------------------------------------
 
     async def get_price_history(
-        self, token_id: str, interval: str = "1h", fidelity: int = 60
+        self, token_id: str, interval: str = "1m", fidelity: int = 10
     ) -> list[dict]:
-        """Get historical prices for a token (from CLOB timeseries)."""
+        """Get historical prices for an asset token from CLOB timeseries."""
         try:
             resp = await self.client.get(
                 f"{self.clob}/prices-history",

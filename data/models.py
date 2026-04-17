@@ -24,13 +24,25 @@ class Side(str, Enum):
 class SignalSource(str, Enum):
     LIQUIDITY = "liquidity_provision"
     ARBITRAGE = "multi_outcome_arbitrage"
+    BUNDLE_ARB = "bundle_arb_strict"
     WHALE = "whale_tracking"
     NEWS = "news_latency"
     MEAN_REVERSION = "mean_reversion"
     CRYPTO_ARB = "crypto_temporal_arb"
+    CRYPTO_STRUCTURE = "crypto_structure"
     WEATHER = "weather_forecast"
-    CRYPTO_ARB = "crypto_temporal_arb"
-    WEATHER = "weather_forecast"
+    WEATHER_SNIPER = "weather_sniper"
+    WEATHER_LATENCY = "weather_latency_hunter"
+    WEATHER_SWING = "weather_swing_trader"
+    WEATHER_MODEL_TRADER = "weather_model_trader"
+    WEATHER_MODEL_SIGNAL = "weather_model_signal"
+    WEATHER_MODEL_V2_TRADER = "weather_model_v2_trader"
+    WEATHER_MODEL_V2_SIGNAL = "weather_model_v2_signal"
+    BITCOIN_MODEL = "bitcoin_futures_ml"
+    BITCOIN_LATENCY_SHADOW = "bitcoin_latency_shadow"
+    BITCOIN_MEANREV_SHADOW = "bitcoin_meanrev_shadow"
+    CRYPTO_PAIRS_AAVE_DOGE_SHADOW = "crypto_pairs_aave_doge_shadow"
+    SPORTS_MODEL = "sports_nba_model"
 
 
 class TradeStatus(str, Enum):
@@ -108,6 +120,7 @@ class Signal(BaseModel):
     reasoning: str = ""
     whale_confirmed: bool = False
     suggested_size_usd: float = 0.0
+    group_key: Optional[str] = None
 
     # For arbitrage signals
     arb_outcomes: list[str] = Field(default_factory=list)  # token_ids
@@ -136,6 +149,9 @@ class PaperTrade(BaseModel):
     exit_price: Optional[float] = None
     exit_timestamp: Optional[datetime] = None
     realized_pnl: Optional[float] = None
+    close_reason: Optional[str] = None
+    hold_hours: Optional[float] = None
+    total_fees: Optional[float] = None
 
 
 class Position(BaseModel):
@@ -148,6 +164,10 @@ class Position(BaseModel):
     current_price: float = 0.0
     unrealized_pnl: float = 0.0
     source: SignalSource
+    group_key: Optional[str] = None
+    opened_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    opened_trade_id: Optional[str] = None
+    opened_signal_id: Optional[str] = None
 
 
 class Portfolio(BaseModel):

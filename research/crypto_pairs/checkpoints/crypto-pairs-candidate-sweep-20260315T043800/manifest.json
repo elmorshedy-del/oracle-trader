@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "crypto-pairs-candidate-sweep-20260315T043800",
+  "created_at": "2026-03-15T04:38:57.335916+00:00",
+  "status": "candidate_screen",
+  "category": "pair_discovery",
+  "summary": "Screened five requested candidate pairs on the frozen 60-day discovery window before any backtests; none passed the cointegration gate required to continue the pipeline.",
+  "artifacts": {
+    "discovery_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/research/crypto_pairs/projects/crypto-pairs-candidate-sweep-v1/crypto_pairs_discovery_20260315T042844_v1/pair_discovery_results.json"
+  },
+  "metrics": {
+    "doge_shib_pvalue": 0.22478,
+    "arb_op_pvalue": 0.488602,
+    "aave_uni_pvalue": 0.761735,
+    "fet_render_pvalue": 0.986946,
+    "sei_sui_pvalue": 0.808758,
+    "passed_pairs": 0
+  }
+}

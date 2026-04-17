@@ -91,6 +91,7 @@ class ArbitrageStrategy(BaseStrategy):
             action=SignalAction.ARB_ALL,
             market_slug=market.slug,
             condition_id=market.condition_id,
+            group_key=f"arb:{market.slug}",
             confidence=min(net_profit * 15, 0.95),  # conservative: ask-based pricing
             expected_edge=net_profit * 100,  # in cents
             reasoning=(
@@ -102,7 +103,7 @@ class ArbitrageStrategy(BaseStrategy):
             arb_total_cost=total,
             arb_guaranteed_payout=1.0,
             suggested_size_usd=min(
-                self.config.risk.max_position_usd,
+                self.cfg.max_position_usd,
                 market.liquidity * 0.01  # don't take more than 1% of liquidity
             ),
         )
@@ -158,6 +159,7 @@ class ArbitrageStrategy(BaseStrategy):
             action=SignalAction.ARB_ALL,
             market_slug=event.slug,
             condition_id=event.markets[0].condition_id if event.markets else "",
+            group_key=f"arb:{event.slug}",
             confidence=min(net_profit * 10, 1.0),
             expected_edge=net_profit * 100,
             reasoning=(
@@ -169,7 +171,7 @@ class ArbitrageStrategy(BaseStrategy):
             arb_total_cost=total_cost,
             arb_guaranteed_payout=1.0,
             suggested_size_usd=min(
-                self.config.risk.max_position_usd,
+                self.cfg.max_position_usd,
                 min(m.liquidity for m in event.markets) * 0.01
             ),
         )

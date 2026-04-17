@@ -1,0 +1,22 @@
+{
+  "checkpoint_id": "btc-multivenue-catboost-meanrev-downshock30-v2-20260313T222431",
+  "created_at": "2026-03-13T22:25:01.380792+00:00",
+  "status": "tuned_meanrev_candidate",
+  "category": "multivenue_mean_reversion",
+  "summary": "Tuned downshock mean-reversion CatBoost using 5s down impulse <= -5 bps and 30s bounce >= +4 bps.",
+  "artifacts": {
+    "session_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_capture/sessions/20260313_144242_multivenue_v1_live",
+    "dataset_path": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_dataset/btc_multivenue_1s_20260313T130413_20260313T154112_5sessions_v1/dataset/features.csv.gz",
+    "training_run_root": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1",
+    "training_report": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1/reports/metadata.json",
+    "meanrev_after_downshock_30s": "/Users/ahmedelmorshedy/Downloads/oracle-trader/output/btc_multivenue_models/btc_multivenue_catboost_impulse_20260313T222428_v1/models/meanrev_after_downshock_30s.cbm"
+  },
+  "metrics": {
+    "meanrev_after_downshock_30s_test_auc": 0.7703349282296651,
+    "meanrev_after_downshock_30s_valid_auc": 0.7565359477124183,
+    "meanrev_after_downshock_30s_test_precision_top_decile": 0.6666666666666666,
+    "impulse_threshold_bps": 5,
+    "revert_threshold_bps": 4,
+    "horizon_seconds": 30
+  }
+}

@@ -7,15 +7,166 @@ Every decision is logged with full context for later analysis.
 
 import json
 import logging
-from datetime import datetime, timezone
+import os
+import re
+import sqlite3
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from data.models import (
-    Signal, PaperTrade, Position, Portfolio, Side, TradeStatus, SignalAction
+    Signal, PaperTrade, Position, Portfolio, Side, TradeStatus, SignalAction, SignalSource
 )
 
 logger = logging.getLogger(__name__)
 
 BASE_FEE_RATE = 0.02
+EXIT_FEE_ESTIMATE_RATE = BASE_FEE_RATE * 0.5
+MIN_TRADE_CASH_USD = 2.0
+MAX_HEDGE_POSITIONS = 10
+MAX_DIRECTIONAL_POSITIONS = 10
+MAX_NEW_HEDGE_POSITIONS_PER_SCAN = 8
+MAX_NEW_ARB_POSITIONS_PER_SCAN = 2
+MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN = 4
+DIRECTIONAL_TAKE_PROFIT_PCT = 0.20
+DIRECTIONAL_STOP_LOSS_PCT = -0.25
+TOKEN_CONVERGENCE_PRICE = 0.95
+HEDGE_ROTATION_HOURS = 6.0
+ARB_ROTATION_HOURS = 4.0
+ARB_EARLY_RELEASE_MIN_HOURS = 1.0
+ARB_REENTRY_COOLDOWN_HOURS = 4.0
+STALE_ROTATION_REENTRY_COOLDOWN_HOURS = 6.0
+BITCOIN_MODEL_STALE_ROTATION_HOURS = float(os.getenv("BITCOIN_MODEL_STALE_ROTATION_HOURS", "3.0"))
+BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS = float(os.getenv("BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS", "1.0"))
+BITCOIN_MODEL_STALE_FLAT_PNL_PCT = float(os.getenv("BITCOIN_MODEL_STALE_FLAT_PNL_PCT", "0.14"))
+BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS = int(os.getenv("BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS", "2"))
+STALE_DIRECTIONAL_ROTATION_HOURS = {
+    SignalSource.NEWS: 18.0,
+    SignalSource.CRYPTO_ARB: 18.0,
+    SignalSource.CRYPTO_STRUCTURE: 8.0,
+    SignalSource.BITCOIN_MODEL: BITCOIN_MODEL_STALE_ROTATION_HOURS,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 6.0,
+    SignalSource.WEATHER: 12.0,
+    SignalSource.WEATHER_SNIPER: 8.0,
+    SignalSource.WEATHER_LATENCY: 6.0,
+    SignalSource.WEATHER_SWING: 18.0,
+    SignalSource.WEATHER_MODEL_TRADER: 12.0,
+    SignalSource.WEATHER_MODEL_SIGNAL: 10.0,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 12.0,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 10.0,
+    SignalSource.SPORTS_MODEL: 8.0,
+    SignalSource.MEAN_REVERSION: 24.0,
+}
+STALE_DIRECTIONAL_FLAT_PNL_PCT = 0.08
+STALE_DIRECTIONAL_LOSS_CUT_HOURS = 8.0
+STALE_DIRECTIONAL_LOSS_CUT_PCT = -0.10
+WEATHER_SNIPER_TAKE_PROFIT_PRICE = 0.20
+WEATHER_LATENCY_TAKE_PROFIT_PRICE = 0.60
+WEATHER_SWING_TAKE_PROFIT_PCT = 0.18
+WEATHER_SWING_STOP_LOSS_PCT = -0.15
+CRYPTO_STRUCTURE_TAKE_PROFIT_PCT = 0.12
+CRYPTO_STRUCTURE_STOP_LOSS_PCT = -0.10
+WEATHER_SLUG_GROUP_RE = re.compile(
+    r"highest-temperature-in-([a-z-]+)-on-([a-z]+)-(\d{1,2})-(\d{4})"
+)
+CRYPTO_EXPIRY_RE = re.compile(r"by-([a-z]+)-(\d{1,2})-(\d{4})")
+MONTHS = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
+WEATHER_CITY_GROUP_ALIASES = {
+    "nyc": "new-york",
+}
+WEATHER_CAPACITY_RELEASE_ENABLED = os.getenv("WEATHER_CAPACITY_RELEASE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+WEATHER_POST_EVENT_ROTATION_HOURS = 30.0
+WEATHER_STALE_ROTATION_PNL_PCT = {
+    SignalSource.WEATHER: 0.12,
+    SignalSource.WEATHER_SNIPER: 0.20,
+    SignalSource.WEATHER_LATENCY: 0.18,
+    SignalSource.WEATHER_SWING: 0.15,
+    SignalSource.WEATHER_MODEL_TRADER: 0.14,
+    SignalSource.WEATHER_MODEL_SIGNAL: 0.14,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 0.14,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 0.14,
+}
+STRATEGY_EXPOSURE_CAPS = {
+    SignalSource.LIQUIDITY: 0.25,
+    SignalSource.ARBITRAGE: 0.20,
+    SignalSource.BUNDLE_ARB: 1.00,
+    SignalSource.NEWS: 0.15,
+    SignalSource.MEAN_REVERSION: 0.20,
+    SignalSource.CRYPTO_ARB: 0.20,
+    SignalSource.CRYPTO_STRUCTURE: 0.30,
+    SignalSource.WEATHER: 0.15,
+    SignalSource.WEATHER_SNIPER: 0.08,
+    SignalSource.WEATHER_LATENCY: 0.12,
+    SignalSource.WEATHER_SWING: 0.10,
+    SignalSource.WEATHER_MODEL_TRADER: 1.00,
+    SignalSource.WEATHER_MODEL_SIGNAL: 1.00,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 1.00,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 1.00,
+    SignalSource.BITCOIN_MODEL: 1.00,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 1.00,
+    SignalSource.SPORTS_MODEL: 1.00,
+    SignalSource.WHALE: 0.35,
+}
+SOURCE_POSITION_LIMITS = {
+    SignalSource.BUNDLE_ARB: 20,
+    SignalSource.CRYPTO_STRUCTURE: 12,
+    SignalSource.WEATHER_SNIPER: 30,
+    SignalSource.WEATHER_LATENCY: 12,
+    SignalSource.WEATHER_SWING: 12,
+    SignalSource.WEATHER_MODEL_TRADER: 20,
+    SignalSource.WEATHER_MODEL_SIGNAL: 14,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 20,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 14,
+    SignalSource.BITCOIN_MODEL: 12,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 8,
+    SignalSource.SPORTS_MODEL: 16,
+    SignalSource.WHALE: 16,
+}
+SOURCE_SCAN_LIMITS = {
+    SignalSource.BUNDLE_ARB: 6,
+    SignalSource.CRYPTO_STRUCTURE: 4,
+    SignalSource.WEATHER_SNIPER: 12,
+    SignalSource.WEATHER_LATENCY: 4,
+    SignalSource.WEATHER_SWING: 4,
+    SignalSource.WEATHER_MODEL_TRADER: 8,
+    SignalSource.WEATHER_MODEL_SIGNAL: 5,
+    SignalSource.WEATHER_MODEL_V2_TRADER: 8,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL: 5,
+    SignalSource.BITCOIN_MODEL: 4,
+    SignalSource.BITCOIN_LATENCY_SHADOW: 4,
+    SignalSource.SPORTS_MODEL: 6,
+    SignalSource.WHALE: 6,
+}
+CRYPTO_SOURCES = {
+    SignalSource.CRYPTO_ARB,
+    SignalSource.CRYPTO_STRUCTURE,
+    SignalSource.BITCOIN_MODEL,
+    SignalSource.BITCOIN_LATENCY_SHADOW,
+}
+WEATHER_SOURCES = {
+    SignalSource.WEATHER,
+    SignalSource.WEATHER_SNIPER,
+    SignalSource.WEATHER_LATENCY,
+    SignalSource.WEATHER_SWING,
+    SignalSource.WEATHER_MODEL_TRADER,
+    SignalSource.WEATHER_MODEL_SIGNAL,
+    SignalSource.WEATHER_MODEL_V2_TRADER,
+    SignalSource.WEATHER_MODEL_V2_SIGNAL,
+}
+TRADE_EVENTS_FILENAME = "trade_events.jsonl"
+TRADE_AUDIT_DB_FILENAME = "trade_audit.sqlite3"
+TRADE_AUDIT_SCHEMA_VERSION = 1
 
 
 class PaperTrader:
@@ -24,19 +175,24 @@ class PaperTrader:
     def __init__(self, starting_capital: float = 1000.0, log_dir: str = "logs", state_path: str = "/data/state.json"):
         self.state_path = Path(state_path)
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(exist_ok=True)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.audit_db_path = self.log_dir / TRADE_AUDIT_DB_FILENAME
+        self._ensure_trade_audit_store()
 
         # Try to restore state from disk, fall back to fresh start
         if not self._load_state():
             self.portfolio = Portfolio(starting_capital=starting_capital, cash=starting_capital, peak_value=starting_capital)
             self.trade_log: list[PaperTrade] = []
             self.signal_log: list[Signal] = []
+            self._group_cooldowns: dict[str, datetime] = {}
             logger.info(f"[PAPER] Fresh start with ${starting_capital}")
         else:
             # Fix peak_value if it was initialized with wrong default
             if self.portfolio.peak_value > self.portfolio.total_value * 1.2:
                 self.portfolio.peak_value = max(self.portfolio.starting_capital, self.portfolio.total_value)
                 logger.info(f"[PAPER] Reset peak_value to ${self.portfolio.peak_value:.2f}")
+            self._backfill_position_groups()
+            self._backfill_position_trade_links()
             logger.info(f"[PAPER] Restored state: ${self.portfolio.total_value:.2f} | {len(self.trade_log)} trades")
 
     def _load_state(self) -> bool:
@@ -48,6 +204,7 @@ class PaperTrader:
                 # Reconstruct positions (they're nested in portfolio)
                 self.trade_log = [PaperTrade(**t) for t in data.get("trade_log", [])]
                 self.signal_log = []  # don't restore signals, they're transient
+                self._group_cooldowns = {}
                 return True
         except Exception as e:
             logger.warning(f"[PAPER] Failed to load state: {e}")
@@ -69,6 +226,444 @@ class PaperTrader:
         except Exception as e:
             logger.error(f"[PAPER] Failed to save state: {e}")
 
+    def reset(self, starting_capital: float | None = None):
+        """Reset paper state without wiping persisted logs."""
+        capital = starting_capital or self.portfolio.starting_capital
+        self.portfolio = Portfolio(
+            starting_capital=capital,
+            cash=capital,
+            peak_value=capital,
+        )
+        self.trade_log = []
+        self.signal_log = []
+        self._group_cooldowns = {}
+        try:
+            self.state_path.unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning(f"[PAPER] Failed to delete state file: {e}")
+        self.save_state()
+        logger.info(f"[PAPER] Reset portfolio state to ${capital:.2f}")
+
+    def _cleanup_cooldowns(self):
+        now = datetime.now(timezone.utc)
+        self._group_cooldowns = {
+            key: expires_at
+            for key, expires_at in self._group_cooldowns.items()
+            if expires_at > now
+        }
+
+    def _set_group_cooldown(self, group_key: str | None, hours: float):
+        if not group_key or hours <= 0:
+            return
+        self._group_cooldowns[group_key] = datetime.now(timezone.utc) + timedelta(hours=hours)
+
+    def _backfill_position_groups(self):
+        for pos in self.portfolio.positions:
+            if pos.group_key:
+                continue
+            pos.group_key = self._infer_group_key(pos)
+
+    def _backfill_position_trade_links(self):
+        for pos in self.portfolio.positions:
+            if pos.opened_trade_id:
+                continue
+            trade = self._find_open_trade_for_position(pos)
+            if trade is None:
+                continue
+            pos.opened_trade_id = trade.id
+            pos.opened_signal_id = trade.signal_id
+
+    def _infer_group_key(self, pos: Position) -> str | None:
+        slug = (pos.market_slug or "").lower()
+        if not slug:
+            return None
+
+        if pos.source == SignalSource.ARBITRAGE:
+            return f"arb:{slug}"
+
+        if pos.source in WEATHER_SOURCES:
+            match = WEATHER_SLUG_GROUP_RE.search(slug)
+            if not match:
+                return None
+            city, month_name, day, year = match.groups()
+            city = WEATHER_CITY_GROUP_ALIASES.get(city, city)
+            month_num = MONTHS.get(month_name)
+            if not month_num:
+                return None
+            try:
+                target_date = datetime(int(year), month_num, int(day)).strftime("%Y-%m-%d")
+            except ValueError:
+                return None
+            return f"weather:{city}:{target_date}"
+
+        if pos.source not in CRYPTO_SOURCES:
+            return None
+
+        symbol = None
+        if "bitcoin" in slug or "btc" in slug:
+            symbol = "BTC"
+        elif "ethereum" in slug or "eth" in slug:
+            symbol = "ETH"
+        elif "solana" in slug or "sol" in slug:
+            symbol = "SOL"
+        if not symbol:
+            return None
+
+        expiry_bucket = "unknown"
+        expiry_match = CRYPTO_EXPIRY_RE.search(slug)
+        if expiry_match:
+            month_name, day, year = expiry_match.groups()
+            month_num = MONTHS.get(month_name)
+            if month_num:
+                try:
+                    expiry_bucket = datetime(int(year), month_num, int(day)).strftime("%Y-%m-%d")
+                except ValueError:
+                    expiry_bucket = "unknown"
+
+        is_temporal = any(token in slug for token in ("5-minute", "5-min", "15-minute", "15-min", "hour"))
+        if is_temporal:
+            direction = "up" if pos.side == "YES" else "down"
+            return f"crypto:{symbol}:temporal:{direction}:{expiry_bucket}"
+
+        kind = "dip" if any(token in slug for token in ("dip", "below")) else "reach"
+        bullish = (
+            (kind == "reach" and pos.side == "YES")
+            or (kind == "dip" and pos.side == "NO")
+        )
+        thesis = "bull" if bullish else "bear"
+        return f"crypto:{symbol}:barrier:{thesis}:{expiry_bucket}"
+
+    def _ensure_trade_audit_store(self):
+        try:
+            with sqlite3.connect(self.audit_db_path) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS trade_events (
+                        event_id TEXT PRIMARY KEY,
+                        logged_at TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        trade_id TEXT,
+                        signal_id TEXT,
+                        source TEXT,
+                        market_slug TEXT,
+                        condition_id TEXT,
+                        token_id TEXT,
+                        position_side TEXT,
+                        trade_side TEXT,
+                        entry_price REAL,
+                        exit_price REAL,
+                        size_shares REAL,
+                        size_usd REAL,
+                        realized_pnl REAL,
+                        net_realized_pnl REAL,
+                        total_fees REAL,
+                        hold_hours REAL,
+                        close_reason TEXT,
+                        group_key TEXT,
+                        portfolio_value REAL,
+                        cash REAL,
+                        payload_json TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_trade_id ON trade_events(trade_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_source_logged_at ON trade_events(source, logged_at)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_trade_events_market_logged_at ON trade_events(market_slug, logged_at)"
+                )
+        except Exception as exc:
+            logger.error("[PAPER] Failed to initialize trade audit store: %s", exc)
+
+    def _attach_trade_to_position(self, pos: Position, trade: PaperTrade):
+        pos.opened_trade_id = trade.id
+        pos.opened_signal_id = trade.signal_id
+
+    def _find_open_trade_for_position(self, pos: Position) -> PaperTrade | None:
+        if pos.opened_trade_id:
+            for trade in reversed(self.trade_log):
+                if trade.id == pos.opened_trade_id:
+                    return trade
+
+        for trade in reversed(self.trade_log):
+            if trade.exit_timestamp is not None:
+                continue
+            if trade.condition_id != pos.condition_id:
+                continue
+            if trade.token_id != pos.token_id:
+                continue
+            if trade.source != pos.source:
+                continue
+            return trade
+        return None
+
+    def _record_trade_event(
+        self,
+        *,
+        event_type: str,
+        trade: PaperTrade,
+        signal: Signal | None = None,
+        position: Position | None = None,
+        close_reason: str | None = None,
+        net_realized_pnl: float | None = None,
+    ):
+        logged_at = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "schema_version": TRADE_AUDIT_SCHEMA_VERSION,
+            "logged_at": logged_at,
+            "event_type": event_type,
+            "trade": trade.model_dump(mode="json"),
+            "signal": signal.model_dump(mode="json") if signal is not None else None,
+            "position": position.model_dump(mode="json") if position is not None else None,
+            "portfolio_value": self.portfolio.total_value,
+            "cash": self.portfolio.cash,
+            "close_reason": close_reason,
+            "net_realized_pnl": net_realized_pnl,
+        }
+        self._append_jsonl(TRADE_EVENTS_FILENAME, payload)
+
+        event_id = f"{trade.id}:{event_type}:{logged_at}"
+        try:
+            with sqlite3.connect(self.audit_db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO trade_events (
+                        event_id, logged_at, event_type, trade_id, signal_id, source,
+                        market_slug, condition_id, token_id, position_side, trade_side,
+                        entry_price, exit_price, size_shares, size_usd, realized_pnl,
+                        net_realized_pnl, total_fees, hold_hours, close_reason, group_key,
+                        portfolio_value, cash, payload_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event_id,
+                        logged_at,
+                        event_type,
+                        trade.id,
+                        trade.signal_id,
+                        trade.source.value,
+                        trade.market_slug,
+                        trade.condition_id,
+                        trade.token_id,
+                        position.side if position is not None else None,
+                        trade.side.value,
+                        trade.price,
+                        trade.exit_price,
+                        trade.size_shares,
+                        trade.size_usd,
+                        trade.realized_pnl,
+                        net_realized_pnl,
+                        trade.total_fees,
+                        trade.hold_hours,
+                        close_reason,
+                        position.group_key if position is not None else None,
+                        self.portfolio.total_value,
+                        self.portfolio.cash,
+                        json.dumps(payload, default=str),
+                    ),
+                )
+        except Exception as exc:
+            logger.error("[PAPER] Failed to persist trade audit event: %s", exc)
+
+    def _close_trade_record(
+        self,
+        *,
+        pos: Position,
+        exit_price: float,
+        realized_pnl: float,
+        total_fees: float,
+        close_reason: str,
+        event_type: str,
+    ):
+        trade = self._find_open_trade_for_position(pos)
+        exit_timestamp = datetime.now(timezone.utc)
+        hold_hours = max(0.0, (exit_timestamp - pos.opened_at).total_seconds() / 3600)
+        net_realized_pnl = realized_pnl - total_fees
+
+        if trade is None:
+            trade = PaperTrade(
+                signal_id=pos.opened_signal_id or "unknown",
+                source=pos.source,
+                market_slug=pos.market_slug,
+                condition_id=pos.condition_id,
+                token_id=pos.token_id,
+                side=Side.BUY,
+                price=pos.avg_entry_price,
+                size_shares=pos.shares,
+                size_usd=pos.shares * pos.avg_entry_price,
+                status=TradeStatus.FILLED,
+            )
+            self.trade_log.append(trade)
+
+        trade.exit_price = exit_price
+        trade.exit_timestamp = exit_timestamp
+        trade.realized_pnl = realized_pnl
+        trade.close_reason = close_reason
+        trade.hold_hours = hold_hours
+        trade.total_fees = total_fees
+
+        self._record_trade_event(
+            event_type=event_type,
+            trade=trade,
+            position=pos,
+            close_reason=close_reason,
+            net_realized_pnl=net_realized_pnl,
+        )
+
+    def _strategy_exposure_cap_pct(
+        self, source: SignalSource, action: SignalAction | None = None
+    ) -> float:
+        if action == SignalAction.HEDGE_BOTH:
+            return STRATEGY_EXPOSURE_CAPS[SignalSource.LIQUIDITY]
+        return STRATEGY_EXPOSURE_CAPS.get(source, 0.20)
+
+    def _max_positions_for_signal(self, signal: Signal) -> int:
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return MAX_HEDGE_POSITIONS
+        return SOURCE_POSITION_LIMITS.get(signal.source, MAX_DIRECTIONAL_POSITIONS)
+
+    def _per_scan_limit_for_signal(self, signal: Signal) -> int:
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return MAX_NEW_HEDGE_POSITIONS_PER_SCAN
+        if signal.action == SignalAction.ARB_ALL:
+            return MAX_NEW_ARB_POSITIONS_PER_SCAN
+        return SOURCE_SCAN_LIMITS.get(signal.source, MAX_NEW_DIRECTIONAL_POSITIONS_PER_SCAN)
+
+    def _position_value(self, pos: Position) -> float:
+        return pos.shares * pos.current_price
+
+    def _signal_side(self, signal: Signal) -> str | None:
+        if signal.action == SignalAction.BUY_YES:
+            return "YES"
+        if signal.action == SignalAction.BUY_NO:
+            return "NO"
+        if signal.action == SignalAction.HEDGE_BOTH:
+            return "HEDGE"
+        if signal.action == SignalAction.ARB_ALL:
+            return "ARB"
+        return None
+
+    def _position_matches_signal(self, pos: Position, signal: Signal) -> bool:
+        desired_side = self._signal_side(signal)
+        return desired_side is not None and pos.side == desired_side
+
+    def _max_same_market_positions(self, signal: Signal) -> int:
+        if signal.source == SignalSource.BITCOIN_MODEL and signal.action in (SignalAction.BUY_YES, SignalAction.BUY_NO):
+            return BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+        return 1
+
+    def _max_same_group_positions(self, signal: Signal) -> int:
+        if signal.source == SignalSource.BITCOIN_MODEL and signal.action in (SignalAction.BUY_YES, SignalAction.BUY_NO):
+            return BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+        return 1
+
+    def _strategy_exposure(self, source: SignalSource) -> float:
+        return sum(
+            self._position_value(pos)
+            for pos in self.portfolio.positions
+            if pos.source == source
+        )
+
+    def select_candidate_signals(self, signals: list[Signal]) -> tuple[list[Signal], dict[str, int]]:
+        """Drop signals that are already impossible given current holdings and source caps."""
+        self._cleanup_cooldowns()
+        selected: list[Signal] = []
+        filtered = {
+            "held_market": 0,
+            "held_group": 0,
+            "duplicate_market": 0,
+            "duplicate_group": 0,
+            "cooldown": 0,
+            "source_scan_cap": 0,
+            "source_position_cap": 0,
+            "source_exposure_cap": 0,
+        }
+        seen_market_counts: dict[tuple[str, str, str], int] = {}
+        seen_group_counts: dict[tuple[str, str, str], int] = {}
+        source_counts: dict = {}
+        source_exposure: dict = {}
+        selected_per_source: dict = {}
+
+        for pos in self.portfolio.positions:
+            source_counts[pos.source] = source_counts.get(pos.source, 0) + 1
+            source_exposure[pos.source] = (
+                source_exposure.get(pos.source, 0.0) + (pos.shares * pos.current_price)
+            )
+
+        for signal in signals:
+            signal_side = self._signal_side(signal) or "UNKNOWN"
+            same_market_positions = [
+                pos for pos in self.portfolio.positions
+                if pos.condition_id == signal.condition_id
+            ]
+            if any(not self._position_matches_signal(pos, signal) for pos in same_market_positions):
+                filtered["held_market"] += 1
+                continue
+            same_market_existing = sum(
+                1 for pos in same_market_positions if self._position_matches_signal(pos, signal)
+            )
+            market_key = (signal.source.value, signal.condition_id, signal_side)
+            market_limit = self._max_same_market_positions(signal)
+            if same_market_existing >= market_limit:
+                filtered["held_market"] += 1
+                continue
+            if same_market_existing + seen_market_counts.get(market_key, 0) >= market_limit:
+                filtered["duplicate_market"] += 1
+                continue
+
+            same_group_positions = [
+                pos for pos in self.portfolio.positions
+                if signal.group_key and pos.group_key == signal.group_key
+            ]
+            if signal.group_key and any(not self._position_matches_signal(pos, signal) for pos in same_group_positions):
+                filtered["held_group"] += 1
+                continue
+            group_key = (signal.source.value, signal.group_key or "", signal_side)
+            same_group_existing = sum(
+                1 for pos in same_group_positions if self._position_matches_signal(pos, signal)
+            )
+            group_limit = self._max_same_group_positions(signal)
+            if signal.group_key and same_group_existing >= group_limit:
+                filtered["held_group"] += 1
+                continue
+            if signal.group_key and same_group_existing + seen_group_counts.get(group_key, 0) >= group_limit:
+                filtered["duplicate_group"] += 1
+                continue
+            if signal.group_key and signal.group_key in self._group_cooldowns:
+                filtered["cooldown"] += 1
+                continue
+
+            per_scan_cap = self._per_scan_limit_for_signal(signal)
+            if selected_per_source.get(signal.source, 0) >= per_scan_cap:
+                filtered["source_scan_cap"] += 1
+                continue
+
+            max_positions = self._max_positions_for_signal(signal)
+            if source_counts.get(signal.source, 0) >= max_positions:
+                filtered["source_position_cap"] += 1
+                continue
+
+            cap = self._strategy_exposure_cap_pct(signal.source, signal.action)
+            current_exposure = source_exposure.get(signal.source, 0.0)
+            projected_exposure = current_exposure + max(signal.suggested_size_usd, 0.0)
+            if projected_exposure > self.portfolio.starting_capital * cap:
+                filtered["source_exposure_cap"] += 1
+                continue
+
+            selected.append(signal)
+            seen_market_counts[market_key] = seen_market_counts.get(market_key, 0) + 1
+            if signal.group_key:
+                seen_group_counts[group_key] = seen_group_counts.get(group_key, 0) + 1
+            selected_per_source[signal.source] = selected_per_source.get(signal.source, 0) + 1
+            source_counts[signal.source] = source_counts.get(signal.source, 0) + 1
+            source_exposure[signal.source] = projected_exposure
+
+        return selected, {k: v for k, v in filtered.items() if v}
+
     def execute_signal(self, signal: Signal, current_prices: dict[str, float]) -> PaperTrade | None:
         """
         Execute a signal in paper mode.
@@ -78,8 +673,7 @@ class PaperTrader:
 
         # Risk checks
         if not self._passes_risk_checks(signal):
-            logger.info(f"[PAPER] Signal {signal.id} rejected by risk checks")
-            self._log_signal(signal, "REJECTED_RISK")
+            logger.debug(f"[PAPER] Signal {signal.id} rejected by risk checks")
             return None
 
         # Route to appropriate execution method
@@ -150,6 +744,7 @@ class PaperTrader:
             avg_entry_price=fill_price,
             current_price=fill_price,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -164,7 +759,9 @@ class PaperTrader:
             size_shares=shares,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
+            total_fees=fee,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
 
@@ -194,6 +791,7 @@ class PaperTrader:
             avg_entry_price=1.0,
             current_price=1.0,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -208,7 +806,9 @@ class PaperTrader:
             size_shares=size_usd,
             size_usd=size_usd,
             status=TradeStatus.FILLED,
+            total_fees=0.0,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
         logger.info(f"[PAPER] Hedge position on {signal.market_slug}: ${size_usd:.2f}")
@@ -271,6 +871,7 @@ class PaperTrader:
             current_price=signal.arb_guaranteed_payout,
             unrealized_pnl=net_profit,
             source=signal.source,
+            group_key=signal.group_key,
         )
         self.portfolio.positions.append(position)
 
@@ -286,7 +887,9 @@ class PaperTrader:
             size_usd=size_usd,
             status=TradeStatus.FILLED,
             realized_pnl=0.0,  # credited at resolution, not now
+            total_fees=fee_estimate,
         )
+        self._attach_trade_to_position(position, trade)
         self.trade_log.append(trade)
         self._log_trade(trade, signal)
 
@@ -296,6 +899,305 @@ class PaperTrader:
             f"Expected profit: ${net_profit:.3f} (at resolution)"
         )
         return trade
+
+    def check_exits(self, current_prices: dict[str, float]):
+        """Check if any positions should be exited (take-profit, stop-loss, time)."""
+        exits = []
+        queued_positions: set[int] = set()
+        now = datetime.now(timezone.utc)
+
+        for pos in self.portfolio.positions[:]:
+            if pos.side == "HEDGE":
+                age_hours = (now - pos.opened_at).total_seconds() / 3600
+                if age_hours >= HEDGE_ROTATION_HOURS:
+                    exits.append((pos, 1.0, f"HEDGE_ROTATE: {age_hours:.1f}h"))
+                    queued_positions.add(id(pos))
+                continue
+            if pos.side == "ARB":
+                age_hours = (now - pos.opened_at).total_seconds() / 3600
+                if age_hours >= ARB_ROTATION_HOURS:
+                    exits.append((pos, pos.current_price or 1.0, f"ARB_ROTATE: {age_hours:.1f}h"))
+                    queued_positions.add(id(pos))
+                continue
+
+            # Get current price
+            current = current_prices.get(pos.token_id, pos.current_price)
+            if current <= 0:
+                continue
+
+            entry = pos.avg_entry_price
+            if entry <= 0:
+                continue
+
+            pnl_pct = (current - entry) / entry
+            age_hours = (now - pos.opened_at).total_seconds() / 3600
+            reason = None
+
+            if pos.source == SignalSource.WEATHER_LATENCY and current >= WEATHER_LATENCY_TAKE_PROFIT_PRICE:
+                reason = f"LATENCY_CATCHUP: ${current:.3f}"
+
+            elif pos.source == SignalSource.WEATHER_SNIPER and current >= WEATHER_SNIPER_TAKE_PROFIT_PRICE:
+                reason = f"SNIPER_SPIKE: ${current:.3f}"
+
+            elif pos.source == SignalSource.WEATHER_SWING and pnl_pct >= WEATHER_SWING_TAKE_PROFIT_PCT:
+                reason = f"SWING_TAKE_PROFIT: +{pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.WEATHER_SWING and pnl_pct <= WEATHER_SWING_STOP_LOSS_PCT:
+                reason = f"SWING_STOP: {pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.CRYPTO_STRUCTURE and pnl_pct >= CRYPTO_STRUCTURE_TAKE_PROFIT_PCT:
+                reason = f"CRYPTO_STRUCTURE_TP: +{pnl_pct:.1%}"
+
+            elif pos.source == SignalSource.CRYPTO_STRUCTURE and pnl_pct <= CRYPTO_STRUCTURE_STOP_LOSS_PCT:
+                reason = f"CRYPTO_STRUCTURE_STOP: {pnl_pct:.1%}"
+
+            # Take profit: price moved +20% from entry
+            elif pnl_pct >= DIRECTIONAL_TAKE_PROFIT_PCT:
+                reason = f"TAKE_PROFIT: +{pnl_pct:.1%}"
+
+            # Stop loss: price moved -25% from entry
+            elif pnl_pct <= DIRECTIONAL_STOP_LOSS_PCT:
+                reason = f"STOP_LOSS: {pnl_pct:.1%}"
+
+            # Close out directional bets once the held token has effectively converged.
+            elif current >= TOKEN_CONVERGENCE_PRICE:
+                reason = f"CONVERGED: {pos.side} at ${current:.3f}"
+
+            else:
+                stale_reason = self._stale_directional_reason(pos, age_hours, pnl_pct, now)
+                if stale_reason:
+                    reason = stale_reason
+
+            if reason:
+                exits.append((pos, current, reason))
+                queued_positions.add(id(pos))
+
+        # Trim overlapping grouped theses, but respect strategy-specific
+        # grouping limits for sleeves like BTC ML that intentionally allow
+        # limited same-thesis scaling.
+        grouped_positions: dict[str, list[Position]] = {}
+        for pos in self.portfolio.positions:
+            if id(pos) in queued_positions:
+                continue
+            if pos.source not in (CRYPTO_SOURCES | WEATHER_SOURCES):
+                continue
+            if pos.side not in {"YES", "NO"} or not pos.group_key:
+                continue
+            grouped_positions.setdefault(pos.group_key, []).append(pos)
+
+        for group_key, positions in grouped_positions.items():
+            source = positions[0].source
+            group_limit = (
+                BITCOIN_MODEL_MAX_SAME_MARKET_POSITIONS
+                if source == SignalSource.BITCOIN_MODEL
+                else 1
+            )
+            if len(positions) <= group_limit:
+                continue
+            positions.sort(
+                key=lambda pos: (
+                    pos.unrealized_pnl,
+                    -pos.avg_entry_price,
+                    pos.opened_at.timestamp(),
+                ),
+                reverse=True,
+            )
+            for pos in positions[group_limit:]:
+                exit_price = current_prices.get(pos.token_id, pos.current_price)
+                if exit_price <= 0:
+                    exit_price = pos.current_price
+                exits.append((pos, exit_price, f"GROUP_REBALANCE: {group_key}"))
+                queued_positions.add(id(pos))
+            logger.info(
+                "[RISK] Rebalancing grouped thesis %s: trimmed %s overlapping positions",
+                group_key,
+                len(positions) - group_limit,
+            )
+
+        # Keep liquidity from monopolizing the portfolio. Trim the oldest hedge
+        # positions until the source is back within its dedicated budget/slot cap.
+        liquidity_positions = [
+            pos
+            for pos in self.portfolio.positions
+            if pos.source == SignalSource.LIQUIDITY
+            and pos.side == "HEDGE"
+            and id(pos) not in queued_positions
+        ]
+        liquidity_cap_usd = (
+            self.portfolio.starting_capital
+            * self._strategy_exposure_cap_pct(SignalSource.LIQUIDITY)
+        )
+        liquidity_exposure = sum(self._position_value(pos) for pos in liquidity_positions)
+        if liquidity_positions and (
+            liquidity_exposure > liquidity_cap_usd
+            or len(liquidity_positions) > MAX_HEDGE_POSITIONS
+        ):
+            liquidity_positions.sort(key=lambda pos: pos.opened_at)
+            trimmed = 0
+            while liquidity_positions and (
+                liquidity_exposure > liquidity_cap_usd
+                or len(liquidity_positions) > MAX_HEDGE_POSITIONS
+            ):
+                pos = liquidity_positions.pop(0)
+                exits.append((pos, 1.0, "REBALANCE: liquidity reserve"))
+                queued_positions.add(id(pos))
+                liquidity_exposure -= self._position_value(pos)
+                trimmed += 1
+            logger.info(
+                "[RISK] Rebalancing liquidity: trimmed %s hedge positions to %.0f%% cap",
+                trimmed,
+                self._strategy_exposure_cap_pct(SignalSource.LIQUIDITY) * 100,
+            )
+
+        return self._apply_exits(exits)
+
+    def release_locked_arb_positions(self, pending_signals: list[Signal]) -> int:
+        """
+        Free cash from older locked arb positions when fresh arb entries are waiting.
+
+        This does not change arb detection or payout math. It only accelerates
+        capital release once an existing arb has been in the book long enough
+        and new arb signals are queued behind it.
+        """
+        pending_arb = [signal for signal in pending_signals if signal.action == SignalAction.ARB_ALL]
+        if not pending_arb:
+            return 0
+
+        target_cash = max(
+            MIN_TRADE_CASH_USD,
+            max(float(signal.suggested_size_usd or 0.0) for signal in pending_arb[:MAX_NEW_ARB_POSITIONS_PER_SCAN]),
+        )
+        if self.portfolio.cash >= target_cash:
+            return 0
+
+        now = datetime.now(timezone.utc)
+        releasable_positions = [
+            pos
+            for pos in self.portfolio.positions
+            if pos.side == "ARB"
+            and (now - pos.opened_at).total_seconds() / 3600 >= ARB_EARLY_RELEASE_MIN_HOURS
+        ]
+        if not releasable_positions:
+            return 0
+
+        releasable_positions.sort(key=lambda pos: pos.opened_at)
+        exits = []
+        projected_cash = self.portfolio.cash
+        for pos in releasable_positions:
+            if projected_cash >= target_cash:
+                break
+            exit_price = pos.current_price or 1.0
+            projected_cash += pos.shares * exit_price
+            age_hours = (now - pos.opened_at).total_seconds() / 3600
+            exits.append((pos, exit_price, f"ARB_RELEASE: pending arb @ {age_hours:.1f}h"))
+
+        if not exits:
+            return 0
+
+        logger.info(
+            "[ARB] Early release triggered: pending=%s target_cash=$%.2f current_cash=$%.2f releasing=%s",
+            len(pending_arb),
+            target_cash,
+            self.portfolio.cash,
+            len(exits),
+        )
+        return self._apply_exits(exits)
+
+    def _apply_exits(self, exits: list[tuple[Position, float, str]]) -> int:
+        """Apply queued exits and release cash back into the paper portfolio."""
+        for pos, exit_price, reason in exits:
+            if pos.side == "HEDGE":
+                pnl = 0.0
+                proceeds = pos.shares
+                fee = 0.0
+            elif pos.side == "ARB":
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = 0.0
+            elif pos.side == "YES":
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = proceeds * EXIT_FEE_ESTIMATE_RATE
+            else:  # NO
+                pnl = (exit_price - pos.avg_entry_price) * pos.shares
+                proceeds = pos.shares * exit_price
+                fee = proceeds * EXIT_FEE_ESTIMATE_RATE
+
+            self.portfolio.cash += proceeds
+            self.portfolio.total_realized_pnl += pnl
+            self.portfolio.total_fees_paid += fee
+
+            if pnl > 0:
+                self.portfolio.winning_trades += 1
+            elif pnl < 0:
+                self.portfolio.losing_trades += 1
+
+            self._close_trade_record(
+                pos=pos,
+                exit_price=exit_price,
+                realized_pnl=pnl,
+                total_fees=fee,
+                close_reason=reason,
+                event_type="trade_closed",
+            )
+            self.portfolio.positions.remove(pos)
+            if pos.side == "ARB":
+                self._set_group_cooldown(pos.group_key or pos.market_slug, ARB_REENTRY_COOLDOWN_HOURS)
+            elif reason.startswith("STALE_ROTATE") or reason.startswith("STALE_STOP"):
+                cooldown_hours = (
+                    BITCOIN_MODEL_STALE_REENTRY_COOLDOWN_HOURS
+                    if pos.source == SignalSource.BITCOIN_MODEL
+                    else STALE_ROTATION_REENTRY_COOLDOWN_HOURS
+                )
+                self._set_group_cooldown(
+                    pos.group_key or pos.market_slug,
+                    cooldown_hours,
+                )
+            logger.info(
+                f"[EXIT] {pos.market_slug} | {pos.side} | {reason} | "
+                f"Entry: ${pos.avg_entry_price:.3f} → Exit: ${exit_price:.3f} | "
+                f"PnL: ${pnl:+.2f} | Cash freed: ${proceeds:.2f}"
+            )
+        return len(exits)
+
+    def _stale_directional_reason(
+        self,
+        pos: Position,
+        age_hours: float,
+        pnl_pct: float,
+        now: datetime | None = None,
+    ) -> str | None:
+        now = now or datetime.now(timezone.utc)
+        max_age = STALE_DIRECTIONAL_ROTATION_HOURS.get(pos.source)
+        if max_age is None:
+            return None
+        if WEATHER_CAPACITY_RELEASE_ENABLED and pos.source in WEATHER_SOURCES:
+            target_date = self._weather_group_target_date(pos)
+            if target_date and now >= target_date + timedelta(hours=WEATHER_POST_EVENT_ROTATION_HOURS):
+                return f"STALE_ROTATE: weather post-event {age_hours:.1f}h @ {pnl_pct:+.1%}"
+        if pnl_pct <= STALE_DIRECTIONAL_LOSS_CUT_PCT and age_hours >= STALE_DIRECTIONAL_LOSS_CUT_HOURS:
+            return f"STALE_STOP: {age_hours:.1f}h @ {pnl_pct:+.1%}"
+        if pos.source == SignalSource.BITCOIN_MODEL:
+            flat_threshold = BITCOIN_MODEL_STALE_FLAT_PNL_PCT
+        else:
+            flat_threshold = (
+                WEATHER_STALE_ROTATION_PNL_PCT.get(pos.source, STALE_DIRECTIONAL_FLAT_PNL_PCT)
+                if WEATHER_CAPACITY_RELEASE_ENABLED
+                else STALE_DIRECTIONAL_FLAT_PNL_PCT
+            )
+        if age_hours >= max_age and abs(pnl_pct) <= flat_threshold:
+            return f"STALE_ROTATE: {age_hours:.1f}h @ {pnl_pct:+.1%}"
+        return None
+
+    def _weather_group_target_date(self, pos: Position) -> datetime | None:
+        group_key = pos.group_key or self._infer_group_key(pos)
+        if not group_key or not group_key.startswith("weather:"):
+            return None
+        _, _, date_text = group_key.split(":", 2)
+        try:
+            return datetime.strptime(date_text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
 
     def update_positions(self, current_prices: dict[str, float]):
         """Update position mark-to-market and portfolio stats."""
@@ -324,6 +1226,85 @@ class PaperTrader:
             if dd > self.portfolio.max_drawdown:
                 self.portfolio.max_drawdown = dd
 
+    def resolve_positions(self, markets: list):
+        """Check if any positions are on resolved markets and settle them."""
+        # Build a lookup of closed markets
+        closed = {}
+        for m in markets:
+            if m.closed and m.outcomes:
+                # Determine winning outcome — price closest to 1.0
+                winner = max(m.outcomes, key=lambda o: o.price)
+                closed[m.condition_id] = {
+                    "slug": m.slug,
+                    "winner_token": winner.token_id,
+                    "winner_name": winner.name,
+                }
+
+        if not closed:
+            return 0
+
+        # Check each position
+        resolved = []
+        for pos in self.portfolio.positions[:]:
+            if pos.condition_id not in closed:
+                continue
+
+            result = closed[pos.condition_id]
+            pnl = 0.0
+
+            if pos.side == "ARB":
+                # Arb always wins — collect $1.00 per unit
+                payout = pos.shares * 1.0
+                cost = pos.shares * pos.avg_entry_price
+                pnl = payout - cost
+            elif pos.side == "HEDGE":
+                # Hedge collects $1.00 per share (both sides = guaranteed $1)
+                pnl = 0.0  # break even on the hedge, profit was from rewards
+                # Return the capital
+            elif pos.side in ("YES", "NO"):
+                # Directional bet
+                if pos.side == "YES" and pos.token_id == result["winner_token"]:
+                    pnl = pos.shares * (1.0 - pos.avg_entry_price)  # won
+                elif pos.side == "NO" and pos.token_id == result["winner_token"]:
+                    pnl = pos.shares * (1.0 - pos.avg_entry_price)  # won
+                else:
+                    pnl = -(pos.shares * pos.avg_entry_price)  # lost
+
+            # Return capital + P&L to cash
+            if pos.side == "HEDGE":
+                self.portfolio.cash += pos.shares  # return hedge capital
+            elif pos.side == "ARB":
+                self.portfolio.cash += pos.shares * 1.0  # arb payout
+            else:
+                self.portfolio.cash += max(0, pos.shares * pos.avg_entry_price + pnl)
+
+            # Track wins/losses
+            self.portfolio.total_realized_pnl += pnl
+            if pnl > 0:
+                self.portfolio.winning_trades += 1
+            elif pnl < 0:
+                self.portfolio.losing_trades += 1
+
+            exit_price = 1.0 if pnl >= 0 else 0.0
+            self._close_trade_record(
+                pos=pos,
+                exit_price=exit_price,
+                realized_pnl=pnl,
+                total_fees=0.0,
+                close_reason=f"RESOLVED:{result['winner_name']}",
+                event_type="trade_resolved",
+            )
+            resolved.append((pos, pnl))
+
+        # Remove resolved positions
+        for pos, pnl in resolved:
+            self.portfolio.positions.remove(pos)
+            logger.info(
+                f"[RESOLVED] {pos.market_slug} | {pos.side} | "
+                f"PnL: ${pnl:+.2f} | Cash returned to portfolio"
+            )
+        return len(resolved)
+
     def _update_drawdown(self):
         """Recalculate drawdown from actual portfolio value."""
         current = self.portfolio.cash + sum(
@@ -340,10 +1321,11 @@ class PaperTrader:
     def _passes_risk_checks(self, signal: Signal) -> bool:
         """Check if a signal passes risk management rules."""
         self._update_drawdown()
+        self._cleanup_cooldowns()
 
         # Check max total exposure
         if self.portfolio.positions_value >= self.portfolio.starting_capital * 2:
-            logger.info("[RISK] Max exposure reached")
+            logger.debug("[RISK] Max exposure reached")
             return False
 
         # Check current drawdown (30% threshold)
@@ -351,35 +1333,51 @@ class PaperTrader:
             logger.warning("[RISK] Max drawdown exceeded — pausing trading")
             return False
 
-        # Check cash available
-        if self.portfolio.cash < signal.suggested_size_usd * 0.5:
-            logger.info(
-                f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < "
-                f"${signal.suggested_size_usd * 0.5:.2f} needed"
+        # Check cash available (minimum $2 to trade, not 50% of suggested size)
+        if self.portfolio.cash < MIN_TRADE_CASH_USD:
+            logger.debug(
+                f"[RISK] Insufficient cash: ${self.portfolio.cash:.2f} < ${MIN_TRADE_CASH_USD}"
             )
             return False
 
         # No duplicate positions on same market
         existing = [p for p in self.portfolio.positions if p.condition_id == signal.condition_id]
-        if existing:
-            logger.info(f"[RISK] Already have position on {signal.market_slug}")
+        if any(not self._position_matches_signal(pos, signal) for pos in existing):
+            logger.debug(f"[RISK] Already have position on {signal.market_slug}")
             return False
+        same_market_positions = [p for p in existing if self._position_matches_signal(p, signal)]
+        if len(same_market_positions) >= self._max_same_market_positions(signal):
+            logger.debug(f"[RISK] Market position cap reached on {signal.market_slug}")
+            return False
+
+        if signal.group_key:
+            same_group = [p for p in self.portfolio.positions if p.group_key == signal.group_key]
+            if any(not self._position_matches_signal(pos, signal) for pos in same_group):
+                logger.debug(f"[RISK] Already have grouped thesis on {signal.group_key}")
+                return False
+            same_group_positions = [p for p in same_group if self._position_matches_signal(p, signal)]
+            if len(same_group_positions) >= self._max_same_group_positions(signal):
+                logger.debug(f"[RISK] Group position cap reached on {signal.group_key}")
+                return False
+            if signal.group_key in self._group_cooldowns:
+                logger.debug(f"[RISK] Group cooldown active on {signal.group_key}")
+                return False
 
         # Max positions per strategy (higher limit for hedged positions)
         same_source = [p for p in self.portfolio.positions if p.source == signal.source]
-        max_positions = 15 if signal.action == SignalAction.HEDGE_BOTH else 5
+        max_positions = self._max_positions_for_signal(signal)
         if len(same_source) >= max_positions:
-            logger.info(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
+            logger.debug(f"[RISK] Too many positions ({len(same_source)}/{max_positions}) from {signal.source.value}")
             return False
 
         # Max exposure per strategy (higher for hedged positions since risk is bounded)
         strategy_exposure = sum(
-            p.shares * p.current_price for p in self.portfolio.positions
+            self._position_value(p) for p in self.portfolio.positions
             if p.source == signal.source
         )
-        cap = 0.60 if signal.action == SignalAction.HEDGE_BOTH else 0.30
+        cap = self._strategy_exposure_cap_pct(signal.source, signal.action)
         if strategy_exposure > self.portfolio.starting_capital * cap:
-            logger.info(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
+            logger.debug(f"[RISK] Strategy {signal.source.value} at {cap:.0%} cap (exposure: ${strategy_exposure:.0f})")
             return False
 
         return True
@@ -407,6 +1405,17 @@ class PaperTrader:
             "cash": self.portfolio.cash,
         }
         self._append_jsonl("trades.jsonl", entry)
+        position = next(
+            (pos for pos in self.portfolio.positions if pos.opened_trade_id == trade.id),
+            None,
+        )
+        self._record_trade_event(
+            event_type="trade_opened",
+            trade=trade,
+            signal=signal,
+            position=position,
+            net_realized_pnl=None,
+        )
 
     def _append_jsonl(self, filename: str, data: dict):
         """Append a JSON line to a log file."""

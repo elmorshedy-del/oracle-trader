@@ -16,6 +16,7 @@ from data.models import (
 logger = logging.getLogger(__name__)
 
 BASE_FEE_RATE = 0.02
+STATE_TRADE_HISTORY_LIMIT = 200
 
 
 class PaperTrader:
@@ -59,7 +60,7 @@ class PaperTrader:
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "portfolio": self.portfolio.model_dump(),
-                "trade_log": [t.model_dump() for t in self.trade_log[-200:]],  # keep last 200
+                "trade_log": [t.model_dump() for t in self.trade_log[-STATE_TRADE_HISTORY_LIMIT:]],
                 "saved_at": datetime.now(timezone.utc).isoformat(),
             }
             # Write to temp file first, then rename (atomic)
@@ -75,6 +76,13 @@ class PaperTrader:
         Returns the simulated trade or None if rejected by risk checks.
         """
         self.signal_log.append(signal)
+        self._log_signal(
+            signal,
+            "EXECUTION_RECEIVED",
+            {
+                "observed_price": current_prices.get(signal.token_id) if signal.token_id else None,
+            },
+        )
 
         # Risk checks
         if not self._passes_risk_checks(signal):
@@ -91,6 +99,7 @@ class PaperTrader:
             return self._execute_directional(signal, current_prices)
         else:
             logger.warning(f"[PAPER] Unknown action: {signal.action}")
+            self._log_signal(signal, "SKIPPED_UNKNOWN_ACTION")
             return None
 
     def _execute_directional(
@@ -98,15 +107,25 @@ class PaperTrader:
     ) -> PaperTrade | None:
         """Execute a directional buy (YES or NO) with Kelly-inspired sizing."""
         if not signal.token_id:
+            self._log_signal(signal, "SKIPPED_NO_TOKEN")
             return None
 
         price = current_prices.get(signal.token_id, 0)
         if price <= 0:
+            self._log_signal(signal, "SKIPPED_NO_PRICE", {"observed_price": price})
             return None
 
         # Apply slippage (0.5%)
         fill_price = price * 1.005
         if fill_price >= 0.99:
+            self._log_signal(
+                signal,
+                "SKIPPED_INVALID_FILL_PRICE",
+                {
+                    "observed_price": round(price, 6),
+                    "fill_price": round(fill_price, 6),
+                },
+            )
             return None
 
         # Kelly-inspired sizing for directional bets
@@ -116,10 +135,20 @@ class PaperTrader:
             kelly_fraction = max(0.01, min(kelly_raw * 0.25, 0.20))  # quarter-Kelly, floor 1%, cap 20%
             size_usd = min(signal.suggested_size_usd, self.portfolio.cash * kelly_fraction)
         else:
+            odds = None
+            kelly_fraction = 0.05
             size_usd = min(signal.suggested_size_usd, self.portfolio.cash * 0.05)
 
         if size_usd < 1.0:  # minimum $1 trade
             logger.info(f"[PAPER] Directional size too small: ${size_usd:.2f}")
+            self._log_signal(
+                signal,
+                "SKIPPED_SIZE_TOO_SMALL",
+                {
+                    "observed_price": round(price, 6),
+                    "size_usd": round(size_usd, 6),
+                },
+            )
             return None
 
         shares = size_usd / fill_price
@@ -134,6 +163,18 @@ class PaperTrader:
             total_cost = size_usd + fee
 
         if total_cost > self.portfolio.cash or size_usd < 1.0:
+            self._log_signal(
+                signal,
+                "SKIPPED_CASH_LIMIT",
+                {
+                    "observed_price": round(price, 6),
+                    "fill_price": round(fill_price, 6),
+                    "size_usd": round(size_usd, 6),
+                    "fee_usd": round(fee, 6),
+                    "total_cost_usd": round(total_cost, 6),
+                    "cash_available_usd": round(self.portfolio.cash, 6),
+                },
+            )
             return None
 
         self.portfolio.cash -= total_cost
@@ -166,7 +207,26 @@ class PaperTrader:
             status=TradeStatus.FILLED,
         )
         self.trade_log.append(trade)
-        self._log_trade(trade, signal)
+        execution_details = {
+            "observed_price": round(price, 6),
+            "fill_price": round(fill_price, 6),
+            "slippage_bps": round(((fill_price / price) - 1) * 10000, 3),
+            "size_usd": round(size_usd, 6),
+            "shares": round(shares, 6),
+            "fee_usd": round(fee, 6),
+            "total_cost_usd": round(total_cost, 6),
+            "kelly_fraction": round(kelly_fraction, 6),
+            "odds": round(odds, 6) if odds is not None else None,
+        }
+        self._log_trade(trade, signal, execution_details)
+        self._log_signal(
+            signal,
+            "EXECUTED",
+            {
+                "trade_id": trade.id,
+                **execution_details,
+            },
+        )
 
         logger.info(
             f"[PAPER] Executed: {signal.action.value} on {signal.market_slug} | "
@@ -210,7 +270,19 @@ class PaperTrader:
             status=TradeStatus.FILLED,
         )
         self.trade_log.append(trade)
-        self._log_trade(trade, signal)
+        execution_details = {
+            "allocation_usd": round(size_usd, 6),
+            "position_type": "hedge",
+        }
+        self._log_trade(trade, signal, execution_details)
+        self._log_signal(
+            signal,
+            "EXECUTED",
+            {
+                "trade_id": trade.id,
+                **execution_details,
+            },
+        )
         logger.info(f"[PAPER] Hedge position on {signal.market_slug}: ${size_usd:.2f}")
         return trade
 
@@ -223,6 +295,7 @@ class PaperTrader:
         """
         if signal.arb_total_cost <= 0:
             logger.warning(f"[PAPER] Arb rejected: zero cost on {signal.market_slug}")
+            self._log_signal(signal, "SKIPPED_ZERO_ARB_COST")
             return None
 
         # Arb sizing: edge-scaled with hard cap at 25% of cash
@@ -241,6 +314,15 @@ class PaperTrader:
                 f"[PAPER] Arb size too small: ${size_usd:.2f} | "
                 f"edge={edge_pct:.3f} | cash=${self.portfolio.cash:.2f}"
             )
+            self._log_signal(
+                signal,
+                "SKIPPED_SIZE_TOO_SMALL",
+                {
+                    "edge_pct": round(edge_pct, 6),
+                    "size_usd": round(size_usd, 6),
+                    "cash_available_usd": round(self.portfolio.cash, 6),
+                },
+            )
             return None
 
         # Calculate guaranteed profit
@@ -253,6 +335,15 @@ class PaperTrader:
             logger.info(
                 f"[PAPER] Arb unprofitable after fees: gross=${guaranteed_profit:.3f} "
                 f"fee=${fee_estimate:.3f} net=${net_profit:.3f}"
+            )
+            self._log_signal(
+                signal,
+                "SKIPPED_UNPROFITABLE_AFTER_FEES",
+                {
+                    "guaranteed_profit_usd": round(guaranteed_profit, 6),
+                    "fee_estimate_usd": round(fee_estimate, 6),
+                    "net_profit_usd": round(net_profit, 6),
+                },
             )
             return None
 
@@ -288,7 +379,23 @@ class PaperTrader:
             realized_pnl=0.0,  # credited at resolution, not now
         )
         self.trade_log.append(trade)
-        self._log_trade(trade, signal)
+        execution_details = {
+            "units": round(units, 6),
+            "guaranteed_profit_usd": round(guaranteed_profit, 6),
+            "fee_estimate_usd": round(fee_estimate, 6),
+            "net_profit_estimate_usd": round(net_profit, 6),
+            "arb_total_cost": round(signal.arb_total_cost, 6),
+            "arb_guaranteed_payout": round(signal.arb_guaranteed_payout, 6),
+        }
+        self._log_trade(trade, signal, execution_details)
+        self._log_signal(
+            signal,
+            "EXECUTED",
+            {
+                "trade_id": trade.id,
+                **execution_details,
+            },
+        )
 
         logger.info(
             f"[PAPER] Arb executed: {signal.market_slug} | "
@@ -388,23 +495,59 @@ class PaperTrader:
     # Logging (for tuning analysis)
     # ------------------------------------------------------------------
 
-    def _log_signal(self, signal: Signal, status: str = "GENERATED"):
+    def log_scan_cycle(self, entry: dict):
+        """Persist a compact per-scan summary for export."""
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **entry,
+        }
+        self._append_jsonl("scans.jsonl", payload)
+
+    def _portfolio_snapshot(self) -> dict:
+        """Small portfolio snapshot for log context without repeating full positions."""
+        return {
+            "total_value": round(self.portfolio.total_value, 6),
+            "cash": round(self.portfolio.cash, 6),
+            "positions_value": round(self.portfolio.positions_value, 6),
+            "total_pnl": round(self.portfolio.total_pnl, 6),
+            "total_pnl_pct": round(self.portfolio.total_pnl_pct, 6),
+            "total_trades": self.portfolio.total_trades,
+            "open_positions": len(self.portfolio.positions),
+            "total_fees_paid": round(self.portfolio.total_fees_paid, 6),
+            "win_rate": round(self.portfolio.win_rate, 6),
+            "current_drawdown": round(self.portfolio.current_drawdown, 6),
+        }
+
+    def _log_signal(self, signal: Signal, status: str = "GENERATED", details: dict | None = None):
         """Log a signal with full context."""
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event": "signal",
             "status": status,
+            "signal_id": signal.id,
+            "source": signal.source.value,
+            "action": signal.action.value,
+            "market_slug": signal.market_slug,
+            "condition_id": signal.condition_id,
+            "portfolio_snapshot": self._portfolio_snapshot(),
+            "details": details or {},
             "signal": signal.model_dump(mode="json"),
         }
         self._append_jsonl("signals.jsonl", entry)
 
-    def _log_trade(self, trade: PaperTrade, signal: Signal):
+    def _log_trade(self, trade: PaperTrade, signal: Signal, details: dict | None = None):
         """Log a trade with full context."""
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event": "trade",
+            "trade_id": trade.id,
+            "signal_id": signal.id,
+            "source": trade.source.value,
+            "market_slug": trade.market_slug,
             "trade": trade.model_dump(mode="json"),
             "signal": signal.model_dump(mode="json"),
-            "portfolio_value": self.portfolio.total_value,
-            "cash": self.portfolio.cash,
+            "portfolio_snapshot": self._portfolio_snapshot(),
+            "details": details or {},
         }
         self._append_jsonl("trades.jsonl", entry)
 

@@ -35,49 +35,54 @@ logger = logging.getLogger(__name__)
 pipeline: Pipeline | None = None
 
 
-def _record_count(payload: bytes) -> int:
-    """Count newline-delimited records without parsing the whole file."""
-    if not payload:
+def _record_count(file_path: Path) -> int:
+    """Count newline-delimited records by streaming the file."""
+    count = 0
+    try:
+        with open(file_path, "rb") as handle:
+            for _ in handle:
+                count += 1
+    except Exception:
         return 0
-    line_count = payload.count(b"\n")
-    if payload.endswith(b"\n"):
-        return line_count
-    return line_count + 1
+    return count
 
 
-def _build_export_manifest(log_dir: Path, runtime_state_path: Path) -> tuple[dict, list[tuple[str, bytes]]]:
-    """Collect export files and a lightweight manifest for the zip bundle."""
-    export_files: list[tuple[str, bytes]] = []
+def _build_export_manifest(
+    log_dir: Path,
+    runtime_state_path: Path,
+    include_record_counts: bool = False,
+) -> tuple[dict, list[tuple[str, Path]]]:
+    """Collect export file metadata and archive paths for the zip bundle."""
+    export_files: list[tuple[str, Path]] = []
     file_entries: list[dict] = []
 
     for log_file in sorted(log_dir.glob("*")):
         if not log_file.is_file() or log_file.suffix not in {".jsonl", ".json"}:
             continue
-        payload = log_file.read_bytes()
         archive_path = f"logs/{log_file.name}"
-        export_files.append((archive_path, payload))
+        export_files.append((archive_path, log_file))
         entry = {
             "path": archive_path,
             "kind": "jsonl" if log_file.suffix == ".jsonl" else "json",
-            "size_bytes": len(payload),
+            "size_bytes": log_file.stat().st_size,
         }
-        if log_file.suffix == ".jsonl":
-            entry["records"] = _record_count(payload)
+        if include_record_counts and log_file.suffix == ".jsonl":
+            entry["records"] = _record_count(log_file)
         file_entries.append(entry)
 
     if runtime_state_path.exists():
-        state_payload = runtime_state_path.read_bytes()
-        export_files.append(("state/runtime_state.json", state_payload))
+        export_files.append(("state/runtime_state.json", runtime_state_path))
         file_entries.append({
             "path": "state/runtime_state.json",
             "kind": "json",
-            "size_bytes": len(state_payload),
+            "size_bytes": runtime_state_path.stat().st_size,
         })
 
     manifest = {
         "format": "oracle-trader-log-export",
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "record_counts_included": include_record_counts,
         "files": file_entries,
     }
 
@@ -227,7 +232,11 @@ async def download_logs():
     """Download a compressed multi-file export of logs and state."""
     log_dir = Path("logs")
     runtime_state_path = pipeline.trader.state_path if pipeline else Path("/data/state.json")
-    manifest, export_files = _build_export_manifest(log_dir, runtime_state_path)
+    manifest, export_files = _build_export_manifest(
+        log_dir,
+        runtime_state_path,
+        include_record_counts=True,
+    )
 
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -238,8 +247,8 @@ async def download_logs():
                 "state/live_state.json",
                 json.dumps(pipeline.get_state(), indent=2, default=str),
             )
-        for archive_path, payload in export_files:
-            zf.writestr(archive_path, payload)
+        for archive_path, file_path in export_files:
+            zf.write(file_path, archive_path)
 
     archive.seek(0)
     filename = f"oracle-trader-export-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.zip"

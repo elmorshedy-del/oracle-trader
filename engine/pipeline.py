@@ -133,22 +133,18 @@ class Pipeline:
 
         # Run all enabled strategies
         all_signals: list[Signal] = []
-        strategy_signal_counts: dict[str, int] = {}
 
         for name, strategy in self.strategies.items():
             if not strategy.enabled:
-                strategy_signal_counts[name] = 0
                 continue
             try:
                 _strat_start = _time.time()
                 signals = await strategy.scan(self._markets, self._events)
                 _strat_dur = (_time.time() - _strat_start) * 1000
                 all_signals.extend(signals)
-                strategy_signal_counts[name] = len(signals)
                 self.health.record_strategy_run(name, len(signals), _strat_dur)
             except Exception as e:
                 logger.error(f"Strategy {name} error: {e}")
-                strategy_signal_counts[name] = 0
                 strategy._stats["errors"] += 1
                 self.health.record_strategy_error(name, str(e))
 
@@ -157,7 +153,6 @@ class Pipeline:
         # TODO: implement cached whale sentiment lookup instead of per-signal API calls
 
         # Sort by confidence (highest first)
-        raw_signal_count = len(all_signals)
         all_signals.sort(key=lambda s: s.confidence, reverse=True)
 
         # Deduplicate: only keep highest-confidence signal per market
@@ -172,12 +167,10 @@ class Pipeline:
         # Execute signals through paper trader
         current_prices = self._build_price_map()
         executed = 0
-        executed_trade_ids: list[str] = []
         for signal in all_signals:
             trade = self.trader.execute_signal(signal, current_prices)
             if trade:
                 executed += 1
-                executed_trade_ids.append(trade.id)
 
         # Update positions with current prices
         self.trader.update_positions(current_prices)
@@ -192,19 +185,6 @@ class Pipeline:
         cycle_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
         # Persist state every scan
         self.trader.save_state()
-        self.trader.log_scan_cycle({
-            "scan_id": self._scan_count,
-            "cycle_started_at": cycle_start.isoformat(),
-            "cycle_duration_secs": round(cycle_time, 3),
-            "market_count": len(self._markets),
-            "event_count": len(self._events),
-            "raw_signal_count": raw_signal_count,
-            "deduped_signal_count": len(all_signals),
-            "executed_count": executed,
-            "strategy_signal_counts": strategy_signal_counts,
-            "signal_ids": [s.id for s in all_signals],
-            "executed_trade_ids": executed_trade_ids,
-        })
 
         self.health.record_scan(cycle_time, len(self._markets), len(all_signals), executed)
         logger.info(

@@ -6,12 +6,9 @@ Runs the algo pipeline in background tasks.
 """
 
 import asyncio
-import json
 import logging
 import os
-import zipfile
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -33,96 +30,6 @@ logger = logging.getLogger(__name__)
 
 # Global pipeline instance
 pipeline: Pipeline | None = None
-
-
-def _record_count(file_path: Path) -> int:
-    """Count newline-delimited records by streaming the file."""
-    count = 0
-    try:
-        with open(file_path, "rb") as handle:
-            for _ in handle:
-                count += 1
-    except Exception:
-        return 0
-    return count
-
-
-def _build_export_manifest(
-    log_dir: Path,
-    runtime_state_path: Path,
-    include_record_counts: bool = False,
-) -> tuple[dict, list[tuple[str, Path]]]:
-    """Collect export file metadata and archive paths for the zip bundle."""
-    export_files: list[tuple[str, Path]] = []
-    file_entries: list[dict] = []
-
-    for log_file in sorted(log_dir.glob("*")):
-        if not log_file.is_file() or log_file.suffix not in {".jsonl", ".json"}:
-            continue
-        archive_path = f"logs/{log_file.name}"
-        export_files.append((archive_path, log_file))
-        entry = {
-            "path": archive_path,
-            "kind": "jsonl" if log_file.suffix == ".jsonl" else "json",
-            "size_bytes": log_file.stat().st_size,
-        }
-        if include_record_counts and log_file.suffix == ".jsonl":
-            entry["records"] = _record_count(log_file)
-        file_entries.append(entry)
-
-    if runtime_state_path.exists():
-        export_files.append(("state/runtime_state.json", runtime_state_path))
-        file_entries.append({
-            "path": "state/runtime_state.json",
-            "kind": "json",
-            "size_bytes": runtime_state_path.stat().st_size,
-        })
-
-    manifest = {
-        "format": "oracle-trader-log-export",
-        "version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "record_counts_included": include_record_counts,
-        "files": file_entries,
-    }
-
-    if pipeline is not None:
-        manifest["runtime"] = {
-            "mode": pipeline.config.mode,
-            "scan_count": pipeline._scan_count,
-            "active_markets": len(pipeline._markets),
-            "open_positions": len(pipeline.trader.portfolio.positions),
-            "portfolio_total_value": round(pipeline.trader.portfolio.total_value, 2),
-            "portfolio_cash": round(pipeline.trader.portfolio.cash, 2),
-            "total_trades": pipeline.trader.portfolio.total_trades,
-        }
-
-    return manifest, export_files
-
-
-def _build_export_readme() -> str:
-    """Human-readable guide bundled with the exported archive."""
-    return "\n".join([
-        "Oracle Trader export layout",
-        "",
-        "summary/manifest.json",
-        "  Inventory of exported files, sizes, and JSONL record counts.",
-        "",
-        "state/live_state.json",
-        "  Current API/dashboard snapshot optimized for quick inspection.",
-        "",
-        "state/runtime_state.json",
-        "  Runtime checkpoint from disk. This stays lightweight for recovery.",
-        "",
-        "logs/*.jsonl",
-        "  Full append-only histories split by data type:",
-        "  - signals.jsonl: signal lifecycle events with portfolio snapshots",
-        "  - trades.jsonl: trade executions with signal context and execution details",
-        "  - scans.jsonl: per-scan summaries and counts",
-        "  - health.jsonl / slippage.jsonl / ab_tests.jsonl: subsystem logs",
-        "",
-        "JSONL files are the source of truth for full historical detail.",
-    ])
 
 
 @asynccontextmanager
@@ -229,43 +136,35 @@ async def get_whales():
 
 @app.get("/api/logs/download")
 async def download_logs():
-    """Download a compressed multi-file export of logs and state."""
-    log_dir = Path("logs")
-    runtime_state_path = pipeline.trader.state_path if pipeline else Path("/data/state.json")
-    manifest, export_files = _build_export_manifest(
-        log_dir,
-        runtime_state_path,
-        include_record_counts=True,
-    )
-
-    archive = io.BytesIO()
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("summary/manifest.json", json.dumps(manifest, indent=2, default=str))
-        zf.writestr("summary/README.txt", _build_export_readme())
-        if pipeline:
-            zf.writestr(
-                "state/live_state.json",
-                json.dumps(pipeline.get_state(), indent=2, default=str),
-            )
-        for archive_path, file_path in export_files:
-            zf.write(file_path, archive_path)
-
-    archive.seek(0)
-    filename = f"oracle-trader-export-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.zip"
+    """Download all logs as a JSON bundle."""
+    import json as _json
+    from pathlib import Path as _Path
+    log_dir = _Path("logs")
+    bundle = {}
+    for log_file in log_dir.glob("*.jsonl"):
+        lines = []
+        try:
+            for line in log_file.read_text().strip().split("\n"):
+                if line:
+                    try:
+                        lines.append(_json.loads(line))
+                    except _json.JSONDecodeError:
+                        lines.append({"raw": line})
+        except Exception:
+            pass
+        bundle[log_file.stem] = lines
+    # Add current state
+    if pipeline:
+        try:
+            bundle["current_state"] = pipeline.get_state()
+        except Exception:
+            pass
+    content = _json.dumps(bundle, indent=2, default=str)
     return StreamingResponse(
-        archive,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        io.BytesIO(content.encode()),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=oracle-trader-logs.json"}
     )
-
-
-@app.get("/api/logs/manifest")
-async def logs_manifest():
-    """Preview the export manifest without downloading the full archive."""
-    log_dir = Path("logs")
-    runtime_state_path = pipeline.trader.state_path if pipeline else Path("/data/state.json")
-    manifest, _ = _build_export_manifest(log_dir, runtime_state_path)
-    return manifest
 
 
 @app.get("/api/reset")
